@@ -1,0 +1,49 @@
+Clean Architecture with ImageSession as Central Coordinator
+Data Flow:
+
+GUI clicks patch → ImageSession::setCurrentPatch() → All accessors stay synchronized
+User opens file → ApplicationController → ImageSession → Manages all ImageData lifecycle
+
+Ownership & Responsibilities:
+ImageSession owns:
+
+All ImageData objects (input, output, ground truth)
+Session state (current frame, current patch selection)
+Patch grid configuration (single source of truth)
+All ImageDataAccessor instances
+
+ImageDataAccessor handles:
+
+Low-level GPU/CPU transfers and caching
+Border extension logic
+Data type conversions
+
+Patch Grid Configuration - My Suggestion:
+ImageSession should own patch grid configuration because:
+
+Needs to configure multiple accessors consistently
+Session-level setting that should persist with save/load
+Avoids drift between accessors
+Simpler API - configure once rather than per accessor
+
+
+class ImageSession {
+public:
+    // Session state coordination
+    void setCurrentFrame(int frame);      // Updates all accessors
+    void setCurrentPatch(int x, int y);   // Updates current selection
+    void configurePatchGrid(int cols, int rows, int border); // Configures all accessors
+    
+    // Unified data access 
+    ImagePatch getCurrentInputPatch();    // Gets current patch from input
+    ImagePatch getCurrentOutputPatch();   // Gets current patch from output
+    void setCurrentOutputPatch(const af::array& data); // Updates current patch
+};
+
+Benefits of This Approach:
+
+Single point of coordination - no accessor synchronization issues
+Clean data lifecycle - ImageSession handles all memory management
+Simplified optimization workflows - just call session->getCurrentInputPatch()
+Consistent state - impossible for accessors to have different patch grids
+Easy session persistence - all state is centralized

@@ -1,0 +1,107 @@
+QWidget {
+	font-size: 9pt;
+}
+
+QMainWindow {
+	background: palette(Window);
+}
+
+QMenu {
+	background-color: palette(Base);
+	color: palette(Text);
+}
+QMenu::item:selected {
+	background-color: palette(Highlight);
+	color: palette(HighlightedText);
+}
+QMenu::separator {
+	height: 1px;
+	margin: 4px 6px;
+	background: palette(Midlight);
+}
+
+QToolTip {
+	background-color: palette(ToolTipBase);
+	color: palette(ToolTipText);
+	border: 1px solid palette(Dark);
+	padding: 3px 6px;
+}
+
+QPushButton {
+	background-color: palette(Button);
+	color: palette(ButtonText);
+	border: 1px solid palette(Midlight);
+	padding: 4px 8px;
+	border-radius: 3px;
+}
+QPushButton:hover {
+	background-color: palette(Light);
+}
+QPushButton:pressed {
+	background-color: palette(Midlight);
+}
+QPushButton:disabled {
+	color: palette(Disabled, Text);
+}
+
+QLineEdit,
+QAbstractSpinBox {
+	background: palette(Base);
+	color: palette(Text);
+	border: 1px solid palette(Midlight);
+	border-radius: 2px;
+	selection-background-color: palette(Highlight);
+	selection-color: palette(HighlightedText);
+}
+
+QComboBox {
+	background-color: palette(Base);
+	color: palette(Text);
+	border: 1px solid palette(Midlight);
+	border-radius: 2px;
+	padding: 2px 4px;
+}
+
+QSlider::groove:horizontal {
+	height: 6px;
+	background: palette(Midlight);
+}
+QSlider::handle:horizontal {
+	width: 12px;
+	background: palette(Button);
+	border: 1px solid palette(Dark);
+	border-radius: 6px;
+	margin: -4px 0;
+}
+QSlider::sub-page:horizontal {
+	background: palette(Highlight);
+}
+
+QScrollBar:vertical {
+	width: 12px;
+	background: palette(Base);
+}
+QScrollBar::handle:vertical {
+	background: palette(Midlight);
+	border-radius: 4px;
+	min-height: 20px;
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+	background: none;
+	height: 0;
+}
+
+QStatusBar {
+	background: palette(Window);
+	color: palette(WindowText);
+}
+
+QGraphicsView {
+	background-color: palette(Base);
+	border: 1px solid palette(Midlight);
+}
+
+QGraphicsView QWidget {
+	background-color: palette(Base);
+}
