@@ -3,12 +3,16 @@
 
 #include <QObject>
 #include <QString>
+#include <QVector>
+#include <arrayfire.h>
+#include "core/psf/wavefrontparameter.h"
 
 // Forward declarations
 class ImageSession;
 class InputDataReader;
 class ImageData;
 class SettingsFileManager;
+class PSFModule;
 
 class ApplicationController : public QObject
 {
@@ -51,6 +55,10 @@ public slots:
 	void setCurrentPatch(int x, int y);
 	void configurePatchGrid(int cols, int rows, int borderExtension = 0);
 
+	// PSF pipeline - slots for GUI widgets
+	void setPSFCoefficient(int id, double value);
+	void resetPSFCoefficients();
+
 private slots:
 	// Handle data changes that require session broadcast
 	void handleInputDataChanged();
@@ -64,11 +72,13 @@ private:
 
 	void initializeComponents();
 	void connectSessionSignals();
+	void connectPSFModuleSignals();
 	bool loadFileToSession(const QString& filePath, bool isGroundTruth);
 
 	// Core components
 	ImageSession* imageSession;
 	InputDataReader* inputDataReader;
+	PSFModule* psfModule;
 
 signals:
 	// File loading results
@@ -84,6 +94,11 @@ signals:
 
 	// Session events
 	void sessionClosed();
+
+	// PSF pipeline results
+	void psfWavefrontUpdated(af::array wavefront);
+	void psfUpdated(af::array psf);
+	void psfParameterDescriptorsChanged(QVector<WavefrontParameter> descriptors);
 };
 
 #endif // APPLICATIONCONTROLLER_H

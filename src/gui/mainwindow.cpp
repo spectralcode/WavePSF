@@ -3,6 +3,7 @@
 #include "utils/settingsfilemanager.h"
 #include "controller/applicationcontroller.h"
 #include "gui/imagesessionviewer/imagesessionviewer.h"
+#include "gui/psfcontrol/psfcontrolwidget.h"
 #include "utils/logging.h"
 #include "utils/supportedfilechecker.h"
 #include "gui/messageconsole/messagerouter.h"
@@ -21,6 +22,7 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QFileInfo>
+#include <QSplitter>
 
 namespace {
 	const char* SETTINGS_GROUP = "main_window";
@@ -32,6 +34,7 @@ namespace {
 	const char* LAST_NAME_FILTER_GROUND_TRUTH_KEY = "last_name_filter_ground_truth";
 	const char* DOCK_STATE_KEY = "dock_state_v1";
 	const char* MESSAGE_CONSOLE_VISIBLE_KEY = "message_console_visible";
+	const char* SPLITTER_STATE_KEY = "central_splitter_state";
 }
 
 MainWindow::MainWindow(SettingsFileManager* guiSettings,
@@ -40,13 +43,14 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	  guiSettings(guiSettings), styleManager(styleManager), applicationController(applicationController),
 	  fileMenu(nullptr), viewMenu(nullptr), styleMenu(nullptr),
 	  openImageDataAction(nullptr), openGroundTruthAction(nullptr),
-	  sessionViewer(nullptr) {
+	  centralSplitter(nullptr), sessionViewer(nullptr), psfControlWidget(nullptr) {
 	MessageRouter::instance()->install();
 	this->ui->setupUi(this);
 	this->setupMenuBar();
 	this->setupCentralWidget();
 	this->connectApplicationController();
 	this->connectImageSessionViewer();
+	this->connectPSFControlWidget();
 	this->loadSettings();
 
 	// Broadcast initial state after all connections are made
@@ -146,7 +150,15 @@ void MainWindow::setupViewMenu() {
 void MainWindow::setupCentralWidget()
 {
 	this->sessionViewer = new ImageSessionViewer(this);
-	this->setCentralWidget(this->sessionViewer);
+	this->psfControlWidget = new PSFControlWidget(this);
+
+	this->centralSplitter = new QSplitter(Qt::Vertical, this);
+	this->centralSplitter->addWidget(this->sessionViewer);
+	this->centralSplitter->addWidget(this->psfControlWidget);
+	this->centralSplitter->setStretchFactor(0, 3);
+	this->centralSplitter->setStretchFactor(1, 1);
+
+	this->setCentralWidget(this->centralSplitter);
 }
 
 void MainWindow::connectApplicationController() {
@@ -182,6 +194,26 @@ void MainWindow::connectImageSessionViewer() {
 				this->sessionViewer, &ImageSessionViewer::configurePatchGrid);
 
 		LOG_DEBUG() << "ImageSessionViewer signal connections established";
+	}
+}
+
+void MainWindow::connectPSFControlWidget() {
+	if (this->applicationController != nullptr && this->psfControlWidget != nullptr) {
+		// PSFControlWidget requests → ApplicationController
+		connect(this->psfControlWidget, &PSFControlWidget::coefficientChanged,
+				this->applicationController, &ApplicationController::setPSFCoefficient);
+		connect(this->psfControlWidget, &PSFControlWidget::resetRequested,
+				this->applicationController, &ApplicationController::resetPSFCoefficients);
+
+		// ApplicationController results → PSFControlWidget
+		connect(this->applicationController, &ApplicationController::psfWavefrontUpdated,
+				this->psfControlWidget, &PSFControlWidget::updateWavefront);
+		connect(this->applicationController, &ApplicationController::psfUpdated,
+				this->psfControlWidget, &PSFControlWidget::updatePSF);
+		connect(this->applicationController, &ApplicationController::psfParameterDescriptorsChanged,
+				this->psfControlWidget, &PSFControlWidget::setParameterDescriptors);
+
+		LOG_DEBUG() << "PSFControlWidget signal connections established";
 	}
 }
 
@@ -287,12 +319,17 @@ void MainWindow::loadSettings() {
 	if (this->messageConsoleDock) this->messageConsoleDock->setVisible(showConsole);
 	if (this->toggleMessageConsoleAction) this->toggleMessageConsoleAction->setChecked(showConsole);
 
+	if (settings.contains(SPLITTER_STATE_KEY) && this->centralSplitter) {
+		this->centralSplitter->restoreState(settings.value(SPLITTER_STATE_KEY).toByteArray());
+	}
+
 	this->resize(this->windowSize);
 	this->move(this->windowPosition);
 
 	//load widget settings
 	this->consoleWidget()->setSettings(this->guiSettings->getStoredSettings(this->consoleWidget()->getName()));
 	this->sessionViewer->setSettings(this->guiSettings->getStoredSettings(this->sessionViewer->getName()));
+	this->psfControlWidget->setSettings(this->guiSettings->getStoredSettings(this->psfControlWidget->getName()));
 }
 
 void MainWindow::saveSettings() {
@@ -308,10 +345,14 @@ void MainWindow::saveSettings() {
 	settings[LAST_NAME_FILTER_GROUND_TRUTH_KEY] = this->lastNameFilterGroundTruth;
 	settings[DOCK_STATE_KEY] = this->saveState();
 	settings[MESSAGE_CONSOLE_VISIBLE_KEY] = (this->messageConsoleDock && this->messageConsoleDock->isVisible());
+	if (this->centralSplitter) {
+		settings[SPLITTER_STATE_KEY] = this->centralSplitter->saveState();
+	}
 	this->guiSettings->storeSettings(SETTINGS_GROUP, settings);
 
 	this->guiSettings->storeSettings(this->consoleWidget()->getName(), this->consoleWidget()->getSettings());
 	this->guiSettings->storeSettings(this->sessionViewer->getName(), this->sessionViewer->getSettings());
+	this->guiSettings->storeSettings(this->psfControlWidget->getName(), this->psfControlWidget->getSettings());
 }
 
 MessageConsoleWidget *MainWindow::consoleWidget() const

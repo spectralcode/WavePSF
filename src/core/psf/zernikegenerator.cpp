@@ -1,0 +1,204 @@
+#include "zernikegenerator.h"
+#include <QtMath>
+
+
+ZernikeGenerator::ZernikeGenerator(int minNollIndex, int maxNollIndex, QObject* parent)
+	: QObject(parent)
+	, minNoll(minNollIndex)
+	, maxNoll(maxNollIndex)
+	, cachedGridSize(0)
+{
+	this->initializeBasisDefinitions();
+}
+
+ZernikeGenerator::~ZernikeGenerator()
+{
+}
+
+QVector<WavefrontParameter> ZernikeGenerator::getParameterDescriptors() const
+{
+	QVector<WavefrontParameter> descriptors;
+	for (const ZernikeBasis& basis : qAsConst(this->basisDefinitions)) {
+		WavefrontParameter param;
+		param.id = basis.nollIndex;
+		param.name = getName(basis.nollIndex);
+		param.minValue = -0.3;
+		param.maxValue = 0.3;
+		param.step = 0.001;
+		param.defaultValue = 0.0;
+		descriptors.append(param);
+	}
+	return descriptors;
+}
+
+void ZernikeGenerator::setCoefficient(int id, double value)
+{
+	this->coefficients[id] = value;
+}
+
+double ZernikeGenerator::getCoefficient(int id) const
+{
+	return this->coefficients.value(id, 0.0);
+}
+
+QVector<double> ZernikeGenerator::getAllCoefficients() const
+{
+	QVector<double> result;
+	for (const ZernikeBasis& basis : qAsConst(this->basisDefinitions)) {
+		result.append(this->coefficients.value(basis.nollIndex, 0.0));
+	}
+	return result;
+}
+
+void ZernikeGenerator::setAllCoefficients(const QVector<double>& coefficients)
+{
+	int count = qMin(coefficients.size(), this->basisDefinitions.size());
+	for (int i = 0; i < count; ++i) {
+		this->coefficients[this->basisDefinitions[i].nollIndex] = coefficients[i];
+	}
+}
+
+void ZernikeGenerator::resetCoefficients()
+{
+	this->coefficients.clear();
+}
+
+af::array ZernikeGenerator::generateWavefront(int gridSize)
+{
+	if (gridSize != this->cachedGridSize || this->cachedBasisArrays.isEmpty()) {
+		this->buildBasisCache(gridSize);
+	}
+
+	af::array wavefront = af::constant(0.0f, gridSize, gridSize, f32);
+
+	for (int i = 0; i < this->basisDefinitions.size(); ++i) {
+		double coeff = this->coefficients.value(this->basisDefinitions[i].nollIndex, 0.0);
+		if (qAbs(coeff) > 1e-12) {
+			wavefront += static_cast<float>(coeff) * this->cachedBasisArrays[i];
+		}
+	}
+
+	return wavefront;
+}
+
+int ZernikeGenerator::getNollN(int nollIndex)
+{
+	if (nollIndex < 1) { nollIndex = 1; }
+	return static_cast<int>(qFloor(qSqrt(2.0 * static_cast<double>(nollIndex) - 1.0) + 0.5)) - 1;
+}
+
+int ZernikeGenerator::getNollM(int nollIndex)
+{
+	if (nollIndex < 1) { nollIndex = 1; }
+	int n = getNollN(nollIndex);
+	int s = n % 2;
+	int me = 2 * static_cast<int>(qFloor((2 * nollIndex + 1.0 - n * (n + 1)) / 4.0));
+	int mo = 2 * static_cast<int>(qFloor((2 * (nollIndex + 1.0) - n * (n + 1)) / 4.0)) - 1;
+	int meo = (mo * s + me * (1 - s)) * (1 - 2 * (nollIndex % 2));
+	return meo;
+}
+
+QString ZernikeGenerator::getName(int nollIndex)
+{
+	switch (nollIndex) {
+		case 1:  return QStringLiteral("Piston");
+		case 2:  return QStringLiteral("Tip");
+		case 3:  return QStringLiteral("Tilt");
+		case 4:  return QStringLiteral("Defocus");
+		case 5:  return QStringLiteral("Oblique primary astigmatism");
+		case 6:  return QStringLiteral("Vertical primary astigmatism");
+		case 7:  return QStringLiteral("Vertical coma");
+		case 8:  return QStringLiteral("Horizontal coma");
+		case 9:  return QStringLiteral("Vertical trefoil");
+		case 10: return QStringLiteral("Oblique trefoil");
+		case 11: return QStringLiteral("Primary spherical");
+		case 12: return QStringLiteral("Vertical secondary astigmatism");
+		case 13: return QStringLiteral("Oblique secondary astigmatism");
+		case 14: return QStringLiteral("Vertical quadrafoil");
+		case 15: return QStringLiteral("Oblique quadrafoil");
+		case 16: return QStringLiteral("Horizontal secondary coma");
+		case 17: return QStringLiteral("Vertical secondary coma");
+		case 18: return QStringLiteral("Oblique secondary trefoil");
+		case 19: return QStringLiteral("Vertical secondary trefoil");
+		case 20: return QStringLiteral("Oblique pentafoil");
+		case 21: return QStringLiteral("Vertical pentafoil");
+		default: return QStringLiteral("Higher order (%1)").arg(nollIndex);
+	}
+}
+
+double ZernikeGenerator::factorial(int n)
+{
+	return (n < 2) ? 1.0 : n * factorial(n - 1);
+}
+
+void ZernikeGenerator::initializeBasisDefinitions()
+{
+	this->basisDefinitions.clear();
+	this->coefficients.clear();
+
+	for (int noll = this->minNoll; noll <= this->maxNoll; ++noll) {
+		ZernikeBasis basis;
+		basis.nollIndex = noll;
+		basis.n = getNollN(noll);
+		basis.m = qAbs(getNollM(noll));
+		basis.isEven = getNollM(noll) >= 0;
+
+		int upperBound = (basis.n - basis.m) / 2;
+		double sign = -1.0;
+		for (int k = 0; k <= upperBound; ++k) {
+			sign *= -1.0;
+			basis.radialExponents.append(basis.n - 2 * k);
+			basis.radialCoeffs.append(
+				sign * factorial(basis.n - k) /
+				(factorial(k) * factorial((basis.n + basis.m) / 2 - k) * factorial((basis.n - basis.m) / 2 - k))
+			);
+		}
+
+		this->basisDefinitions.append(basis);
+		this->coefficients[noll] = 0.0;
+	}
+}
+
+void ZernikeGenerator::buildBasisCache(int gridSize)
+{
+	this->cachedBasisArrays.clear();
+	this->cachedGridSize = gridSize;
+
+	// Build normalized 2D coordinate grids: range [-1, 1]
+	// Standard convention: x = columns (dim 1), y = rows (dim 0)
+	af::array x = (2.0f * af::range(af::dim4(gridSize, gridSize), 1).as(f32) / (gridSize - 1) - 1.0f);
+	af::array y = (2.0f * af::range(af::dim4(gridSize, gridSize), 0).as(f32) / (gridSize - 1) - 1.0f);
+
+	af::array r = af::sqrt(x * x + y * y);
+	af::array theta = af::atan2(y, x);
+
+	for (const ZernikeBasis& basis : qAsConst(this->basisDefinitions)) {
+		af::array basisArray = this->evaluateBasisOnGrid(basis, r, theta);
+		af::eval(basisArray); // force GPU computation now, not lazily on first use //todo: check if this makes a difference on different machines
+		this->cachedBasisArrays.append(basisArray);
+	}
+}
+
+af::array ZernikeGenerator::evaluateBasisOnGrid(const ZernikeBasis& basis, const af::array& r, const af::array& theta) const
+{
+	af::array radial = af::constant(0.0f, r.dims(), f32);
+	for (int k = 0; k < basis.radialCoeffs.size(); ++k) {
+		radial += static_cast<float>(basis.radialCoeffs[k]) * af::pow(r, basis.radialExponents[k]);
+	}
+
+	af::array angular;
+	if (basis.m == 0) {
+		angular = af::constant(1.0f, r.dims(), f32);
+	} else if (basis.isEven) {
+		angular = af::cos(static_cast<float>(basis.m) * theta);
+	} else {
+		angular = af::sin(static_cast<float>(basis.m) * theta);
+	}
+
+	double kroneckerDelta = (basis.m == 0) ? 1.0 : 0.0;
+	float normFactor = static_cast<float>(qSqrt(2.0 * (basis.n + 1.0) / (1.0 + kroneckerDelta)));
+
+	af::array mask = (r <= 1.0f).as(f32);
+
+	return normFactor * radial * angular * mask;
+}

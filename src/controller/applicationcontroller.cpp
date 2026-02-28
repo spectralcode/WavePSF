@@ -2,15 +2,17 @@
 #include "imagesession.h"
 #include "data/inputdatareader.h"
 #include "data/imagedata.h"
+#include "core/psf/psfmodule.h"
 #include "utils/logging.h"
 #include "utils/settingsfilemanager.h"
 #include <QFileInfo>
 
 ApplicationController::ApplicationController(QObject* parent)
-	: QObject(parent), imageSession(nullptr), inputDataReader(nullptr)
+	: QObject(parent), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
 {
 	this->initializeComponents();
 	this->connectSessionSignals();
+	this->connectPSFModuleSignals();
 }
 
 ApplicationController::~ApplicationController()
@@ -51,6 +53,20 @@ void ApplicationController::configurePatchGrid(int cols, int rows, int borderExt
 {
 	if (this->imageSession != nullptr) {
 		this->imageSession->configurePatchGrid(cols, rows, borderExtension);
+	}
+}
+
+void ApplicationController::setPSFCoefficient(int id, double value)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->setCoefficient(id, value);
+	}
+}
+
+void ApplicationController::resetPSFCoefficients()
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->resetCoefficients();
 	}
 }
 
@@ -139,6 +155,11 @@ void ApplicationController::broadcastCurrentState()
 					<< ", patch=(" << currentPatch.x() << "," << currentPatch.y() << ")"
 					<< ", grid=" << this->imageSession->getPatchGridCols() << "x" << this->imageSession->getPatchGridRows();
 	}
+
+	// Broadcast PSF parameter descriptors
+	if (this->psfModule != nullptr) {
+		emit psfParameterDescriptorsChanged(this->psfModule->getParameterDescriptors());
+	}
 }
 
 void ApplicationController::requestOpenInputFile(const QString& filePath)
@@ -182,6 +203,7 @@ void ApplicationController::initializeComponents()
 	// Create core components with Qt ownership
 	this->imageSession = new ImageSession(this);
 	this->inputDataReader = new InputDataReader(this);
+	this->psfModule = new PSFModule(this);
 }
 
 void ApplicationController::connectSessionSignals()
@@ -202,6 +224,18 @@ void ApplicationController::connectSessionSignals()
 				this, &ApplicationController::handleOutputDataChanged);
 		connect(this->imageSession, &ImageSession::groundTruthDataChanged,
 				this, &ApplicationController::handleGroundTruthDataChanged);
+	}
+}
+
+void ApplicationController::connectPSFModuleSignals()
+{
+	if (this->psfModule != nullptr) {
+		connect(this->psfModule, &PSFModule::wavefrontUpdated,
+				this, &ApplicationController::psfWavefrontUpdated);
+		connect(this->psfModule, &PSFModule::psfUpdated,
+				this, &ApplicationController::psfUpdated);
+		connect(this->psfModule, &PSFModule::parameterDescriptorsChanged,
+				this, &ApplicationController::psfParameterDescriptorsChanged);
 	}
 }
 

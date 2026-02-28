@@ -36,7 +36,15 @@ SOURCES += \
 	$$SOURCEDIR/gui/imagesessionviewer/imagerenderworker.cpp \
 	$$SOURCEDIR/utils/supportedfilechecker.cpp \
 	$$SOURCEDIR/gui/messageconsole/messagerouter.cpp \
-	$$SOURCEDIR/gui/messageconsole/messageconsolewidget.cpp
+	$$SOURCEDIR/gui/messageconsole/messageconsolewidget.cpp \
+	$$SOURCEDIR/core/psf/zernikegenerator.cpp \
+	$$SOURCEDIR/core/psf/psfcalculator.cpp \
+	$$SOURCEDIR/core/psf/deconvolver.cpp \
+	$$SOURCEDIR/core/psf/psfmodule.cpp \
+	$$SOURCEDIR/gui/psfcontrol/coefficienteditorwidget.cpp \
+	$$SOURCEDIR/gui/psfcontrol/wavefrontplotwidget.cpp \
+	$$SOURCEDIR/gui/psfcontrol/psfpreviewwidget.cpp \
+	$$SOURCEDIR/gui/psfcontrol/psfcontrolwidget.cpp
 
 HEADERS += \
 	$$QCUSTOMPLOTDIR/qcustomplot.h \
@@ -58,7 +66,17 @@ HEADERS += \
 	$$SOURCEDIR/utils/supportedfilechecker.h \
 	$$SOURCEDIR/gui/messageconsole/messagerouter.h \
 	$$SOURCEDIR/gui/messageconsole/messageconsoledock.h \
-	$$SOURCEDIR/gui/messageconsole/messageconsolewidget.h
+	$$SOURCEDIR/gui/messageconsole/messageconsolewidget.h \
+	$$SOURCEDIR/core/psf/wavefrontparameter.h \
+	$$SOURCEDIR/core/psf/iwavefrontgenerator.h \
+	$$SOURCEDIR/core/psf/zernikegenerator.h \
+	$$SOURCEDIR/core/psf/psfcalculator.h \
+	$$SOURCEDIR/core/psf/deconvolver.h \
+	$$SOURCEDIR/core/psf/psfmodule.h \
+	$$SOURCEDIR/gui/psfcontrol/coefficienteditorwidget.h \
+	$$SOURCEDIR/gui/psfcontrol/wavefrontplotwidget.h \
+	$$SOURCEDIR/gui/psfcontrol/psfpreviewwidget.h \
+	$$SOURCEDIR/gui/psfcontrol/psfcontrolwidget.h
 
 FORMS += \
 	$$SOURCEDIR/gui/mainwindow.ui
