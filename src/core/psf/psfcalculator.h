@@ -8,6 +8,8 @@ class PSFCalculator : public QObject
 {
 	Q_OBJECT
 public:
+	enum NormalizationMode { SumNormalization = 0, PeakNormalization = 1, NoNormalization = 2 };
+
 	explicit PSFCalculator(double lambda = 0.055, double apertureRadius = 0.4, QObject* parent = nullptr);
 	~PSFCalculator() override;
 
@@ -17,10 +19,13 @@ public:
 	double getLambda() const;
 	void setApertureRadius(double radius);
 	double getApertureRadius() const;
+	void setNormalizationMode(NormalizationMode mode);
+	NormalizationMode getNormalizationMode() const;
 
 private:
 	double lambda;
 	double apertureRadius;
+	NormalizationMode normMode;
 
 	int cachedGridSize;
 	af::array cachedApertureMask;

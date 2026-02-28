@@ -38,6 +38,7 @@ public slots:
 	void setCurrentFrame(int frame);
 	void highlightPatch(int x, int y);
 	void configurePatchGrid(int cols, int rows, int borderExtension);
+	void refreshOutputViewer();
 
 private slots:
 	// Internal UI interactions

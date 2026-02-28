@@ -2,6 +2,7 @@
 #include "coefficienteditorwidget.h"
 #include "wavefrontplotwidget.h"
 #include "psfpreviewwidget.h"
+#include "deconvolutionsettingswidget.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QTabWidget>
@@ -21,7 +22,10 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 
 	// PSF Generation tab
 	QWidget* generationTab = new QWidget(this->tabWidget);
-	QHBoxLayout* genLayout = new QHBoxLayout(generationTab);
+	QVBoxLayout* genMainLayout = new QVBoxLayout(generationTab);
+
+	// Widgets row
+	QHBoxLayout* genLayout = new QHBoxLayout();
 
 	this->coeffEditor = new CoefficientEditorWidget(generationTab);
 	this->wavefrontPlot = new WavefrontPlotWidget(generationTab);
@@ -30,11 +34,15 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 	genLayout->addWidget(this->coeffEditor, 1);
 	genLayout->addWidget(this->wavefrontPlot, 1);
 	genLayout->addWidget(this->psfPreview, 1);
+	genMainLayout->addLayout(genLayout, 1);
 
 	this->tabWidget->addTab(generationTab, tr("PSF Generation"));
 
+	// Deconvolution settings tab
+	this->deconvSettings = new DeconvolutionSettingsWidget(this->tabWidget);
+	this->tabWidget->addTab(this->deconvSettings, tr("Deconvolution"));
+
 	// Placeholder tabs for future milestones
-	this->tabWidget->addTab(new QWidget(this->tabWidget), tr("Deconvolution"));
 	this->tabWidget->addTab(new QWidget(this->tabWidget), tr("Optimization"));
 	this->tabWidget->addTab(new QWidget(this->tabWidget), tr("Interpolation"));
 
@@ -43,6 +51,22 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 			this, &PSFControlWidget::coefficientChanged);
 	connect(this->coeffEditor, &CoefficientEditorWidget::resetRequested,
 			this, &PSFControlWidget::resetRequested);
+
+	// Forward signals from deconvolution settings
+	connect(this->deconvSettings, &DeconvolutionSettingsWidget::algorithmChanged,
+			this, &PSFControlWidget::deconvAlgorithmChanged);
+	connect(this->deconvSettings, &DeconvolutionSettingsWidget::iterationsChanged,
+			this, &PSFControlWidget::deconvIterationsChanged);
+	connect(this->deconvSettings, &DeconvolutionSettingsWidget::relaxationFactorChanged,
+			this, &PSFControlWidget::deconvRelaxationFactorChanged);
+	connect(this->deconvSettings, &DeconvolutionSettingsWidget::regularizationFactorChanged,
+			this, &PSFControlWidget::deconvRegularizationFactorChanged);
+	connect(this->deconvSettings, &DeconvolutionSettingsWidget::noiseToSignalFactorChanged,
+			this, &PSFControlWidget::deconvNoiseToSignalFactorChanged);
+	connect(this->deconvSettings, &DeconvolutionSettingsWidget::liveModeChanged,
+			this, &PSFControlWidget::deconvLiveModeChanged);
+	connect(this->deconvSettings, &DeconvolutionSettingsWidget::deconvolutionRequested,
+			this, &PSFControlWidget::deconvolutionRequested);
 }
 
 PSFControlWidget::~PSFControlWidget()
@@ -58,6 +82,8 @@ QVariantMap PSFControlWidget::getSettings() const
 {
 	QVariantMap settings;
 	settings.insert("coefficients", this->coeffEditor->getSettings());
+	settings.insert("deconvolution", this->deconvSettings->getSettings());
+	settings.insert("psf_settings", serializePSFSettings(this->currentSettings));
 	return settings;
 }
 
@@ -66,11 +92,22 @@ void PSFControlWidget::setSettings(const QVariantMap& settings)
 	if (settings.contains("coefficients")) {
 		this->coeffEditor->setSettings(settings.value("coefficients").toMap());
 	}
+	if (settings.contains("deconvolution")) {
+		this->deconvSettings->setSettings(settings.value("deconvolution").toMap());
+	}
+	if (settings.contains("psf_settings")) {
+		this->currentSettings = deserializePSFSettings(settings.value("psf_settings").toMap());
+	}
 }
 
 void PSFControlWidget::setParameterDescriptors(QVector<WavefrontParameter> descriptors)
 {
 	this->coeffEditor->setParameterDescriptors(descriptors);
+}
+
+void PSFControlWidget::setCoefficients(const QVector<double>& values)
+{
+	this->coeffEditor->setValues(values);
 }
 
 void PSFControlWidget::updateWavefront(af::array wavefront)
@@ -81,4 +118,9 @@ void PSFControlWidget::updateWavefront(af::array wavefront)
 void PSFControlWidget::updatePSF(af::array psf)
 {
 	this->psfPreview->updateImage(psf);
+}
+
+void PSFControlWidget::setPSFSettings(const PSFSettings& settings)
+{
+	this->currentSettings = settings;
 }

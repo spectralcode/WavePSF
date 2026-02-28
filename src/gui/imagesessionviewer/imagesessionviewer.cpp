@@ -102,6 +102,13 @@ void ImageSessionViewer::updateImageSession(ImageSession* imageSession)
 	this->syncViewersToSession();
 }
 
+void ImageSessionViewer::refreshOutputViewer()
+{
+	if (this->outputViewer != nullptr && this->imageSession != nullptr) {
+		this->outputViewer->setCurrentFrame(this->imageSession->getCurrentFrame());
+	}
+}
+
 void ImageSessionViewer::setCurrentFrame(int frame)
 {
 	if (!this->updatingControls) {

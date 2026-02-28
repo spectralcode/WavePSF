@@ -4,10 +4,15 @@
 
 ZernikeGenerator::ZernikeGenerator(int minNollIndex, int maxNollIndex, QObject* parent)
 	: QObject(parent)
-	, minNoll(minNollIndex)
-	, maxNoll(maxNollIndex)
+	, globalMinValue(-0.3)
+	, globalMaxValue(0.3)
+	, stepValue(0.001)
 	, cachedGridSize(0)
 {
+	// Build indices list from min..max range
+	for (int i = minNollIndex; i <= maxNollIndex; ++i) {
+		this->nollIndices.append(i);
+	}
 	this->initializeBasisDefinitions();
 }
 
@@ -22,9 +27,14 @@ QVector<WavefrontParameter> ZernikeGenerator::getParameterDescriptors() const
 		WavefrontParameter param;
 		param.id = basis.nollIndex;
 		param.name = getName(basis.nollIndex);
-		param.minValue = -0.3;
-		param.maxValue = 0.3;
-		param.step = 0.001;
+		if (this->rangeOverrides.contains(basis.nollIndex)) {
+			param.minValue = this->rangeOverrides[basis.nollIndex].first;
+			param.maxValue = this->rangeOverrides[basis.nollIndex].second;
+		} else {
+			param.minValue = this->globalMinValue;
+			param.maxValue = this->globalMaxValue;
+		}
+		param.step = this->stepValue;
 		param.defaultValue = 0.0;
 		descriptors.append(param);
 	}
@@ -79,6 +89,64 @@ af::array ZernikeGenerator::generateWavefront(int gridSize)
 	}
 
 	return wavefront;
+}
+
+void ZernikeGenerator::setNollIndices(const QVector<int>& indices)
+{
+	this->nollIndices = indices;
+	this->cachedGridSize = 0; // invalidate GPU cache
+	this->initializeBasisDefinitions();
+}
+
+QVector<int> ZernikeGenerator::getNollIndices() const
+{
+	return this->nollIndices;
+}
+
+void ZernikeGenerator::setGlobalRange(double minValue, double maxValue)
+{
+	this->globalMinValue = minValue;
+	this->globalMaxValue = maxValue;
+}
+
+void ZernikeGenerator::setStepValue(double step)
+{
+	this->stepValue = step;
+}
+
+void ZernikeGenerator::setParameterRange(int nollIndex, double minValue, double maxValue)
+{
+	this->rangeOverrides[nollIndex] = qMakePair(minValue, maxValue);
+}
+
+void ZernikeGenerator::clearParameterRange(int nollIndex)
+{
+	this->rangeOverrides.remove(nollIndex);
+}
+
+void ZernikeGenerator::clearAllParameterRanges()
+{
+	this->rangeOverrides.clear();
+}
+
+double ZernikeGenerator::getGlobalMinValue() const
+{
+	return this->globalMinValue;
+}
+
+double ZernikeGenerator::getGlobalMaxValue() const
+{
+	return this->globalMaxValue;
+}
+
+double ZernikeGenerator::getStepValue() const
+{
+	return this->stepValue;
+}
+
+QMap<int, QPair<double,double>> ZernikeGenerator::getRangeOverrides() const
+{
+	return this->rangeOverrides;
 }
 
 int ZernikeGenerator::getNollN(int nollIndex)
@@ -136,7 +204,7 @@ void ZernikeGenerator::initializeBasisDefinitions()
 	this->basisDefinitions.clear();
 	this->coefficients.clear();
 
-	for (int noll = this->minNoll; noll <= this->maxNoll; ++noll) {
+	for (int noll : qAsConst(this->nollIndices)) {
 		ZernikeBasis basis;
 		basis.nollIndex = noll;
 		basis.n = getNollN(noll);

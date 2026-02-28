@@ -297,6 +297,7 @@ void ImageSession::setCurrentOutputPatch(const af::array& data)
 	// Write the processed data back
 	this->outputAccessor->writePatchResult(currentPatch, data);
 	LOG_DEBUG() << "Current output patch updated";
+	emit outputPatchUpdated();
 }
 
 af::array ImageSession::getCurrentInputFrame()

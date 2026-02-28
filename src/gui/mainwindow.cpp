@@ -4,6 +4,7 @@
 #include "controller/applicationcontroller.h"
 #include "gui/imagesessionviewer/imagesessionviewer.h"
 #include "gui/psfcontrol/psfcontrolwidget.h"
+#include "gui/psfcontrol/psfsettingsdialog.h"
 #include "utils/logging.h"
 #include "utils/supportedfilechecker.h"
 #include "gui/messageconsole/messagerouter.h"
@@ -41,8 +42,9 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 					   StyleManager* styleManager, ApplicationController* applicationController, QWidget *parent)
 	: QMainWindow(parent), ui(new Ui::MainWindow),
 	  guiSettings(guiSettings), styleManager(styleManager), applicationController(applicationController),
-	  fileMenu(nullptr), viewMenu(nullptr), styleMenu(nullptr),
+	  fileMenu(nullptr), viewMenu(nullptr), extrasMenu(nullptr), styleMenu(nullptr),
 	  openImageDataAction(nullptr), openGroundTruthAction(nullptr),
+	  saveParametersAction(nullptr), loadParametersAction(nullptr),
 	  centralSplitter(nullptr), sessionViewer(nullptr), psfControlWidget(nullptr) {
 	MessageRouter::instance()->install();
 	this->ui->setupUi(this);
@@ -77,6 +79,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 void MainWindow::setupMenuBar() {
 	this->setupFileMenu();
 	this->setupViewMenu();
+	this->setupExtrasMenu();
 }
 
 void MainWindow::setupFileMenu() {
@@ -95,6 +98,21 @@ void MainWindow::setupFileMenu() {
 	this->openGroundTruthAction->setStatusTip("Open ground truth image for quality metrics");
 	connect(this->openGroundTruthAction, &QAction::triggered, this, &MainWindow::openGroundTruth);
 	this->fileMenu->addAction(this->openGroundTruthAction);
+
+	this->fileMenu->addSeparator();
+
+	// Save Parameters action
+	this->saveParametersAction = new QAction("&Save Parameters...", this);
+	this->saveParametersAction->setShortcut(QKeySequence::Save);
+	this->saveParametersAction->setStatusTip("Save wavefront parameters to CSV file");
+	connect(this->saveParametersAction, &QAction::triggered, this, &MainWindow::saveParameters);
+	this->fileMenu->addAction(this->saveParametersAction);
+
+	// Load Parameters action
+	this->loadParametersAction = new QAction("&Load Parameters...", this);
+	this->loadParametersAction->setStatusTip("Load wavefront parameters from CSV file");
+	connect(this->loadParametersAction, &QAction::triggered, this, &MainWindow::loadParameters);
+	this->fileMenu->addAction(this->loadParametersAction);
 
 	this->fileMenu->addSeparator();
 
@@ -147,6 +165,24 @@ void MainWindow::setupViewMenu() {
 	connect(this->messageConsoleDock, &QDockWidget::visibilityChanged, this->toggleMessageConsoleAction, &QAction::setChecked);
 }
 
+void MainWindow::setupExtrasMenu() {
+	this->extrasMenu = this->menuBar()->addMenu("E&xtras");
+
+	QAction* settingsAction = new QAction("&Settings...", this);
+	settingsAction->setStatusTip("Configure application settings");
+	connect(settingsAction, &QAction::triggered, this, &MainWindow::openSettings);
+	this->extrasMenu->addAction(settingsAction);
+}
+
+void MainWindow::openSettings() {
+	PSFSettingsDialog dialog(this->currentPSFSettings, this);
+	connect(&dialog, &PSFSettingsDialog::settingsApplied,
+			this->applicationController, &ApplicationController::applyPSFSettings);
+	if (dialog.exec() == QDialog::Accepted) {
+		this->applicationController->applyPSFSettings(dialog.getSettings());
+	}
+}
+
 void MainWindow::setupCentralWidget()
 {
 	this->sessionViewer = new ImageSessionViewer(this);
@@ -168,6 +204,10 @@ void MainWindow::connectApplicationController() {
 				this, &MainWindow::onInputFileLoaded);
 		connect(this->applicationController, &ApplicationController::fileLoadError,
 				this, &MainWindow::onFileLoadError);
+
+		// Keep local copy of PSF settings in sync for the settings dialog
+		connect(this->applicationController, &ApplicationController::psfSettingsUpdated,
+				this, [this](const PSFSettings& s) { this->currentPSFSettings = s; });
 	}
 }
 
@@ -212,6 +252,34 @@ void MainWindow::connectPSFControlWidget() {
 				this->psfControlWidget, &PSFControlWidget::updatePSF);
 		connect(this->applicationController, &ApplicationController::psfParameterDescriptorsChanged,
 				this->psfControlWidget, &PSFControlWidget::setParameterDescriptors);
+
+		// Deconvolution settings: PSFControlWidget → ApplicationController
+		connect(this->psfControlWidget, &PSFControlWidget::deconvAlgorithmChanged,
+				this->applicationController, &ApplicationController::setDeconvolutionAlgorithm);
+		connect(this->psfControlWidget, &PSFControlWidget::deconvIterationsChanged,
+				this->applicationController, &ApplicationController::setDeconvolutionIterations);
+		connect(this->psfControlWidget, &PSFControlWidget::deconvRelaxationFactorChanged,
+				this->applicationController, &ApplicationController::setDeconvolutionRelaxationFactor);
+		connect(this->psfControlWidget, &PSFControlWidget::deconvRegularizationFactorChanged,
+				this->applicationController, &ApplicationController::setDeconvolutionRegularizationFactor);
+		connect(this->psfControlWidget, &PSFControlWidget::deconvNoiseToSignalFactorChanged,
+				this->applicationController, &ApplicationController::setDeconvolutionNoiseToSignalFactor);
+		connect(this->psfControlWidget, &PSFControlWidget::deconvLiveModeChanged,
+				this->applicationController, &ApplicationController::setDeconvolutionLiveMode);
+		connect(this->psfControlWidget, &PSFControlWidget::deconvolutionRequested,
+				this->applicationController, &ApplicationController::requestDeconvolution);
+
+		// Deconvolution completed → refresh output viewer
+		connect(this->applicationController, &ApplicationController::deconvolutionCompleted,
+				this->sessionViewer, &ImageSessionViewer::refreshOutputViewer);
+
+		// Loaded coefficients → update GUI sliders
+		connect(this->applicationController, &ApplicationController::coefficientsLoaded,
+				this->psfControlWidget, &PSFControlWidget::setCoefficients);
+
+		// PSF settings: ApplicationController → PSFControlWidget (for initial broadcast + updates)
+		connect(this->applicationController, &ApplicationController::psfSettingsUpdated,
+				this->psfControlWidget, &PSFControlWidget::setPSFSettings);
 
 		LOG_DEBUG() << "PSFControlWidget signal connections established";
 	}
@@ -260,6 +328,32 @@ void MainWindow::openGroundTruth() {
 		this->lastNameFilterGroundTruth = selectedFilter;
 
 		this->applicationController->requestOpenGroundTruthFile(filePath);
+	}
+}
+
+void MainWindow::saveParameters() {
+	const QString filePath = QFileDialog::getSaveFileName(
+		this,
+		"Save Parameters",
+		QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+		"CSV Files (*.csv)"
+	);
+	if (!filePath.isEmpty()) {
+		this->applicationController->saveParametersToFile(filePath);
+		this->statusBar()->showMessage("Parameters saved", 3000);
+	}
+}
+
+void MainWindow::loadParameters() {
+	const QString filePath = QFileDialog::getOpenFileName(
+		this,
+		"Load Parameters",
+		QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+		"CSV Files (*.csv)"
+	);
+	if (!filePath.isEmpty()) {
+		this->applicationController->loadParametersFromFile(filePath);
+		this->statusBar()->showMessage("Parameters loaded", 3000);
 	}
 }
 

@@ -11,6 +11,7 @@
 #include <QList>
 #include "stylemanager.h"
 #include "gui/messageconsole/messageconsoledock.h"
+#include "core/psf/psfsettings.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -42,6 +43,11 @@ private slots:
 	// File operations
 	void openImageData();
 	void openGroundTruth();
+	void saveParameters();
+	void loadParameters();
+
+	// Settings
+	void openSettings();
 
 	// ApplicationController response handlers
 	void onInputFileLoaded(const QString& filePath);
@@ -51,6 +57,7 @@ private:
 	void setupMenuBar();
 	void setupFileMenu();
 	void setupViewMenu();
+	void setupExtrasMenu();
 	void setupCentralWidget();
 	void connectApplicationController();
 	void connectImageSessionViewer();
@@ -75,17 +82,23 @@ private:
 	// Menus
 	QMenu* fileMenu;
 	QMenu* viewMenu;
+	QMenu* extrasMenu;
 	QMenu* styleMenu;
 
 	// File actions
 	QAction* openImageDataAction;
 	QAction* openGroundTruthAction;
+	QAction* saveParametersAction;
+	QAction* loadParametersAction;
 
 	// Style actions
 	QList<QAction*> styleActions;
 
 	// View actions
 	QAction* toggleMessageConsoleAction;
+
+	// Settings state
+	PSFSettings currentPSFSettings;
 
 	// Main widgets
 	QSplitter* centralSplitter;

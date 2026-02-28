@@ -108,6 +108,7 @@ signals:
 	void patchChanged(int x, int y);
 	void inputDataChanged();
 	void outputDataChanged();
+	void outputPatchUpdated();
 	void groundTruthDataChanged();
 	void patchGridConfigured(int cols, int rows, int borderExtension);
 };

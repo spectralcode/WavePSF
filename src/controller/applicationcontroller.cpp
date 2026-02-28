@@ -2,6 +2,7 @@
 #include "imagesession.h"
 #include "data/inputdatareader.h"
 #include "data/imagedata.h"
+#include "data/wavefrontparametertable.h"
 #include "core/psf/psfmodule.h"
 #include "utils/logging.h"
 #include "utils/settingsfilemanager.h"
@@ -9,10 +10,12 @@
 
 ApplicationController::ApplicationController(QObject* parent)
 	: QObject(parent), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
+	, parameterTable(nullptr), deconvolutionLiveMode(false)
 {
 	this->initializeComponents();
 	this->connectSessionSignals();
 	this->connectPSFModuleSignals();
+	this->connectDeconvolutionSignals();
 }
 
 ApplicationController::~ApplicationController()
@@ -38,14 +41,18 @@ bool ApplicationController::openGroundTruthFile(const QString& filePath)
 void ApplicationController::setCurrentFrame(int frame)
 {
 	if (this->imageSession != nullptr) {
+		this->storeCurrentCoefficients();
 		this->imageSession->setCurrentFrame(frame);
+		this->loadCoefficientsForCurrentPatch();
 	}
 }
 
 void ApplicationController::setCurrentPatch(int x, int y)
 {
 	if (this->imageSession != nullptr) {
+		this->storeCurrentCoefficients();
 		this->imageSession->setCurrentPatch(x, y);
+		this->loadCoefficientsForCurrentPatch();
 	}
 }
 
@@ -53,6 +60,7 @@ void ApplicationController::configurePatchGrid(int cols, int rows, int borderExt
 {
 	if (this->imageSession != nullptr) {
 		this->imageSession->configurePatchGrid(cols, rows, borderExtension);
+		this->resizeParameterTable();
 	}
 }
 
@@ -61,12 +69,123 @@ void ApplicationController::setPSFCoefficient(int id, double value)
 	if (this->psfModule != nullptr) {
 		this->psfModule->setCoefficient(id, value);
 	}
+	this->storeCurrentCoefficients();
 }
 
 void ApplicationController::resetPSFCoefficients()
 {
 	if (this->psfModule != nullptr) {
 		this->psfModule->resetCoefficients();
+	}
+	this->storeCurrentCoefficients();
+}
+
+void ApplicationController::saveParametersToFile(const QString& filePath)
+{
+	this->storeCurrentCoefficients();
+	if (this->parameterTable != nullptr) {
+		this->parameterTable->saveToFile(filePath);
+	}
+}
+
+void ApplicationController::loadParametersFromFile(const QString& filePath)
+{
+	if (this->parameterTable != nullptr) {
+		if (this->parameterTable->loadFromFile(filePath)) {
+			this->loadCoefficientsForCurrentPatch();
+		}
+	}
+}
+
+void ApplicationController::applyPSFSettings(const PSFSettings& settings)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->applyPSFSettings(settings);
+	}
+	emit psfSettingsUpdated(settings);
+}
+
+// Deconvolution settings forwarding
+void ApplicationController::setDeconvolutionAlgorithm(int algorithm)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->setDeconvolutionAlgorithm(algorithm);
+	}
+}
+
+void ApplicationController::setDeconvolutionIterations(int iterations)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->setDeconvolutionIterations(iterations);
+	}
+}
+
+void ApplicationController::setDeconvolutionRelaxationFactor(float factor)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->setDeconvolutionRelaxationFactor(factor);
+	}
+}
+
+void ApplicationController::setDeconvolutionRegularizationFactor(float factor)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->setDeconvolutionRegularizationFactor(factor);
+	}
+}
+
+void ApplicationController::setDeconvolutionNoiseToSignalFactor(float factor)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->setDeconvolutionNoiseToSignalFactor(factor);
+	}
+}
+
+void ApplicationController::setDeconvolutionLiveMode(bool enabled)
+{
+	this->deconvolutionLiveMode = enabled;
+	if (enabled) {
+		this->runDeconvolutionOnCurrentPatch();
+	}
+}
+
+void ApplicationController::requestDeconvolution()
+{
+	this->runDeconvolutionOnCurrentPatch();
+}
+
+void ApplicationController::runDeconvolutionOnCurrentPatch()
+{
+	if (!this->hasInputData() || this->psfModule == nullptr) {
+		return;
+	}
+
+	ImagePatch inputPatch = this->imageSession->getCurrentInputPatch();
+	if (!inputPatch.isValid()) {
+		LOG_WARNING() << "No valid input patch for deconvolution";
+		return;
+	}
+
+	af::array result = this->psfModule->deconvolve(inputPatch.data);
+	if (result.isempty()) {
+		return;
+	}
+
+	this->imageSession->setCurrentOutputPatch(result);
+}
+
+void ApplicationController::handlePSFUpdatedForDeconvolution(af::array psf)
+{
+	Q_UNUSED(psf);
+	if (this->deconvolutionLiveMode) {
+		this->runDeconvolutionOnCurrentPatch();
+	}
+}
+
+void ApplicationController::handleDeconvolutionSettingsChanged()
+{
+	if (this->deconvolutionLiveMode) {
+		this->runDeconvolutionOnCurrentPatch();
 	}
 }
 
@@ -156,9 +275,10 @@ void ApplicationController::broadcastCurrentState()
 					<< ", grid=" << this->imageSession->getPatchGridCols() << "x" << this->imageSession->getPatchGridRows();
 	}
 
-	// Broadcast PSF parameter descriptors
+	// Broadcast PSF parameter descriptors and settings
 	if (this->psfModule != nullptr) {
 		emit psfParameterDescriptorsChanged(this->psfModule->getParameterDescriptors());
+		emit psfSettingsUpdated(this->psfModule->getPSFSettings());
 	}
 }
 
@@ -184,6 +304,9 @@ void ApplicationController::handleInputDataChanged()
 {
 	// Emit ImageSession changed so viewers can update their data connections
 	emit imageSessionChanged(this->imageSession);
+
+	// Resize parameter table to match new data dimensions
+	this->resizeParameterTable();
 }
 
 void ApplicationController::handleOutputDataChanged()
@@ -204,6 +327,7 @@ void ApplicationController::initializeComponents()
 	this->imageSession = new ImageSession(this);
 	this->inputDataReader = new InputDataReader(this);
 	this->psfModule = new PSFModule(this);
+	this->parameterTable = new WavefrontParameterTable(this);
 }
 
 void ApplicationController::connectSessionSignals()
@@ -236,7 +360,93 @@ void ApplicationController::connectPSFModuleSignals()
 				this, &ApplicationController::psfUpdated);
 		connect(this->psfModule, &PSFModule::parameterDescriptorsChanged,
 				this, &ApplicationController::psfParameterDescriptorsChanged);
+
+		// When Noll indices change, parameter table must be cleared and resized
+		connect(this->psfModule, &PSFModule::nollIndicesChanged, this, [this]() {
+			if (this->parameterTable != nullptr) {
+				this->parameterTable->clear();
+				this->resizeParameterTable();
+			}
+		});
 	}
+}
+
+void ApplicationController::connectDeconvolutionSignals()
+{
+	if (this->psfModule != nullptr) {
+		// When PSF changes and live mode is on, re-deconvolve
+		connect(this->psfModule, &PSFModule::psfUpdated,
+				this, &ApplicationController::handlePSFUpdatedForDeconvolution);
+
+		// When deconvolution settings change and live mode is on, re-deconvolve
+		connect(this->psfModule, &PSFModule::deconvolutionSettingsChanged,
+				this, &ApplicationController::handleDeconvolutionSettingsChanged);
+	}
+
+	if (this->imageSession != nullptr) {
+		// When patch or frame changes and live mode is on, re-deconvolve
+		connect(this->imageSession, &ImageSession::patchChanged,
+				this, [this](int, int) {
+					if (this->deconvolutionLiveMode) {
+						this->runDeconvolutionOnCurrentPatch();
+					}
+				});
+		connect(this->imageSession, &ImageSession::frameChanged,
+				this, [this](int) {
+					if (this->deconvolutionLiveMode) {
+						this->runDeconvolutionOnCurrentPatch();
+					}
+				});
+
+		// Forward outputPatchUpdated to deconvolutionCompleted
+		connect(this->imageSession, &ImageSession::outputPatchUpdated,
+				this, &ApplicationController::deconvolutionCompleted);
+	}
+}
+
+void ApplicationController::storeCurrentCoefficients()
+{
+	if (this->parameterTable == nullptr || this->psfModule == nullptr || this->imageSession == nullptr) {
+		return;
+	}
+	if (!this->hasInputData()) {
+		return;
+	}
+	int frame = this->getCurrentFrame();
+	int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
+	this->parameterTable->setCoefficients(frame, patchIdx, this->psfModule->getAllCoefficients());
+}
+
+void ApplicationController::loadCoefficientsForCurrentPatch()
+{
+	if (this->parameterTable == nullptr || this->psfModule == nullptr || this->imageSession == nullptr) {
+		return;
+	}
+	if (!this->hasInputData()) {
+		return;
+	}
+	int frame = this->getCurrentFrame();
+	int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
+	QVector<double> coeffs = this->parameterTable->getCoefficients(frame, patchIdx);
+	if (!coeffs.isEmpty()) {
+		this->psfModule->setAllCoefficients(coeffs);
+		emit coefficientsLoaded(coeffs);
+	}
+}
+
+void ApplicationController::resizeParameterTable()
+{
+	if (this->parameterTable == nullptr || this->psfModule == nullptr || this->imageSession == nullptr) {
+		return;
+	}
+	if (!this->hasInputData()) {
+		return;
+	}
+	int frames = this->imageSession->getInputFrames();
+	int cols = this->imageSession->getPatchGridCols();
+	int rows = this->imageSession->getPatchGridRows();
+	int coeffs = this->psfModule->getAllCoefficients().size();
+	this->parameterTable->resize(frames, cols, rows, coeffs);
 }
 
 bool ApplicationController::loadFileToSession(const QString& filePath, bool isGroundTruth)

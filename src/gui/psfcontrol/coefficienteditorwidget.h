@@ -24,6 +24,7 @@ public:
 
 public slots:
 	void setParameterDescriptors(QVector<WavefrontParameter> descriptors);
+	void setValues(const QVector<double>& values);
 
 signals:
 	void coefficientChanged(int id, double value);

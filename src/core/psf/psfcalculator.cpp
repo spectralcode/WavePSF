@@ -5,6 +5,7 @@ PSFCalculator::PSFCalculator(double lambda, double apertureRadius, QObject* pare
 	: QObject(parent)
 	, lambda(lambda)
 	, apertureRadius(apertureRadius)
+	, normMode(SumNormalization)
 	, cachedGridSize(0)
 {
 }
@@ -21,7 +22,10 @@ af::array PSFCalculator::computePSF(const af::array& wavefront)
 		this->buildApertureCache(gridSize);
 	}
 
-	// Phase = 2*pi/lambda * wavefront
+	// scaling factor converts from unit of wavefront to radians of phase, but is actually
+	// not needed here since the Zernike coefficients (the thing the optimization algorithm optimizes) 
+	// are dimensionless and can be interpreted as phase values directly.
+	// todo: maybe remove scaling factor here (currently onle kept to match an earlier implementaion)
 	float phaseScale = static_cast<float>(2.0 * af::Pi / this->lambda);
 	af::array phase = phaseScale * wavefront;
 
@@ -39,11 +43,19 @@ af::array PSFCalculator::computePSF(const af::array& wavefront)
 	// Shift DC component to center
 	psf = fftshift2D(psf);
 
-	// Normalize so total intensity = 1 //todo: recheck how this was done in publication and maybe give user option to select normalization
-	double totalIntensity = af::sum<double>(psf);
-	if (totalIntensity > 0.0) {
-		psf = psf / static_cast<float>(totalIntensity);
+	// Normalize PSF
+	if (this->normMode == SumNormalization) {
+		double totalIntensity = af::sum<double>(psf);
+		if (totalIntensity > 0.0) {
+			psf = psf / static_cast<float>(totalIntensity);
+		}
+	} else if (this->normMode == PeakNormalization) {
+		double peak = af::max<double>(psf);
+		if (peak > 0.0) {
+			psf = psf / static_cast<float>(peak);
+		}
 	}
+	// NoNormalization: do nothing
 
 	return psf;
 }
@@ -67,6 +79,16 @@ void PSFCalculator::setApertureRadius(double radius)
 double PSFCalculator::getApertureRadius() const
 {
 	return this->apertureRadius;
+}
+
+void PSFCalculator::setNormalizationMode(NormalizationMode mode)
+{
+	this->normMode = mode;
+}
+
+PSFCalculator::NormalizationMode PSFCalculator::getNormalizationMode() const
+{
+	return this->normMode;
 }
 
 void PSFCalculator::buildApertureCache(int gridSize)

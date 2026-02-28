@@ -54,8 +54,8 @@ void RectItemGroup::generateRects(int totalWidth, int totalHeight, int numberOfR
 
 	this->removeAndDeleteAllItems();
 
-	for(int x = 0; x < numberOfRectsInX; x++) {
-		for(int y = 0; y < numberOfRectsInY; y++) {
+	for(int y = 0; y < numberOfRectsInY; y++) {
+		for(int x = 0; x < numberOfRectsInX; x++) {
 			xPos = x*width;
 			yPos = y*height;
 			RectItem* newRectItem = new RectItem(xPos, yPos, width, height, this);

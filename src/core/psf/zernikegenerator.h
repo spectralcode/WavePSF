@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QVector>
 #include <QMap>
+#include <QPair>
 #include <arrayfire.h>
 #include "iwavefrontgenerator.h"
 
@@ -23,6 +24,21 @@ public:
 	void resetCoefficients() override;
 	af::array generateWavefront(int gridSize) override;
 
+	// Noll index control
+	void setNollIndices(const QVector<int>& indices);
+	QVector<int> getNollIndices() const;
+
+	// Range control
+	void setGlobalRange(double minValue, double maxValue);
+	void setStepValue(double step);
+	void setParameterRange(int nollIndex, double minValue, double maxValue);
+	void clearParameterRange(int nollIndex);
+	void clearAllParameterRanges();
+	double getGlobalMinValue() const;
+	double getGlobalMaxValue() const;
+	double getStepValue() const;
+	QMap<int, QPair<double,double>> getRangeOverrides() const;
+
 	// Zernike-specific static utilities
 	static int getNollN(int nollIndex);
 	static int getNollM(int nollIndex);
@@ -38,8 +54,11 @@ private:
 		QVector<int> radialExponents;
 	};
 
-	int minNoll;
-	int maxNoll;
+	QVector<int> nollIndices;
+	double globalMinValue;
+	double globalMaxValue;
+	double stepValue;
+	QMap<int, QPair<double,double>> rangeOverrides;
 	QVector<ZernikeBasis> basisDefinitions;
 	QMap<int, double> coefficients;
 

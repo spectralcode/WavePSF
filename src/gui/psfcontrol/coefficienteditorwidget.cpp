@@ -91,9 +91,25 @@ void CoefficientEditorWidget::setSettings(const QVariantMap& settings)
 	this->updatingControls = false;
 }
 
+void CoefficientEditorWidget::setValues(const QVector<double>& values)
+{
+	this->updatingControls = true;
+	for (int i = 0; i < qMin(values.size(), this->rows.size()); i++) {
+		this->rows[i].spinBox->setValue(values.at(i));
+		this->rows[i].slider->setValue(static_cast<int>(values.at(i) * SLIDER_SCALE_FACTOR));
+	}
+	this->updatingControls = false;
+}
+
 void CoefficientEditorWidget::setParameterDescriptors(QVector<WavefrontParameter> descriptors)
 {
 	this->descriptors = descriptors;
+
+	// Sync the step size spinbox from descriptors (all share the same step value)
+	if (!descriptors.isEmpty()) {
+		this->stepSizeSpinBox->setValue(descriptors.first().step);
+	}
+
 	this->clearRows();
 	this->buildRows();
 }
