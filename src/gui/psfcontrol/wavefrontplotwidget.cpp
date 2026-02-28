@@ -111,46 +111,55 @@ void WavefrontPlotWidget::enforceAspectRatio()
 
 void WavefrontPlotWidget::setupGradientCombo()
 {
-	this->gradientCombo->addItem(tr("Blue-White-Red"));
 	this->gradientCombo->addItem(tr("Grayscale"));
 	this->gradientCombo->addItem(tr("Hot"));
 	this->gradientCombo->addItem(tr("Cold"));
+	this->gradientCombo->addItem(tr("Night"));
+	this->gradientCombo->addItem(tr("Candy"));
+	this->gradientCombo->addItem(tr("Geography"));
+	this->gradientCombo->addItem(tr("Ion"));
 	this->gradientCombo->addItem(tr("Thermal"));
 	this->gradientCombo->addItem(tr("Polar"));
 	this->gradientCombo->addItem(tr("Spectrum"));
 	this->gradientCombo->addItem(tr("Jet"));
 	this->gradientCombo->addItem(tr("Hues"));
+	this->gradientCombo->addItem(tr("Blue-White-Red"));
+	this->gradientCombo->addItem(tr("Custom"));
+	this->gradientCombo->setCurrentIndex(13); // Custom is default
 }
 
 void WavefrontPlotWidget::applyGradient(int index)
 {
-	if (index == 0) {
-		this->applyCustomGradient();
+	// Indices 0-11 map directly to QCPColorGradient::GradientPreset enum values
+	if (index >= 0 && index < 12) {
+		this->colorMap->setGradient(
+			QCPColorGradient(static_cast<QCPColorGradient::GradientPreset>(index)));
+	} else if (index == 12) {
+		this->applyBlueWhiteRedGradient();
 	} else {
-		// Map combo index to QCPColorGradient preset
-		static const QCPColorGradient::GradientPreset presets[] = {
-			QCPColorGradient::gpGrayscale,  // index 1
-			QCPColorGradient::gpHot,        // index 2
-			QCPColorGradient::gpCold,       // index 3
-			QCPColorGradient::gpThermal,    // index 4
-			QCPColorGradient::gpPolar,      // index 5
-			QCPColorGradient::gpSpectrum,   // index 6
-			QCPColorGradient::gpJet,        // index 7
-			QCPColorGradient::gpHues        // index 8
-		};
-		int presetIndex = index - 1;
-		if (presetIndex >= 0 && presetIndex < static_cast<int>(sizeof(presets) / sizeof(presets[0]))) {
-			this->colorMap->setGradient(QCPColorGradient(presets[presetIndex]));
-		}
+		this->applyCustomGradient();
 	}
 	this->plot->replot();
 }
 
-void WavefrontPlotWidget::applyCustomGradient()
+void WavefrontPlotWidget::applyBlueWhiteRedGradient()
 {
 	QCPColorGradient gradient;
 	gradient.setColorStopAt(0.0, QColor(0, 0, 180));
 	gradient.setColorStopAt(0.5, QColor(255, 255, 255));
 	gradient.setColorStopAt(1.0, QColor(180, 0, 0));
+	this->colorMap->setGradient(gradient);
+}
+
+void WavefrontPlotWidget::applyCustomGradient()
+{
+	QCPColorGradient gradient;
+	gradient.setColorStopAt(0.0, Qt::darkBlue);
+	gradient.setColorStopAt(0.2, Qt::blue);
+	gradient.setColorStopAt(0.5, Qt::white);
+	gradient.setColorStopAt(0.6, QColor(255, 0, 127));
+	gradient.setColorStopAt(0.8, Qt::red);
+	gradient.setColorStopAt(1.0, Qt::yellow);
+	gradient.setColorInterpolation(QCPColorGradient::ciRGB);
 	this->colorMap->setGradient(gradient);
 }

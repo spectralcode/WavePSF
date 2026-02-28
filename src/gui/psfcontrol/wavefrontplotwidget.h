@@ -26,6 +26,7 @@ private slots:
 
 private:
 	void setupGradientCombo();
+	void applyBlueWhiteRedGradient();
 	void applyCustomGradient();
 
 	QCustomPlot* plot;
