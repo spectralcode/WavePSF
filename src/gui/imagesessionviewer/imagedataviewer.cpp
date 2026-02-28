@@ -96,6 +96,11 @@ void ImageDataViewer::connectReferenceImageData(const ImageData* referenceImageD
 	this->referenceImageData = referenceImageData;
 }
 
+const ImageData* ImageDataViewer::getImageData() const
+{
+	return this->imageData;
+}
+
 void ImageDataViewer::setCurrentFrame(int frame)
 {
 	const ImageData* dataSource = this->getCurrentDataSource();
@@ -191,9 +196,10 @@ void ImageDataViewer::displayFrame(int frameNr)
 	const ImageData* dataSource = this->getCurrentDataSource();
 	if (dataSource == nullptr) return;
 
-	// Clamp requested frame
+	// Clamp frame for current data source (e.g. single-frame ground truth → 0)
+	// but preserve the logical frame position so switching back restores it
 	const int validFrame = this->getValidFrameForDataSource(frameNr, dataSource);
-	this->currentFrame = validFrame;
+	this->currentFrame = frameNr;
 
 	// Update bottom info immediately
 	QStringList frameNames = dataSource->getFrameNames();
@@ -201,11 +207,15 @@ void ImageDataViewer::displayFrame(int frameNr)
 		? frameNames[validFrame]
 		: QString("Frame %1").arg(validFrame));
 
-	QVector<qreal> wavelengths = dataSource->getWavelengths();
-	if (validFrame < wavelengths.size()) {
-		emit currentWavelengthChanged(wavelengths[validFrame]);
+	// Only emit frame/wavelength signals when showing primary data,
+	// not during temporary ground truth preview
+	if (!this->showingReference) {
+		QVector<qreal> wavelengths = dataSource->getWavelengths();
+		if (validFrame < wavelengths.size()) {
+			emit currentWavelengthChanged(wavelengths[validFrame]);
+		}
+		emit currentFrameChanged(validFrame);
 	}
-	emit currentFrameChanged(validFrame);
 
 	// Coalesce rapid changes
 	this->hasPending = true;
@@ -228,7 +238,8 @@ void ImageDataViewer::dispatchRenderNow()
 		return;
 	}
 
-	void* framePtr = dataSource->getData(this->currentFrame);
+	const int renderFrame = this->getValidFrameForDataSource(this->currentFrame, dataSource);
+	void* framePtr = dataSource->getData(renderFrame);
 	if (!framePtr) { this->hasPending = false; return; }
 
 	const int count = w * h;

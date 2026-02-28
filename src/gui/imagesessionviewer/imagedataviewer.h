@@ -29,6 +29,7 @@ public:
 	void connectImageData(const ImageData* imageData);
 	void disconnectImageData();
 	void connectReferenceImageData(const ImageData* referenceImageData);
+	const ImageData* getImageData() const;
 
 	// Frame control
 	void setCurrentFrame(int frame);

@@ -561,16 +561,21 @@ void ImageSessionViewer::syncViewersToSession()
 void ImageSessionViewer::updateDataInViewers()
 {
 	if (this->imageSession != nullptr) {
-		// Connect viewers to data
+		// Connect viewers to data (only reconnect if the data pointer changed,
+		// to avoid resetting frame position when only ground truth was added)
 		if (this->imageSession->hasInputData()) {
-			this->inputViewer->connectImageData(this->imageSession->getInputData());
+			if (this->inputViewer->getImageData() != this->imageSession->getInputData()) {
+				this->inputViewer->connectImageData(this->imageSession->getInputData());
+			}
 			this->inputViewer->setPatchGridVisible(true);
 		} else {
 			this->inputViewer->disconnectImageData();
 		}
 
 		if (this->imageSession->hasOutputData()) {
-			this->outputViewer->connectImageData(this->imageSession->getOutputData());
+			if (this->outputViewer->getImageData() != this->imageSession->getOutputData()) {
+				this->outputViewer->connectImageData(this->imageSession->getOutputData());
+			}
 			this->outputViewer->setPatchGridVisible(true);
 		} else {
 			this->outputViewer->disconnectImageData();
