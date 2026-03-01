@@ -122,6 +122,7 @@ bool WavefrontParameterTable::saveToFile(const QString& filePath) const
 		}
 	}
 
+	stream.flush();
 	file.close();
 	LOG_INFO() << "Parameters saved to:" << filePath;
 	return true;
@@ -147,16 +148,16 @@ bool WavefrontParameterTable::loadFromFile(const QString& filePath)
 	// Line 1: Date
 	stream.readLine();
 	// Line 2: Number of frames
-	QString line = stream.readLine();
-	frames = line.section(";", 1, 1).toInt();
+	QString line = stream.readLine().trimmed();
+	frames = line.section(";", 1, 1).trimmed().toInt();
 	// Line 3: Patches per frame;N;Patches in X;NX;Patches in Y;NY
-	line = stream.readLine();
-	patches = line.section(";", 1, 1).toInt();
-	patchesX = line.section(";", 3, 3).toInt();
-	patchesY = line.section(";", 5, 5).toInt();
+	line = stream.readLine().trimmed();
+	patches = line.section(";", 1, 1).trimmed().toInt();
+	patchesX = line.section(";", 3, 3).trimmed().toInt();
+	patchesY = line.section(";", 5, 5).trimmed().toInt();
 	// Line 4: Coefficients per patch
-	line = stream.readLine();
-	coeffs = line.section(";", 1, 1).toInt();
+	line = stream.readLine().trimmed();
+	coeffs = line.section(";", 1, 1).trimmed().toInt();
 	// Line 5: blank
 	stream.readLine();
 	// Line 6: column headers
