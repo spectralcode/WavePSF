@@ -100,6 +100,7 @@ private:
 	// Metric
 	QComboBox* metricModeComboBox;
 	QComboBox* metricTypeComboBox;
+	QDoubleSpinBox* metricMultiplierSpinBox;
 
 	// Coefficient specification
 	QLineEdit* coefficientSpecLineEdit;

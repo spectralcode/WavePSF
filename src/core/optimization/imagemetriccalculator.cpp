@@ -53,8 +53,7 @@ double ImageMetricCalculator::calculate(const af::array& image, const af::array&
 				af::sum<float>(af::pow(img, 2)) * af::sum<float>(af::pow(ref, 2)));
 			if (normFactor == 0.0f) return (std::numeric_limits<double>::max)();
 			float dotProduct = af::sum<float>(img * ref);
-			// Negate so that minimization finds the best correlation
-			return -static_cast<double>(dotProduct / normFactor);
+			return static_cast<double>(dotProduct / normFactor);
 		}
 
 		case SUM_OF_HAMMING_DISTANCE_BINARY: {

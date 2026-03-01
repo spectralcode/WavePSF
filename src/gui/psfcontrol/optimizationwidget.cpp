@@ -210,6 +210,14 @@ void OptimizationWidget::setupMetricSection(QVBoxLayout* layout)
 	this->installScrollGuard(this->metricTypeComboBox);
 	metricForm->addRow(tr("Type:"), this->metricTypeComboBox);
 
+	this->metricMultiplierSpinBox = new QDoubleSpinBox(metricGroup);
+	this->metricMultiplierSpinBox->setRange(-10000.0, 10000.0);
+	this->metricMultiplierSpinBox->setValue(1.0);
+	this->metricMultiplierSpinBox->setDecimals(2);
+	this->metricMultiplierSpinBox->setSingleStep(1.0);
+	this->installScrollGuard(this->metricMultiplierSpinBox);
+	metricForm->addRow(tr("Multiplier:"), this->metricMultiplierSpinBox);
+
 	layout->addWidget(metricGroup);
 
 	connect(this->metricModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
@@ -496,6 +504,7 @@ OptimizationConfig OptimizationWidget::buildConfig() const
 	} else {
 		config.imageMetric = this->metricTypeComboBox->currentIndex();
 	}
+	config.metricMultiplier = this->metricMultiplierSpinBox->value();
 
 	// Mode and batch spec
 	config.mode = this->modeComboBox->currentIndex();
@@ -540,6 +549,7 @@ QVariantMap OptimizationWidget::getSettings() const
 	settings.insert("itersPerTemp", this->itersPerTempSpinBox->value());
 	settings.insert("metricMode", this->metricModeComboBox->currentIndex());
 	settings.insert("metricType", this->metricTypeComboBox->currentIndex());
+	settings.insert("metricMultiplier", this->metricMultiplierSpinBox->value());
 	settings.insert("patches", this->patchesLineEdit->text());
 	settings.insert("frames", this->framesLineEdit->text());
 	settings.insert("startCoeffSource", this->startCoeffSourceComboBox->currentIndex());
@@ -580,6 +590,9 @@ void OptimizationWidget::setSettings(const QVariantMap& settings)
 	}
 	if (settings.contains("metricType")) {
 		this->metricTypeComboBox->setCurrentIndex(settings.value("metricType").toInt());
+	}
+	if (settings.contains("metricMultiplier")) {
+		this->metricMultiplierSpinBox->setValue(settings.value("metricMultiplier").toDouble());
 	}
 	if (settings.contains("patches")) {
 		this->patchesLineEdit->setText(settings.value("patches").toString());

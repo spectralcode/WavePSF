@@ -48,6 +48,7 @@ struct OptimizationConfig {
 	bool useReferenceMetric = false;
 	int imageMetric = 0;
 	int referenceMetric = 0;
+	double metricMultiplier = 1.0;
 
 	// Batch specification (filled by UI, used by controller to build jobs)
 	int mode = 0;  // 0 = single patch, 1 = batch

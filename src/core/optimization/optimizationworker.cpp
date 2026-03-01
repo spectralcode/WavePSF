@@ -79,11 +79,11 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 			if (deconvolved.isempty()) return (std::numeric_limits<double>::max)();
 
 			if (config.useReferenceMetric && !groundTruthPatch.isempty()) {
-				return ImageMetricCalculator::calculate(
+				return config.metricMultiplier * ImageMetricCalculator::calculate(
 					deconvolved, groundTruthPatch,
 					static_cast<ImageMetricCalculator::ReferenceMetric>(config.referenceMetric));
 			} else {
-				return ImageMetricCalculator::calculate(
+				return config.metricMultiplier * ImageMetricCalculator::calculate(
 					deconvolved,
 					static_cast<ImageMetricCalculator::ImageMetric>(config.imageMetric));
 			}
