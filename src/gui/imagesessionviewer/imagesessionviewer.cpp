@@ -14,8 +14,7 @@
 #include <QCheckBox>
 #include <QDoubleSpinBox>
 #include <QTimer>
-#include <QScrollArea>
-#include <QFrame>
+#include "gui/verticalscrollarea.h"
 
 namespace {
 	const char* SETTINGS_GROUP = "image_session_viewer";
@@ -32,7 +31,6 @@ namespace {
 	const int DEFAULT_PATCH_COLS = 4;
 	const int DEFAULT_PATCH_ROWS = 4;
 	const int DEFAULT_BORDER_EXTENSION = 10;
-	const int CONTROLS_MIN_WIDTH = 250;
 }
 
 ImageSessionViewer::ImageSessionViewer(QWidget* parent)
@@ -338,12 +336,7 @@ void ImageSessionViewer::setupUI()
 	this->setupImageViewers();
 
 	// Create controls widget in scroll area
-	QScrollArea* controlsScrollArea = new QScrollArea();
-	controlsScrollArea->setWidgetResizable(true);
-	controlsScrollArea->setFrameShape(QFrame::NoFrame);
-	controlsScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	controlsScrollArea->setMinimumWidth(CONTROLS_MIN_WIDTH);
-	controlsScrollArea->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+	VerticalScrollArea* controlsScrollArea = new VerticalScrollArea();
 
 	this->controlsWidget = new QWidget(controlsScrollArea);
 

@@ -10,7 +10,7 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QFrame>
-#include <QScrollArea>
+#include "gui/verticalscrollarea.h"
 #include <QEvent>
 
 namespace {
@@ -32,12 +32,7 @@ void DeconvolutionSettingsWidget::setupUI()
 {
 	QHBoxLayout* mainLayout = new QHBoxLayout(this);
 
-	QScrollArea* scrollArea = new QScrollArea(this);
-	scrollArea->setWidgetResizable(true);
-	scrollArea->setFrameShape(QFrame::NoFrame);
-	scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	scrollArea->setMinimumWidth(220);
-	scrollArea->setMaximumWidth(380);
+	VerticalScrollArea* scrollArea = new VerticalScrollArea(this);
 
 	QWidget* controlsWidget = new QWidget(scrollArea);
 	QVBoxLayout* controlsLayout = new QVBoxLayout(controlsWidget);

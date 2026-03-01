@@ -16,7 +16,7 @@
 #include <QGroupBox>
 #include <QFrame>
 #include <QCheckBox>
-#include <QScrollArea>
+#include "gui/verticalscrollarea.h"
 #include <QEvent>
 #include <QMenu>
 
@@ -41,12 +41,7 @@ void OptimizationWidget::setupUI()
 	QHBoxLayout* mainLayout = new QHBoxLayout(this);
 
 	// Left side: controls in scroll area
-	QScrollArea* scrollArea = new QScrollArea(this);
-	scrollArea->setWidgetResizable(true);
-	scrollArea->setFrameShape(QFrame::NoFrame);
-	scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	scrollArea->setMinimumWidth(220);
-	scrollArea->setMaximumWidth(380);
+	VerticalScrollArea* scrollArea = new VerticalScrollArea(this);
 
 	QWidget* scrollContent = new QWidget(scrollArea);
 	QVBoxLayout* contentLayout = new QVBoxLayout(scrollContent);

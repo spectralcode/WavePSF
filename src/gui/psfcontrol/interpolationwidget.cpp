@@ -8,8 +8,7 @@
 #include <QPushButton>
 #include <QSpinBox>
 #include <QLabel>
-#include <QScrollArea>
-#include <QFrame>
+#include "gui/verticalscrollarea.h"
 #include <QEvent>
 
 InterpolationWidget::InterpolationWidget(QWidget* parent)
@@ -28,12 +27,7 @@ void InterpolationWidget::setupUI()
 	QHBoxLayout* mainLayout = new QHBoxLayout(this);
 
 	// Left side: controls in scroll area
-	QScrollArea* scrollArea = new QScrollArea(this);
-	scrollArea->setWidgetResizable(true);
-	scrollArea->setFrameShape(QFrame::NoFrame);
-	scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	scrollArea->setMinimumWidth(220);
-	scrollArea->setMaximumWidth(300);
+	VerticalScrollArea* scrollArea = new VerticalScrollArea(this);
 
 	QWidget* controlsWidget = new QWidget(scrollArea);
 	QVBoxLayout* controlsLayout = new QVBoxLayout(controlsWidget);
