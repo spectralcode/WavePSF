@@ -154,11 +154,17 @@ QStringList Deconvolver::getAlgorithmNames()
 
 af::array Deconvolver::wienerDeconvolution(const af::array& blurredInput, const af::array& psf, float nsr) const
 {
+	// The PSF is center-placed (fftshift'd from PSFCalculator). Move peak to origin
+	// so that FFT zero-padding or cropping always preserves the peak correctly.
+	int psfRows = psf.dims(0);
+	int psfCols = psf.dims(1);
+	af::array psfCorner = af::shift(psf, -(psfRows / 2), -(psfCols / 2));
+
 	// Fourier Transform of the blurred image
 	af::array G = af::fft2(blurredInput);
 
-	// Fourier Transform of the PSF, zero-padded to input dimensions by af::fft2
-	af::array H = af::fft2(psf, blurredInput.dims(0), blurredInput.dims(1));
+	// Fourier Transform of the PSF, padded/cropped to input dimensions
+	af::array H = af::fft2(psfCorner, blurredInput.dims(0), blurredInput.dims(1));
 
 	// Conjugate of the PSF spectrum
 	af::array HConj = af::conjg(H);
@@ -166,13 +172,9 @@ af::array Deconvolver::wienerDeconvolution(const af::array& blurredInput, const 
 	// Wiener filter: H* / (|H|^2 + NSR)
 	af::array WienerFilter = HConj / (af::abs(H) * af::abs(H) + nsr);
 
-	// Apply filter in frequency domain
+	// Apply filter in frequency domain and inverse FFT
 	af::array F = WienerFilter * G;
-
-	// Inverse FFT and shift to compensate for center-placed PSF
-	int xShift = blurredInput.dims(0) / 2;
-	int yShift = blurredInput.dims(1) / 2;
-	af::array result = af::shift(af::ifft2(F), xShift, yShift);
+	af::array result = af::ifft2(F);
 
 	return af::real(result);
 }
