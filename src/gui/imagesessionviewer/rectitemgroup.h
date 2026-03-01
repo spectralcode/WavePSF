@@ -33,6 +33,7 @@ protected:
 public slots:
 	void generateRects(int totalWidth, int totalHeight, int numberOfRectsInX, int numberOfRectsInY);
 	void highlightSingleRect(int rectId);
+	void highlightMultipleRects(const QVector<int>& rectIds);
 
 signals:
 	void error(QString);

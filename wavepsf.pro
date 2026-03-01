@@ -48,7 +48,10 @@ SOURCES += \
 	$$SOURCEDIR/gui/psfcontrol/deconvolutionsettingswidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/psfsettingsdialog.cpp \
 	$$SOURCEDIR/core/psf/psfsettings.cpp \
-	$$SOURCEDIR/data/wavefrontparametertable.cpp
+	$$SOURCEDIR/data/wavefrontparametertable.cpp \
+	$$SOURCEDIR/core/optimization/imagemetriccalculator.cpp \
+	$$SOURCEDIR/core/optimization/optimizationworker.cpp \
+	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.cpp
 
 HEADERS += \
 	$$QCUSTOMPLOTDIR/qcustomplot.h \
@@ -84,7 +87,10 @@ HEADERS += \
 	$$SOURCEDIR/gui/psfcontrol/deconvolutionsettingswidget.h \
 	$$SOURCEDIR/gui/psfcontrol/psfsettingsdialog.h \
 	$$SOURCEDIR/core/psf/psfsettings.h \
-	$$SOURCEDIR/data/wavefrontparametertable.h
+	$$SOURCEDIR/data/wavefrontparametertable.h \
+	$$SOURCEDIR/core/optimization/imagemetriccalculator.h \
+	$$SOURCEDIR/core/optimization/optimizationworker.h \
+	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.h
 
 FORMS += \
 	$$SOURCEDIR/gui/mainwindow.ui

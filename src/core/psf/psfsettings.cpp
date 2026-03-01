@@ -76,6 +76,96 @@ QString formatNollIndexSpec(const QVector<int>& indices)
 	return parts.join(", ");
 }
 
+QVector<int> parseIndexSpec(const QString& spec)
+{
+	QVector<int> result;
+	QStringList parts = spec.split(',', QString::SkipEmptyParts);
+
+	for (const QString& part : qAsConst(parts)) {
+		QString trimmed = part.trimmed();
+		if (trimmed.isEmpty()) {
+			continue;
+		}
+
+		int dashIndex = trimmed.indexOf('-');
+		if (dashIndex > 0) {
+			// Range: "2-10"
+			bool okStart = false, okEnd = false;
+			int start = trimmed.left(dashIndex).trimmed().toInt(&okStart);
+			int end = trimmed.mid(dashIndex + 1).trimmed().toInt(&okEnd);
+			if (okStart && okEnd && start >= 0 && end >= start) {
+				for (int i = start; i <= end; ++i) {
+					if (!result.contains(i)) {
+						result.append(i);
+					}
+				}
+			}
+		} else {
+			// Single index: "7"
+			bool ok = false;
+			int val = trimmed.toInt(&ok);
+			if (ok && val >= 0 && !result.contains(val)) {
+				result.append(val);
+			}
+		}
+	}
+
+	std::sort(result.begin(), result.end());
+	return result;
+}
+
+QVector<int> parseFrameSpec(const QString& spec)
+{
+	QVector<int> result;
+	QStringList parts = spec.split(',', QString::SkipEmptyParts);
+
+	for (const QString& part : qAsConst(parts)) {
+		QString trimmed = part.trimmed();
+		if (trimmed.isEmpty()) {
+			continue;
+		}
+
+		int dashIndex = trimmed.indexOf('-');
+		int colonIndex = trimmed.indexOf(':');
+
+		if (dashIndex > 0) {
+			// Range with optional step: "0-500" or "0-500:50"
+			QString rangeStr = (colonIndex > dashIndex)
+				? trimmed.left(colonIndex).trimmed()
+				: trimmed;
+
+			bool okStart = false, okEnd = false;
+			int start = rangeStr.left(dashIndex).trimmed().toInt(&okStart);
+			int end = rangeStr.mid(dashIndex + 1).trimmed().toInt(&okEnd);
+
+			int step = 1;
+			if (colonIndex > dashIndex) {
+				bool okStep = false;
+				step = trimmed.mid(colonIndex + 1).trimmed().toInt(&okStep);
+				if (!okStep || step < 1) step = 1;
+			}
+
+			if (okStart && okEnd && start >= 0 && end >= start) {
+				for (int i = start; i <= end; i += step) {
+					if (!result.contains(i)) {
+						result.append(i);
+					}
+				}
+			}
+		} else {
+			// Single frame number: "200"
+			bool ok = false;
+			int val = trimmed.toInt(&ok);
+			if (ok && val >= 0 && !result.contains(val)) {
+				result.append(val);
+			}
+		}
+	}
+
+	std::sort(result.begin(), result.end());
+	return result;
+}
+
 QVariantMap serializePSFSettings(const PSFSettings& settings)
 {
 	QVariantMap map;

@@ -275,6 +275,31 @@ ImagePatch ImageSession::getCurrentGroundTruthPatch()
 	return this->groundTruthAccessor->getExtendedPatch(this->currentPatch.x(), this->currentPatch.y(), groundTruthFrame);
 }
 
+ImagePatch ImageSession::getInputPatch(int frameNr, int patchX, int patchY)
+{
+	if (!this->hasInputData() || this->inputAccessor == nullptr) {
+		return ImagePatch();
+	}
+	if (!this->isValidFrame(frameNr) || !this->isValidPatch(patchX, patchY)) {
+		return ImagePatch();
+	}
+	return this->inputAccessor->getExtendedPatch(patchX, patchY, frameNr);
+}
+
+ImagePatch ImageSession::getGroundTruthPatch(int frameNr, int patchX, int patchY)
+{
+	if (!this->hasGroundTruthData() || this->groundTruthAccessor == nullptr) {
+		return ImagePatch();
+	}
+	if (!this->isValidPatch(patchX, patchY)) {
+		return ImagePatch();
+	}
+	// Map frame to ground truth frame (single-frame GT → always 0)
+	int gtFrames = this->groundTruthData->getFrames();
+	int gtFrame = (gtFrames == 1) ? 0 : qBound(0, frameNr, gtFrames - 1);
+	return this->groundTruthAccessor->getExtendedPatch(patchX, patchY, gtFrame);
+}
+
 void ImageSession::setCurrentOutputPatch(const af::array& data)
 {
 	if (!this->hasOutputData() || this->outputAccessor == nullptr) {

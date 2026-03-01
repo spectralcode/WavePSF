@@ -7,11 +7,13 @@
 #include <arrayfire.h>
 #include "core/psf/wavefrontparameter.h"
 #include "core/psf/psfsettings.h"
+#include "core/optimization/optimizationworker.h"
 
 class CoefficientEditorWidget;
 class WavefrontPlotWidget;
 class PSFPreviewWidget;
 class DeconvolutionSettingsWidget;
+class OptimizationWidget;
 class QTabWidget;
 
 class PSFControlWidget : public QGroupBox
@@ -24,6 +26,7 @@ public:
 	QString getName() const;
 	QVariantMap getSettings() const;
 	void setSettings(const QVariantMap& settings);
+	PSFSettings getPSFSettings() const;
 
 public slots:
 	void setParameterDescriptors(QVector<WavefrontParameter> descriptors);
@@ -31,6 +34,10 @@ public slots:
 	void updateWavefront(af::array wavefront);
 	void updatePSF(af::array psf);
 	void setPSFSettings(const PSFSettings& settings);
+	void setGroundTruthAvailable(bool available);
+	void updateOptimizationProgress(const OptimizationProgress& progress);
+	void onOptimizationFinished(const OptimizationResult& result);
+	void onOptimizationStarted();
 
 signals:
 	void coefficientChanged(int id, double value);
@@ -45,12 +52,18 @@ signals:
 	void deconvLiveModeChanged(bool enabled);
 	void deconvolutionRequested();
 
+	// Optimization signals (forwarded from OptimizationWidget)
+	void optimizationRequested(OptimizationConfig config);
+	void optimizationCancelRequested();
+	void optimizationPatchSelectionChanged(QVector<int> patchLinearIds);
+
 private:
 	QTabWidget* tabWidget;
 	CoefficientEditorWidget* coeffEditor;
 	WavefrontPlotWidget* wavefrontPlot;
 	PSFPreviewWidget* psfPreview;
 	DeconvolutionSettingsWidget* deconvSettings;
+	OptimizationWidget* optimizationWidget;
 	PSFSettings currentSettings;
 };
 

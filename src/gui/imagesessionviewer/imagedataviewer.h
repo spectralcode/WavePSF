@@ -45,6 +45,7 @@ public:
 	void configurePatchGrid(int cols, int rows);
 	void setPatchGridVisible(bool visible);
 	void highlightPatch(int patchId);
+	void highlightPatches(const QVector<int>& patchIds);
 
 	// Utility
 	void reset();

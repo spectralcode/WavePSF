@@ -4,9 +4,12 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include <QThread>
+#include <QElapsedTimer>
 #include <arrayfire.h>
 #include "core/psf/wavefrontparameter.h"
 #include "core/psf/psfsettings.h"
+#include "core/optimization/optimizationworker.h"
 
 // Forward declarations
 class ImageSession;
@@ -77,6 +80,10 @@ public slots:
 	void setDeconvolutionLiveMode(bool enabled);
 	void requestDeconvolution();
 
+	// Optimization
+	void startOptimization(const OptimizationConfig& uiConfig);
+	void cancelOptimization();
+
 private slots:
 	// Handle data changes that require session broadcast
 	void handleInputDataChanged();
@@ -86,6 +93,10 @@ private slots:
 	// Live deconvolution triggers
 	void handlePSFUpdatedForDeconvolution(af::array psf);
 	void handleDeconvolutionSettingsChanged();
+
+	// Optimization handling
+	void handleOptimizationProgress(const OptimizationProgress& progress);
+	void handleOptimizationFinished(const OptimizationResult& result);
 
 private:
 	// File operations
@@ -101,6 +112,10 @@ private:
 	// Deconvolution orchestration
 	void runDeconvolutionOnCurrentPatch();
 
+	// Optimization orchestration
+	void initializeOptimizationThread();
+	bool buildOptimizationJobs(OptimizationConfig& config);
+
 	// Parameter table orchestration
 	void storeCurrentCoefficients();
 	void loadCoefficientsForCurrentPatch();
@@ -114,6 +129,17 @@ private:
 
 	// Deconvolution state
 	bool deconvolutionLiveMode;
+
+	// Optimization threading
+	QThread* optimizationThread;
+	OptimizationWorker* optimizationWorker;
+
+	// Optimization live preview state
+	bool optimizationLivePreview;
+	int optimizationLivePreviewInterval;
+	int optimizationProgressCounter;
+	QElapsedTimer progressUpdateTimer;
+	bool suppressLiveDeconv;
 
 signals:
 	// File loading results
@@ -143,6 +169,12 @@ signals:
 
 	// PSF settings broadcast
 	void psfSettingsUpdated(PSFSettings settings);
+
+	// Optimization signals
+	void optimizationStarted();
+	void optimizationProgressUpdated(OptimizationProgress progress);
+	void optimizationFinished(OptimizationResult result);
+	void runOptimizationOnWorker(OptimizationConfig config);
 };
 
 #endif // APPLICATIONCONTROLLER_H

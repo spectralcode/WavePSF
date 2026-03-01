@@ -161,6 +161,11 @@ void ImageDataViewer::highlightPatch(int patchId)
 	this->frameView->highlightSingleRect(patchId);
 }
 
+void ImageDataViewer::highlightPatches(const QVector<int>& patchIds)
+{
+	this->frameView->highlightMultipleRects(patchIds);
+}
+
 void ImageDataViewer::reset()
 {
 	if (this->getCurrentDataSource() != nullptr) {

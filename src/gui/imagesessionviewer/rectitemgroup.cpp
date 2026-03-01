@@ -76,6 +76,18 @@ void RectItemGroup::highlightSingleRect(int rectId)
 	}
 }
 
+void RectItemGroup::highlightMultipleRects(const QVector<int>& rectIds)
+{
+	foreach(auto item, this->rectItems) {
+		item->setRectSelected(false);
+	}
+	for (int rectId : rectIds) {
+		if (rectId >= 0 && rectId < this->rectItems.size()) {
+			this->rectItems.at(rectId)->setRectSelected(true);
+		}
+	}
+}
+
 
 
 

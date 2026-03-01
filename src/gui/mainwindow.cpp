@@ -55,6 +55,11 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	this->connectPSFControlWidget();
 	this->loadSettings();
 
+	// Apply loaded PSF settings to the controller (loadSettings only deserializes
+	// into PSFControlWidget, this actually activates them in PSFModule)
+	this->currentPSFSettings = this->psfControlWidget->getPSFSettings();
+	this->applicationController->applyPSFSettings(this->currentPSFSettings);
+
 	// Broadcast initial state after all connections are made
 	this->applicationController->broadcastCurrentState();
 
@@ -280,6 +285,30 @@ void MainWindow::connectPSFControlWidget() {
 		// PSF settings: ApplicationController → PSFControlWidget (for initial broadcast + updates)
 		connect(this->applicationController, &ApplicationController::psfSettingsUpdated,
 				this->psfControlWidget, &PSFControlWidget::setPSFSettings);
+
+		// Optimization: PSFControlWidget → ApplicationController
+		connect(this->psfControlWidget, &PSFControlWidget::optimizationRequested,
+				this->applicationController, &ApplicationController::startOptimization);
+		connect(this->psfControlWidget, &PSFControlWidget::optimizationCancelRequested,
+				this->applicationController, &ApplicationController::cancelOptimization);
+
+		// Optimization: ApplicationController → PSFControlWidget
+		connect(this->applicationController, &ApplicationController::optimizationStarted,
+				this->psfControlWidget, &PSFControlWidget::onOptimizationStarted);
+		connect(this->applicationController, &ApplicationController::optimizationProgressUpdated,
+				this->psfControlWidget, &PSFControlWidget::updateOptimizationProgress);
+		connect(this->applicationController, &ApplicationController::optimizationFinished,
+				this->psfControlWidget, &PSFControlWidget::onOptimizationFinished);
+
+		// Ground truth availability → optimization widget
+		connect(this->applicationController, &ApplicationController::groundTruthFileLoaded,
+				this, [this](const QString&) {
+					this->psfControlWidget->setGroundTruthAvailable(true);
+				});
+
+		// Multi-patch highlighting from optimization widget
+		connect(this->psfControlWidget, &PSFControlWidget::optimizationPatchSelectionChanged,
+				this->sessionViewer, &ImageSessionViewer::highlightPatches);
 
 		LOG_DEBUG() << "PSFControlWidget signal connections established";
 	}

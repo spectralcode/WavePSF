@@ -146,6 +146,16 @@ void ImageSessionViewer::highlightPatch(int x, int y)
 	this->updatePatchGridControls();
 }
 
+void ImageSessionViewer::highlightPatches(const QVector<int>& patchLinearIds)
+{
+	if (this->inputViewer != nullptr) {
+		this->inputViewer->highlightPatches(patchLinearIds);
+	}
+	if (this->outputViewer != nullptr) {
+		this->outputViewer->highlightPatches(patchLinearIds);
+	}
+}
+
 void ImageSessionViewer::configurePatchGrid(int cols, int rows, int borderExtension)
 {
 	if (!this->updatingControls) {

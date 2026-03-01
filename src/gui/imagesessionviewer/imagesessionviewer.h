@@ -37,6 +37,7 @@ public slots:
 	void updateImageSession(ImageSession* imageSession);
 	void setCurrentFrame(int frame);
 	void highlightPatch(int x, int y);
+	void highlightPatches(const QVector<int>& patchLinearIds);
 	void configurePatchGrid(int cols, int rows, int borderExtension);
 	void refreshOutputViewer();
 

@@ -336,3 +336,7 @@ void GraphicsView::setRectsVisible(bool visible) {
 void GraphicsView::highlightSingleRect(int rectId) {
 	this->grid->highlightSingleRect(rectId);
 }
+
+void GraphicsView::highlightMultipleRects(const QVector<int>& rectIds) {
+	this->grid->highlightMultipleRects(rectIds);
+}

@@ -3,6 +3,7 @@
 #include "wavefrontplotwidget.h"
 #include "psfpreviewwidget.h"
 #include "deconvolutionsettingswidget.h"
+#include "optimizationwidget.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QTabWidget>
@@ -42,8 +43,11 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 	this->deconvSettings = new DeconvolutionSettingsWidget(this->tabWidget);
 	this->tabWidget->addTab(this->deconvSettings, tr("Deconvolution"));
 
+	// Optimization tab
+	this->optimizationWidget = new OptimizationWidget(this->tabWidget);
+	this->tabWidget->addTab(this->optimizationWidget, tr("Optimization"));
+
 	// Placeholder tabs for future milestones
-	this->tabWidget->addTab(new QWidget(this->tabWidget), tr("Optimization"));
 	this->tabWidget->addTab(new QWidget(this->tabWidget), tr("Interpolation"));
 
 	// Forward signals from coefficient editor
@@ -67,6 +71,14 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 			this, &PSFControlWidget::deconvLiveModeChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::deconvolutionRequested,
 			this, &PSFControlWidget::deconvolutionRequested);
+
+	// Forward signals from optimization widget
+	connect(this->optimizationWidget, &OptimizationWidget::optimizationRequested,
+			this, &PSFControlWidget::optimizationRequested);
+	connect(this->optimizationWidget, &OptimizationWidget::optimizationCancelRequested,
+			this, &PSFControlWidget::optimizationCancelRequested);
+	connect(this->optimizationWidget, &OptimizationWidget::patchSelectionChanged,
+			this, &PSFControlWidget::optimizationPatchSelectionChanged);
 }
 
 PSFControlWidget::~PSFControlWidget()
@@ -78,11 +90,17 @@ QString PSFControlWidget::getName() const
 	return QLatin1String(SETTINGS_GROUP);
 }
 
+PSFSettings PSFControlWidget::getPSFSettings() const
+{
+	return this->currentSettings;
+}
+
 QVariantMap PSFControlWidget::getSettings() const
 {
 	QVariantMap settings;
 	settings.insert("coefficients", this->coeffEditor->getSettings());
 	settings.insert("deconvolution", this->deconvSettings->getSettings());
+	settings.insert("optimization", this->optimizationWidget->getSettings());
 	settings.insert("psf_settings", serializePSFSettings(this->currentSettings));
 	return settings;
 }
@@ -95,6 +113,9 @@ void PSFControlWidget::setSettings(const QVariantMap& settings)
 	if (settings.contains("deconvolution")) {
 		this->deconvSettings->setSettings(settings.value("deconvolution").toMap());
 	}
+	if (settings.contains("optimization")) {
+		this->optimizationWidget->setSettings(settings.value("optimization").toMap());
+	}
 	if (settings.contains("psf_settings")) {
 		this->currentSettings = deserializePSFSettings(settings.value("psf_settings").toMap());
 	}
@@ -103,6 +124,7 @@ void PSFControlWidget::setSettings(const QVariantMap& settings)
 void PSFControlWidget::setParameterDescriptors(QVector<WavefrontParameter> descriptors)
 {
 	this->coeffEditor->setParameterDescriptors(descriptors);
+	this->optimizationWidget->setParameterDescriptors(descriptors);
 }
 
 void PSFControlWidget::setCoefficients(const QVector<double>& values)
@@ -123,4 +145,24 @@ void PSFControlWidget::updatePSF(af::array psf)
 void PSFControlWidget::setPSFSettings(const PSFSettings& settings)
 {
 	this->currentSettings = settings;
+}
+
+void PSFControlWidget::setGroundTruthAvailable(bool available)
+{
+	this->optimizationWidget->setGroundTruthAvailable(available);
+}
+
+void PSFControlWidget::updateOptimizationProgress(const OptimizationProgress& progress)
+{
+	this->optimizationWidget->updateProgress(progress);
+}
+
+void PSFControlWidget::onOptimizationFinished(const OptimizationResult& result)
+{
+	this->optimizationWidget->onOptimizationFinished(result);
+}
+
+void PSFControlWidget::onOptimizationStarted()
+{
+	this->optimizationWidget->onOptimizationStarted();
 }
