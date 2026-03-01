@@ -101,21 +101,27 @@ void WavefrontPlotWidget::updatePlot(af::array wavefront)
 
 	this->applyDataRange();
 	this->plot->rescaleAxes();
-	this->plot->yAxis->setScaleRatio(this->plot->xAxis, 1.0);
+	this->enforceAspectRatio();
 	this->plot->replot();
 }
 
 void WavefrontPlotWidget::resetView()
 {
 	this->plot->rescaleAxes();
-	this->plot->yAxis->setScaleRatio(this->plot->xAxis, 1.0);
+	this->enforceAspectRatio();
 	this->plot->replot();
 }
 
 void WavefrontPlotWidget::enforceAspectRatio()
 {
-	// Called via beforeReplot — just set the ratio, no replot() needed
-	this->plot->yAxis->setScaleRatio(this->plot->xAxis, 1.0);
+	// Adjust the axis with more room to match the tighter one,
+	// so the full data range is always visible with 1:1 aspect ratio
+	QCPAxisRect* ar = this->plot->axisRect();
+	if (ar->width() > ar->height()) {
+		this->plot->xAxis->setScaleRatio(this->plot->yAxis, 1.0);
+	} else {
+		this->plot->yAxis->setScaleRatio(this->plot->xAxis, 1.0);
+	}
 }
 
 void WavefrontPlotWidget::setupGradientCombo()
