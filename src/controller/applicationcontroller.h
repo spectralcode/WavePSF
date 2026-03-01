@@ -90,6 +90,10 @@ public slots:
 	// Optimization
 	void startOptimization(const OptimizationConfig& uiConfig);
 	void cancelOptimization();
+	void updateOptimizationLivePreview(bool enabled, int interval);
+	void updateOptimizationSAParameters(double endTemp, double coolingFactor,
+										double startPerturb, double endPerturb,
+										int itersPerTemp);
 
 	// Coefficient clipboard
 	void copyCoefficients();

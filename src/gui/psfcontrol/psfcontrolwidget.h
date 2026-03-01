@@ -62,6 +62,10 @@ signals:
 	void optimizationRequested(OptimizationConfig config);
 	void optimizationCancelRequested();
 	void optimizationPatchSelectionChanged(QVector<int> patchLinearIds);
+	void optimizationLivePreviewChanged(bool enabled, int interval);
+	void optimizationSAParametersChanged(double endTemp, double coolingFactor,
+										 double startPerturb, double endPerturb,
+										 int itersPerTemp);
 
 	// Interpolation signals (forwarded from InterpolationWidget)
 	void interpolateInXRequested();

@@ -24,6 +24,18 @@ void OptimizationWorker::requestCancel()
 	this->cancelRequested.storeRelease(1);
 }
 
+void OptimizationWorker::updateLiveSAParameters(double endTemp, double coolingFactor,
+												double startPerturb, double endPerturb,
+												int itersPerTemp)
+{
+	QMutexLocker locker(&this->liveParamsMutex);
+	this->liveEndTemperature = endTemp;
+	this->liveCoolingFactor = coolingFactor;
+	this->liveStartPerturbance = startPerturb;
+	this->liveEndPerturbance = endPerturb;
+	this->liveIterationsPerTemperature = itersPerTemp;
+}
+
 void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 {
 	this->cancelRequested.storeRelease(0);
@@ -96,6 +108,16 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 	finalResult.totalOuterIterations = 0;
 	finalResult.wasCancelled = false;
 
+	// Initialize live-updatable SA parameters from config
+	{
+		QMutexLocker locker(&this->liveParamsMutex);
+		this->liveEndTemperature = config.endTemperature;
+		this->liveCoolingFactor = config.coolingFactor;
+		this->liveStartPerturbance = config.startPerturbance;
+		this->liveEndPerturbance = config.endPerturbance;
+		this->liveIterationsPerTemperature = config.iterationsPerTemperature;
+	}
+
 	// Process each job
 	for (int jobIdx = 0; jobIdx < config.jobs.size(); ++jobIdx) {
 		if (this->cancelRequested.loadAcquire()) {
@@ -125,9 +147,16 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 		double bestMetric = metricOld;
 		int outerIteration = 0;
 
+		// Local copies of live-updatable SA parameters
+		double saEndTemp = config.endTemperature;
+		double saCoolingFactor = config.coolingFactor;
+		double saStartPerturb = config.startPerturbance;
+		double saEndPerturb = config.endPerturbance;
+		int saItersPerTemp = config.iterationsPerTemperature;
+
 		// SA main loop
-		while (temperature > config.endTemperature && !this->cancelRequested.loadAcquire()) {
-			for (int i = 0; i < config.iterationsPerTemperature; ++i) {
+		while (temperature > saEndTemp && !this->cancelRequested.loadAcquire()) {
+			for (int i = 0; i < saItersPerTemp; ++i) {
 				if (this->cancelRequested.loadAcquire()) break;
 
 				// Evaluate current coefficients
@@ -154,8 +183,8 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 				}
 
 				// Perturb for next iteration (scale perturbance with temperature)
-				double t = (temperature - config.endTemperature) / (config.startTemperature - config.endTemperature);
-				double basePerturbance = config.endPerturbance + t * (config.startPerturbance - config.endPerturbance);
+				double t = (temperature - saEndTemp) / (config.startTemperature - saEndTemp);
+				double basePerturbance = saEndPerturb + t * (saStartPerturb - saEndPerturb);
 				double iterPerturbance = basePerturbance / (i + 1.0);
 				if (iterPerturbance < 0.00005) iterPerturbance = 0.00005;
 				this->perturbCoefficients(currentCoeffs, config.selectedCoefficientIndices,
@@ -163,9 +192,19 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 			}
 
 			// Cool down
-			temperature *= config.coolingFactor;
+			temperature *= saCoolingFactor;
 			outerIteration++;
 			finalResult.totalOuterIterations++;
+
+			// Read live parameter updates from main thread
+			{
+				QMutexLocker locker(&this->liveParamsMutex);
+				saEndTemp = this->liveEndTemperature;
+				saCoolingFactor = this->liveCoolingFactor;
+				saStartPerturb = this->liveStartPerturbance;
+				saEndPerturb = this->liveEndPerturbance;
+				saItersPerTemp = this->liveIterationsPerTemperature;
+			}
 
 			// Report progress
 			OptimizationProgress progress;

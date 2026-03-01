@@ -461,6 +461,10 @@ void MainWindow::connectPSFControlWidget() {
 				this->applicationController, &ApplicationController::startOptimization);
 		connect(this->psfControlWidget, &PSFControlWidget::optimizationCancelRequested,
 				this->applicationController, &ApplicationController::cancelOptimization);
+		connect(this->psfControlWidget, &PSFControlWidget::optimizationLivePreviewChanged,
+				this->applicationController, &ApplicationController::updateOptimizationLivePreview);
+		connect(this->psfControlWidget, &PSFControlWidget::optimizationSAParametersChanged,
+				this->applicationController, &ApplicationController::updateOptimizationSAParameters);
 
 		// Optimization: ApplicationController → PSFControlWidget
 		connect(this->applicationController, &ApplicationController::optimizationStarted,

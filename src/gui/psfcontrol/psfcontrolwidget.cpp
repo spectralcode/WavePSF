@@ -97,6 +97,10 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 			this, &PSFControlWidget::optimizationCancelRequested);
 	connect(this->optimizationWidget, &OptimizationWidget::patchSelectionChanged,
 			this, &PSFControlWidget::optimizationPatchSelectionChanged);
+	connect(this->optimizationWidget, &OptimizationWidget::livePreviewSettingsChanged,
+			this, &PSFControlWidget::optimizationLivePreviewChanged);
+	connect(this->optimizationWidget, &OptimizationWidget::saParametersChanged,
+			this, &PSFControlWidget::optimizationSAParametersChanged);
 
 	// Forward signals from interpolation widget
 	connect(this->interpolationWidget, &InterpolationWidget::interpolateInXRequested,

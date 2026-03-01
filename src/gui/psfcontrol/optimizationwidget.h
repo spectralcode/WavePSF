@@ -41,6 +41,10 @@ signals:
 	void optimizationRequested(OptimizationConfig config);
 	void optimizationCancelRequested();
 	void patchSelectionChanged(QVector<int> patchLinearIds);
+	void livePreviewSettingsChanged(bool enabled, int interval);
+	void saParametersChanged(double endTemp, double coolingFactor,
+							 double startPerturb, double endPerturb,
+							 int itersPerTemp);
 
 private slots:
 	void onModeChanged(int index);
@@ -51,6 +55,8 @@ private slots:
 	void onPatchTextChanged(const QString& text);
 	void resetPlotView();
 	void showPlotContextMenu(const QPoint& pos);
+	void emitSAParametersChanged();
+	void emitLivePreviewSettingsChanged();
 
 private:
 	void setupUI();

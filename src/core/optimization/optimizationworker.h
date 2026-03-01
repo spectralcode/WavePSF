@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QVector>
 #include <QAtomicInt>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QMetaType>
 #include <arrayfire.h>
 #include "core/psf/psfsettings.h"
@@ -108,6 +110,11 @@ public:
 	// Thread-safe cancellation (called from main thread)
 	void requestCancel();
 
+	// Thread-safe live SA parameter update (called from main thread)
+	void updateLiveSAParameters(double endTemp, double coolingFactor,
+								double startPerturb, double endPerturb,
+								int itersPerTemp);
+
 public slots:
 	void runOptimization(const OptimizationConfig& config);
 
@@ -118,6 +125,14 @@ signals:
 
 private:
 	QAtomicInt cancelRequested;
+
+	// Live-updatable SA parameters (protected by mutex)
+	QMutex liveParamsMutex;
+	double liveEndTemperature;
+	double liveCoolingFactor;
+	double liveStartPerturbance;
+	double liveEndPerturbance;
+	int liveIterationsPerTemperature;
 
 	void perturbCoefficients(QVector<double>& coefficients,
 							 const QVector<int>& selectedIndices,

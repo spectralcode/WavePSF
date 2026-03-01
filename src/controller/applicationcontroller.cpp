@@ -787,6 +787,26 @@ void ApplicationController::cancelOptimization()
 	}
 }
 
+void ApplicationController::updateOptimizationLivePreview(bool enabled, int interval)
+{
+	this->optimizationLivePreview = enabled;
+	this->optimizationLivePreviewInterval = interval;
+	if (enabled) {
+		this->optimizationProgressCounter = 0;
+		this->progressUpdateTimer.restart();
+	}
+}
+
+void ApplicationController::updateOptimizationSAParameters(double endTemp, double coolingFactor,
+														   double startPerturb, double endPerturb,
+														   int itersPerTemp)
+{
+	if (this->optimizationWorker != nullptr) {
+		this->optimizationWorker->updateLiveSAParameters(
+			endTemp, coolingFactor, startPerturb, endPerturb, itersPerTemp);
+	}
+}
+
 bool ApplicationController::buildOptimizationJobs(OptimizationConfig& config)
 {
 	const int gridCols = this->imageSession->getPatchGridCols();

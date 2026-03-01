@@ -192,6 +192,18 @@ void OptimizationWidget::setupSAParametersSection(QVBoxLayout* layout)
 	saForm->addRow(tr("Iterations/Temperature:"), this->itersPerTempSpinBox);
 
 	layout->addWidget(saGroup);
+
+	// Live SA parameter updates during optimization
+	connect(this->endTempSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, &OptimizationWidget::emitSAParametersChanged);
+	connect(this->coolingFactorSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, &OptimizationWidget::emitSAParametersChanged);
+	connect(this->startPerturbanceSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, &OptimizationWidget::emitSAParametersChanged);
+	connect(this->endPerturbanceSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, &OptimizationWidget::emitSAParametersChanged);
+	connect(this->itersPerTempSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+			this, &OptimizationWidget::emitSAParametersChanged);
 }
 
 void OptimizationWidget::setupMetricSection(QVBoxLayout* layout)
@@ -276,6 +288,10 @@ void OptimizationWidget::setupControlSection(QVBoxLayout* layout)
 			this, &OptimizationWidget::onCancelClicked);
 	connect(this->livePreviewCheckBox, &QCheckBox::toggled,
 			this->livePreviewIntervalSpinBox, &QSpinBox::setEnabled);
+	connect(this->livePreviewCheckBox, &QCheckBox::toggled,
+			this, &OptimizationWidget::emitLivePreviewSettingsChanged);
+	connect(this->livePreviewIntervalSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+			this, &OptimizationWidget::emitLivePreviewSettingsChanged);
 }
 
 void OptimizationWidget::setupStatusSection(QVBoxLayout* layout)
@@ -530,6 +546,27 @@ void OptimizationWidget::setRunning(bool running)
 	this->modeComboBox->setEnabled(!running);
 	this->batchGroup->setEnabled(!running);
 	this->initialValuesGroup->setEnabled(!running);
+}
+
+void OptimizationWidget::emitSAParametersChanged()
+{
+	if (this->isRunning) {
+		emit saParametersChanged(
+			this->endTempSpinBox->value(),
+			this->coolingFactorSpinBox->value(),
+			this->startPerturbanceSpinBox->value(),
+			this->endPerturbanceSpinBox->value(),
+			this->itersPerTempSpinBox->value());
+	}
+}
+
+void OptimizationWidget::emitLivePreviewSettingsChanged()
+{
+	if (this->isRunning) {
+		emit livePreviewSettingsChanged(
+			this->livePreviewCheckBox->isChecked(),
+			this->livePreviewIntervalSpinBox->value());
+	}
 }
 
 QString OptimizationWidget::getName() const
