@@ -46,6 +46,7 @@ private slots:
 	void openGroundTruth();
 	void saveParameters();
 	void loadParameters();
+	void saveOutputData();
 
 	// Settings
 	void openSettings();
@@ -91,6 +92,7 @@ private:
 	QAction* openGroundTruthAction;
 	QAction* saveParametersAction;
 	QAction* loadParametersAction;
+	QAction* saveOutputAction;
 
 	// Style actions
 	QList<QAction*> styleActions;

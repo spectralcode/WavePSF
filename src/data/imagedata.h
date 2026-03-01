@@ -61,6 +61,9 @@ public:
 	// Utility
 	double getMaxPixelValue();
 	void saveDataToDisk(const QString& filePath);
+	void saveAsEnvi(const QString& filePath);
+	void saveAsTiff(const QString& filePath);
+	void saveFrameAsImage(const QString& filePath, int frameNr);
 
 private:
 	int width;

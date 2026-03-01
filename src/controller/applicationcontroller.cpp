@@ -805,6 +805,15 @@ void ApplicationController::handleOptimizationFinished(const OptimizationResult&
 	emit optimizationFinished(result);
 }
 
+// --- File Output ---
+
+void ApplicationController::saveOutputToFile(const QString& filePath)
+{
+	if (this->imageSession != nullptr) {
+		this->imageSession->saveOutputToFile(filePath, this->getCurrentFrame());
+	}
+}
+
 // --- Interpolation ---
 
 void ApplicationController::interpolateCoefficientsInX()

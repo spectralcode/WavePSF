@@ -90,6 +90,9 @@ public slots:
 	void copyCoefficients();
 	void pasteCoefficients();
 
+	// File output
+	void saveOutputToFile(const QString& filePath);
+
 	// Interpolation
 	void interpolateCoefficientsInX();
 	void interpolateCoefficientsInY();

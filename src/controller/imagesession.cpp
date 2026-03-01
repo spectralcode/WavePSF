@@ -1,6 +1,7 @@
 #include "imagesession.h"
 #include "utils/logging.h"
 #include "utils/settingsfilemanager.h"
+#include <QFileInfo>
 
 namespace {
 	const int DEFAULT_PATCH_GRID_COLS = 1;
@@ -410,6 +411,32 @@ int ImageSession::getOutputFrames() const { return this->hasOutputData() ? this-
 int ImageSession::getGroundTruthWidth() const { return this->hasGroundTruthData() ? this->groundTruthData->getWidth() : 0; }
 int ImageSession::getGroundTruthHeight() const { return this->hasGroundTruthData() ? this->groundTruthData->getHeight() : 0; }
 int ImageSession::getGroundTruthFrames() const { return this->hasGroundTruthData() ? this->groundTruthData->getFrames() : 0; }
+
+void ImageSession::saveOutputToFile(const QString& filePath, int currentFrame)
+{
+	if (this->outputData == nullptr) {
+		LOG_WARNING() << "No output data to save";
+		return;
+	}
+
+	// Flush any cached GPU data to CPU
+	if (this->outputAccessor != nullptr) {
+		this->outputAccessor->forceSyncToCPU();
+	}
+
+	// Detect format from extension
+	QFileInfo fileInfo(filePath);
+	QString suffix = fileInfo.suffix().toLower();
+
+	if (suffix == "dat" || suffix == "raw" || suffix == "img" || suffix == "bin" || suffix == "hdr") {
+		this->outputData->saveAsEnvi(filePath);
+	} else if (suffix == "tif" || suffix == "tiff") {
+		this->outputData->saveAsTiff(filePath);
+	} else {
+		// Standard image format (png, bmp, jpg, etc.) single frame, 8-bit
+		this->outputData->saveFrameAsImage(filePath, currentFrame);
+	}
+}
 
 bool ImageSession::isValidFrame(int frame) const
 {

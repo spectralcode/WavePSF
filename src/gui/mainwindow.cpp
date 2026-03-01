@@ -50,7 +50,7 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	  guiSettings(guiSettings), styleManager(styleManager), applicationController(applicationController),
 	  fileMenu(nullptr), viewMenu(nullptr), extrasMenu(nullptr), styleMenu(nullptr),
 	  openImageDataAction(nullptr), openGroundTruthAction(nullptr),
-	  saveParametersAction(nullptr), loadParametersAction(nullptr),
+	  saveParametersAction(nullptr), loadParametersAction(nullptr), saveOutputAction(nullptr),
 	  centralSplitter(nullptr), sessionViewer(nullptr), psfControlWidget(nullptr) {
 	MessageRouter::instance()->install();
 	this->ui->setupUi(this);
@@ -155,6 +155,15 @@ void MainWindow::setupFileMenu() {
 	this->loadParametersAction->setStatusTip("Load wavefront parameters from CSV file");
 	connect(this->loadParametersAction, &QAction::triggered, this, &MainWindow::loadParameters);
 	this->fileMenu->addAction(this->loadParametersAction);
+
+	this->fileMenu->addSeparator();
+
+	// Save Output Data action
+	this->saveOutputAction = new QAction("Save &Output Data...", this);
+	this->saveOutputAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
+	this->saveOutputAction->setStatusTip("Save deconvolved output data to file");
+	connect(this->saveOutputAction, &QAction::triggered, this, &MainWindow::saveOutputData);
+	this->fileMenu->addAction(this->saveOutputAction);
 
 	this->fileMenu->addSeparator();
 
@@ -444,6 +453,23 @@ void MainWindow::loadParameters() {
 	if (!filePath.isEmpty()) {
 		this->applicationController->loadParametersFromFile(filePath);
 		this->statusBar()->showMessage("Parameters loaded", 3000);
+	}
+}
+
+void MainWindow::saveOutputData() {
+	if (!this->applicationController->hasOutputData()) {
+		this->statusBar()->showMessage("No output data to save", 3000);
+		return;
+	}
+	const QString filePath = QFileDialog::getSaveFileName(
+		this,
+		"Save Output Data",
+		QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+		"ENVI Files (*.img);;TIFF Image (*.tif);;PNG Image (current frame only) (*.png)"
+	);
+	if (!filePath.isEmpty()) {
+		this->applicationController->saveOutputToFile(filePath);
+		this->statusBar()->showMessage("Output data saved", 3000);
 	}
 }
 

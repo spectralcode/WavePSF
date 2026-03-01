@@ -2,6 +2,9 @@
 #include "utils/logging.h"
 #include <QImage>
 #include <QFile>
+#include <QFileInfo>
+#include <QDir>
+#include <QTextStream>
 #include <QtMath>
 #include <cstring>
 #include <algorithm>
@@ -273,6 +276,251 @@ void ImageData::saveDataToDisk(const QString& filePath)
 	}
 
 	outputFile.close();
+}
+
+void ImageData::saveAsEnvi(const QString& filePath)
+{
+	if (this->data == nullptr) {
+		LOG_WARNING() << "No data to save";
+		return;
+	}
+
+	// Derive base name (strip known extensions)
+	QFileInfo fileInfo(filePath);
+	QString baseName;
+	QString suffix = fileInfo.suffix().toLower();
+	if (suffix == "hdr" || suffix == "dat" || suffix == "img" || suffix == "raw" || suffix == "bin") {
+		baseName = QDir(fileInfo.absolutePath()).filePath(fileInfo.baseName());
+	} else {
+		baseName = filePath;
+	}
+
+	QString hdrPath = baseName + ".hdr";
+	QString datPath = baseName + ".img";
+
+	// Write ENVI header
+	QFile hdrFile(hdrPath);
+	if (!hdrFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+		LOG_WARNING() << "Could not write ENVI header:" << hdrFile.errorString();
+		return;
+	}
+
+	QTextStream out(&hdrFile);
+	out << "ENVI\n";
+	out << "description = {WavePSF deconvolved output}\n";
+	out << "samples = " << this->width << "\n";
+	out << "lines = " << this->height << "\n";
+	out << "bands = " << this->frames << "\n";
+	out << "header offset = 0\n";
+	out << "file type = ENVI Standard\n";
+	out << "data type = " << static_cast<int>(this->dataType) << "\n";
+	out << "interleave = bsq\n";
+	out << "byte order = 0\n";
+
+	if (!this->wavelengthUnit.isEmpty()) {
+		out << "wavelength units = " << this->wavelengthUnit << "\n";
+	}
+
+	if (!this->wavelengths.isEmpty()) {
+		out << "wavelength = {";
+		for (int i = 0; i < this->wavelengths.size(); i++) {
+			if (i > 0) out << ", ";
+			out << QString::number(this->wavelengths[i], 'f', 6);
+		}
+		out << "}\n";
+	}
+
+	hdrFile.close();
+	LOG_INFO() << "ENVI header written:" << hdrPath;
+
+	// Write binary data
+	this->saveDataToDisk(datPath);
+}
+
+void ImageData::saveAsTiff(const QString& filePath)
+{
+	if (this->data == nullptr) {
+		LOG_WARNING() << "No data to save as TIFF";
+		return;
+	}
+
+	// Map EnviDataType to TIFF BitsPerSample and SampleFormat
+	uint16_t bitsPerSample = 0;
+	uint16_t sampleFormat = 1; // 1=uint, 2=int, 3=IEEE float
+	switch (this->dataType) {
+		case UNSIGNED_CHAR_8BIT:       bitsPerSample = 8;  sampleFormat = 1; break;
+		case SIGNED_SHORT_16BIT:       bitsPerSample = 16; sampleFormat = 2; break;
+		case UNSIGNED_SHORT_16BIT:     bitsPerSample = 16; sampleFormat = 1; break;
+		case SIGNED_INT_32BIT:         bitsPerSample = 32; sampleFormat = 2; break;
+		case UNSIGNED_INT_32BIT:       bitsPerSample = 32; sampleFormat = 1; break;
+		case FLOAT_32BIT:              bitsPerSample = 32; sampleFormat = 3; break;
+		case DOUBLE_64BIT:             bitsPerSample = 64; sampleFormat = 3; break;
+		case SIGNED_LONG_INT_64BIT:    bitsPerSample = 64; sampleFormat = 2; break;
+		case UNSIGNED_LONG_INT_64BIT:  bitsPerSample = 64; sampleFormat = 1; break;
+		default:
+			LOG_WARNING() << "Unsupported data type for TIFF export:" << this->dataType;
+			return;
+	}
+
+	QFile file(filePath);
+	if (!file.open(QIODevice::WriteOnly)) {
+		LOG_WARNING() << "Could not write TIFF file:" << file.errorString();
+		return;
+	}
+
+	size_t bytesPerSample = this->calculateBytesPerSample();
+	size_t bytesPerFrame = static_cast<size_t>(this->width) * static_cast<size_t>(this->height) * bytesPerSample;
+
+	// Layout: [Header 8B] [IFD0 126B] [IFD1 126B] ... [IFDN 126B] [Frame0 data] [Frame1 data] ...
+	const int numIfdEntries = 10;
+	const uint32_t ifdSize = 2 + numIfdEntries * 12 + 4; // 126 bytes
+	const uint32_t headerSize = 8;
+	uint32_t dataStart = headerSize + static_cast<uint32_t>(this->frames) * ifdSize;
+
+	// Helper to write a 12-byte IFD entry with an inline value (fits in 4 bytes)
+	auto writeIfdEntry = [&](QDataStream& s, uint16_t tag, uint16_t type, uint32_t count, uint32_t value) {
+		s << tag << type << count << value;
+	};
+
+	QDataStream stream(&file);
+	stream.setByteOrder(QDataStream::LittleEndian);
+
+	// TIFF Header
+	stream.writeRawData("II", 2);           // Little-endian byte order
+	stream << static_cast<uint16_t>(42);    // TIFF magic number
+	stream << static_cast<uint32_t>(headerSize); // Offset to first IFD
+
+	// Write all IFDs
+	for (int f = 0; f < this->frames; f++) {
+		uint32_t frameDataOffset = dataStart + static_cast<uint32_t>(f) * static_cast<uint32_t>(bytesPerFrame);
+		uint32_t nextIfdOffset = (f < this->frames - 1) ? (headerSize + static_cast<uint32_t>(f + 1) * ifdSize) : 0;
+
+		stream << static_cast<uint16_t>(numIfdEntries);
+
+		// IFD entries must be sorted by tag number
+		writeIfdEntry(stream, 256, 4, 1, static_cast<uint32_t>(this->width));             // ImageWidth (LONG)
+		writeIfdEntry(stream, 257, 4, 1, static_cast<uint32_t>(this->height));            // ImageLength (LONG)
+		writeIfdEntry(stream, 258, 3, 1, static_cast<uint32_t>(bitsPerSample));           // BitsPerSample (SHORT)
+		writeIfdEntry(stream, 259, 3, 1, 1);                                               // Compression = None
+		writeIfdEntry(stream, 262, 3, 1, 1);                                               // PhotometricInterpretation = MinIsBlack
+		writeIfdEntry(stream, 273, 4, 1, frameDataOffset);                                 // StripOffsets (LONG)
+		writeIfdEntry(stream, 277, 3, 1, 1);                                               // SamplesPerPixel = 1
+		writeIfdEntry(stream, 278, 4, 1, static_cast<uint32_t>(this->height));            // RowsPerStrip = full height
+		writeIfdEntry(stream, 279, 4, 1, static_cast<uint32_t>(bytesPerFrame));           // StripByteCounts (LONG)
+		writeIfdEntry(stream, 339, 3, 1, static_cast<uint32_t>(sampleFormat));            // SampleFormat
+
+		stream << nextIfdOffset;
+	}
+
+	// Write frame data (raw bytes, already row-major matching TIFF strip layout)
+	const char* rawData = static_cast<const char*>(this->data);
+	for (int f = 0; f < this->frames; f++) {
+		stream.writeRawData(rawData + f * bytesPerFrame, static_cast<int>(bytesPerFrame));
+	}
+
+	file.close();
+	LOG_INFO() << "Multi-page TIFF written:" << filePath << "(" << this->frames << " frames," << bitsPerSample << "-bit)";
+}
+
+void ImageData::saveFrameAsImage(const QString& filePath, int frameNr)
+{
+	if (this->data == nullptr) {
+		LOG_WARNING() << "Invalid parameters for saveFrameAsImage";
+		return;
+	}
+
+	size_t bytesPerSample = this->calculateBytesPerSample();
+	size_t samplesPerFrame = static_cast<size_t>(this->width) * static_cast<size_t>(this->height);
+
+	// Helper to read a pixel value from a typed frame buffer
+	auto readPixel = [this](const char* buf, size_t idx) -> double {
+		switch (this->dataType) {
+			case UNSIGNED_CHAR_8BIT:    return static_cast<const unsigned char*>(static_cast<const void*>(buf))[idx];
+			case UNSIGNED_SHORT_16BIT:  return static_cast<const unsigned short*>(static_cast<const void*>(buf))[idx];
+			case SIGNED_SHORT_16BIT:    return static_cast<const short*>(static_cast<const void*>(buf))[idx];
+			case FLOAT_32BIT:           return static_cast<const float*>(static_cast<const void*>(buf))[idx];
+			case DOUBLE_64BIT:          return static_cast<const double*>(static_cast<const void*>(buf))[idx];
+			default:                    return static_cast<const unsigned char*>(static_cast<const void*>(buf))[idx];
+		}
+	};
+
+	bool isRGB = (this->frames == 3 && this->wavelengthUnit == "RGB");
+
+	if (isRGB) {
+		// Save as RGB image combining all 3 frames (R, G, B)
+		const char* rData = static_cast<const char*>(this->data);
+		const char* gData = rData + samplesPerFrame * bytesPerSample;
+		const char* bData = gData + samplesPerFrame * bytesPerSample;
+
+		// Find global min/max across all 3 channels for consistent normalization
+		double minVal = 0.0, maxVal = 0.0;
+		bool first = true;
+		for (size_t i = 0; i < samplesPerFrame; i++) {
+			double r = readPixel(rData, i), g = readPixel(gData, i), b = readPixel(bData, i);
+			if (first) { minVal = std::min({r, g, b}); maxVal = std::max({r, g, b}); first = false; }
+			else { minVal = std::min({minVal, r, g, b}); maxVal = std::max({maxVal, r, g, b}); }
+		}
+		double range = maxVal - minVal;
+		if (range < 1e-15) range = 1.0;
+
+		auto scale = [&](double v) -> uchar {
+			return static_cast<uchar>(qBound(0.0, (v - minVal) / range * 255.0, 255.0));
+		};
+
+		QImage img(this->width, this->height, QImage::Format_RGB32);
+		for (int y = 0; y < this->height; y++) {
+			QRgb* scanLine = reinterpret_cast<QRgb*>(img.scanLine(y));
+			for (int x = 0; x < this->width; x++) {
+				size_t idx = static_cast<size_t>(y) * static_cast<size_t>(this->width) + static_cast<size_t>(x);
+				scanLine[x] = qRgb(scale(readPixel(rData, idx)),
+								   scale(readPixel(gData, idx)),
+								   scale(readPixel(bData, idx)));
+			}
+		}
+
+		if (img.save(filePath)) {
+			LOG_INFO() << "RGB image saved:" << filePath;
+		} else {
+			LOG_WARNING() << "Failed to save RGB image:" << filePath;
+		}
+	} else {
+		// Save single frame as grayscale
+		if (frameNr < 0 || frameNr >= this->frames) {
+			LOG_WARNING() << "Invalid frame number for saveFrameAsImage:" << frameNr;
+			return;
+		}
+
+		const char* frameData = static_cast<const char*>(this->data) + frameNr * samplesPerFrame * bytesPerSample;
+
+		double minVal = 0.0, maxVal = 0.0;
+		bool first = true;
+		for (size_t i = 0; i < samplesPerFrame; i++) {
+			double v = readPixel(frameData, i);
+			if (first) { minVal = v; maxVal = v; first = false; }
+			else { minVal = std::min(minVal, v); maxVal = std::max(maxVal, v); }
+		}
+		double range = maxVal - minVal;
+		if (range < 1e-15) range = 1.0;
+
+		auto scale = [&](double v) -> uchar {
+			return static_cast<uchar>(qBound(0.0, (v - minVal) / range * 255.0, 255.0));
+		};
+
+		QImage img(this->width, this->height, QImage::Format_Grayscale8);
+		for (int y = 0; y < this->height; y++) {
+			uchar* scanLine = img.scanLine(y);
+			for (int x = 0; x < this->width; x++) {
+				size_t idx = static_cast<size_t>(y) * static_cast<size_t>(this->width) + static_cast<size_t>(x);
+				scanLine[x] = scale(readPixel(frameData, idx));
+			}
+		}
+
+		if (img.save(filePath)) {
+			LOG_INFO() << "Frame" << frameNr << "saved as image:" << filePath;
+		} else {
+			LOG_WARNING() << "Failed to save frame as image:" << filePath;
+		}
+	}
 }
 
 void ImageData::convertRGBToFrames(const QImage& rgbImage)

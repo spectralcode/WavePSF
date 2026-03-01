@@ -72,6 +72,9 @@ public:
 	int getGroundTruthHeight() const;
 	int getGroundTruthFrames() const;
 
+	// File output
+	void saveOutputToFile(const QString& filePath, int currentFrame);
+
 	// Validation
 	bool isValidFrame(int frame) const;
 	bool isValidPatch(int x, int y) const;
