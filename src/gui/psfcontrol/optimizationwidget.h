@@ -93,7 +93,8 @@ private:
 	QDoubleSpinBox* startTempSpinBox;
 	QDoubleSpinBox* endTempSpinBox;
 	QDoubleSpinBox* coolingFactorSpinBox;
-	QDoubleSpinBox* perturbanceSpinBox;
+	QDoubleSpinBox* startPerturbanceSpinBox;
+	QDoubleSpinBox* endPerturbanceSpinBox;
 	QSpinBox* itersPerTempSpinBox;
 
 	// Metric

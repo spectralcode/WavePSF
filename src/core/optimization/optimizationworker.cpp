@@ -153,8 +153,10 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 					}
 				}
 
-				// Perturb for next iteration
-				double iterPerturbance = config.perturbance / (i + 1.0);
+				// Perturb for next iteration (scale perturbance with temperature)
+				double t = (temperature - config.endTemperature) / (config.startTemperature - config.endTemperature);
+				double basePerturbance = config.endPerturbance + t * (config.startPerturbance - config.endPerturbance);
+				double iterPerturbance = basePerturbance / (i + 1.0);
 				if (iterPerturbance < 0.00005) iterPerturbance = 0.00005;
 				this->perturbCoefficients(currentCoeffs, config.selectedCoefficientIndices,
 										  iterPerturbance, config.minBounds, config.maxBounds);

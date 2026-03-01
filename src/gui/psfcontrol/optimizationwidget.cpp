@@ -169,13 +169,21 @@ void OptimizationWidget::setupSAParametersSection(QVBoxLayout* layout)
 	this->installScrollGuard(this->coolingFactorSpinBox);
 	saForm->addRow(tr("Cooling Factor:"), this->coolingFactorSpinBox);
 
-	this->perturbanceSpinBox = new QDoubleSpinBox(saGroup);
-	this->perturbanceSpinBox->setRange(0.0001, 10.0);
-	this->perturbanceSpinBox->setDecimals(4);
-	this->perturbanceSpinBox->setValue(0.05);
-	this->perturbanceSpinBox->setSingleStep(0.01);
-	this->installScrollGuard(this->perturbanceSpinBox);
-	saForm->addRow(tr("Perturbance:"), this->perturbanceSpinBox);
+	this->startPerturbanceSpinBox = new QDoubleSpinBox(saGroup);
+	this->startPerturbanceSpinBox->setRange(0.0001, 10.0);
+	this->startPerturbanceSpinBox->setDecimals(4);
+	this->startPerturbanceSpinBox->setValue(0.05);
+	this->startPerturbanceSpinBox->setSingleStep(0.01);
+	this->installScrollGuard(this->startPerturbanceSpinBox);
+	saForm->addRow(tr("Start Perturbance:"), this->startPerturbanceSpinBox);
+
+	this->endPerturbanceSpinBox = new QDoubleSpinBox(saGroup);
+	this->endPerturbanceSpinBox->setRange(0.0001, 10.0);
+	this->endPerturbanceSpinBox->setDecimals(4);
+	this->endPerturbanceSpinBox->setValue(0.001);
+	this->endPerturbanceSpinBox->setSingleStep(0.001);
+	this->installScrollGuard(this->endPerturbanceSpinBox);
+	saForm->addRow(tr("End Perturbance:"), this->endPerturbanceSpinBox);
 
 	this->itersPerTempSpinBox = new QSpinBox(saGroup);
 	this->itersPerTempSpinBox->setRange(1, 10000);
@@ -474,7 +482,8 @@ OptimizationConfig OptimizationWidget::buildConfig() const
 	config.startTemperature = this->startTempSpinBox->value();
 	config.endTemperature = this->endTempSpinBox->value();
 	config.coolingFactor = this->coolingFactorSpinBox->value();
-	config.perturbance = this->perturbanceSpinBox->value();
+	config.startPerturbance = this->startPerturbanceSpinBox->value();
+	config.endPerturbance = this->endPerturbanceSpinBox->value();
 	config.iterationsPerTemperature = this->itersPerTempSpinBox->value();
 
 	// Selected coefficient indices (parse from text, 0-based)
@@ -526,7 +535,8 @@ QVariantMap OptimizationWidget::getSettings() const
 	settings.insert("startTemperature", this->startTempSpinBox->value());
 	settings.insert("endTemperature", this->endTempSpinBox->value());
 	settings.insert("coolingFactor", this->coolingFactorSpinBox->value());
-	settings.insert("perturbance", this->perturbanceSpinBox->value());
+	settings.insert("startPerturbance", this->startPerturbanceSpinBox->value());
+	settings.insert("endPerturbance", this->endPerturbanceSpinBox->value());
 	settings.insert("itersPerTemp", this->itersPerTempSpinBox->value());
 	settings.insert("metricMode", this->metricModeComboBox->currentIndex());
 	settings.insert("metricType", this->metricTypeComboBox->currentIndex());
@@ -554,8 +564,13 @@ void OptimizationWidget::setSettings(const QVariantMap& settings)
 	if (settings.contains("coolingFactor")) {
 		this->coolingFactorSpinBox->setValue(settings.value("coolingFactor").toDouble());
 	}
-	if (settings.contains("perturbance")) {
-		this->perturbanceSpinBox->setValue(settings.value("perturbance").toDouble());
+	if (settings.contains("startPerturbance")) {
+		this->startPerturbanceSpinBox->setValue(settings.value("startPerturbance").toDouble());
+	} else if (settings.contains("perturbance")) {
+		this->startPerturbanceSpinBox->setValue(settings.value("perturbance").toDouble());
+	}
+	if (settings.contains("endPerturbance")) {
+		this->endPerturbanceSpinBox->setValue(settings.value("endPerturbance").toDouble());
 	}
 	if (settings.contains("itersPerTemp")) {
 		this->itersPerTempSpinBox->setValue(settings.value("itersPerTemp").toInt());

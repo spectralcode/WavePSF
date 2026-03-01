@@ -23,7 +23,8 @@ struct OptimizationConfig {
 	double startTemperature = 1.0;
 	double endTemperature = 0.001;
 	double coolingFactor = 0.95;
-	double perturbance = 0.05;
+	double startPerturbance = 0.05;
+	double endPerturbance = 0.001;
 	int iterationsPerTemperature = 10;
 
 	// Which coefficient indices to optimize (indices into the coefficient vector)
