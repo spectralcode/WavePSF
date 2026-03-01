@@ -103,6 +103,9 @@ public slots:
 	void setUseCustomPSFFolder(bool enabled);
 	void setCustomPSFFolder(const QString& folder);
 
+	// Batch processing
+	void requestBatchDeconvolution();
+
 	// Interpolation
 	void interpolateCoefficientsInX();
 	void interpolateCoefficientsInY();
@@ -214,6 +217,10 @@ signals:
 	void optimizationProgressUpdated(OptimizationProgress progress);
 	void optimizationFinished(OptimizationResult result);
 	void runOptimizationOnWorker(OptimizationConfig config);
+
+	// Batch processing
+	void parametersLoaded();
+	void batchDeconvolutionCompleted();
 
 	// Interpolation results
 	void interpolationCompleted(InterpolationResult result);

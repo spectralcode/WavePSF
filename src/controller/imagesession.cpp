@@ -326,6 +326,40 @@ void ImageSession::setCurrentOutputPatch(const af::array& data)
 	emit outputPatchUpdated();
 }
 
+void ImageSession::setOutputPatch(int frameNr, int patchX, int patchY, const af::array& processedExtendedData)
+{
+	if (!this->hasOutputData() || !this->hasInputData() || this->outputAccessor == nullptr || this->inputAccessor == nullptr) {
+		LOG_WARNING() << "No data available for batch output writing";
+		return;
+	}
+
+	if (!this->isValidFrame(frameNr) || !this->isValidPatch(patchX, patchY)) {
+		LOG_WARNING() << "Invalid frame or patch for output writing:" << frameNr << patchX << patchY;
+		return;
+	}
+
+	// Get input patch to obtain border info and absolute position
+	ImagePatch inputPatch = this->inputAccessor->getExtendedPatch(patchX, patchY, frameNr);
+	if (!inputPatch.isValid()) {
+		LOG_WARNING() << "Could not get input patch for batch output writing";
+		return;
+	}
+
+	// Ensure the output accessor has the correct frame cached
+	// (getFrame flushes any previously modified frame automatically)
+	this->outputAccessor->getFrame(frameNr);
+
+	// Write the processed data using input patch's position/border info
+	this->outputAccessor->writePatchResult(inputPatch, processedExtendedData);
+}
+
+void ImageSession::flushOutput()
+{
+	if (this->outputAccessor != nullptr) {
+		this->outputAccessor->forceSyncToCPU();
+	}
+}
+
 af::array ImageSession::getCurrentInputFrame()
 {
 	if (!this->hasInputData() || this->inputAccessor == nullptr) {

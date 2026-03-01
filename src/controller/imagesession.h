@@ -33,9 +33,11 @@ public:
 	ImagePatch getCurrentGroundTruthPatch();
 	void setCurrentOutputPatch(const af::array& data);
 
-	// Arbitrary coordinate patch access (for batch optimization)
+	// Arbitrary coordinate patch access (for batch processing)
 	ImagePatch getInputPatch(int frameNr, int patchX, int patchY);
 	ImagePatch getGroundTruthPatch(int frameNr, int patchX, int patchY);
+	void setOutputPatch(int frameNr, int patchX, int patchY, const af::array& processedExtendedData);
+	void flushOutput();
 
 	// Frame-level access
 	af::array getCurrentInputFrame();

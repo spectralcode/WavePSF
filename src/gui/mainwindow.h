@@ -57,6 +57,9 @@ private slots:
 	void setPSFSaveFolder();
 	void setCustomPSFFolder();
 
+	// Batch processing
+	void deconvolveAll();
+
 	// ApplicationController response handlers
 	void onInputFileLoaded(const QString& filePath);
 	void onFileLoadError(const QString& filePath, const QString& error);
@@ -65,6 +68,7 @@ private:
 	void setupMenuBar();
 	void setupFileMenu();
 	void setupPSFMenu();
+	void setupProcessingMenu();
 	void setupViewMenu();
 	void setupExtrasMenu();
 	void setupCentralWidget();
@@ -91,6 +95,7 @@ private:
 	// Menus
 	QMenu* fileMenu;
 	QMenu* psfMenu;
+	QMenu* processingMenu;
 	QMenu* viewMenu;
 	QMenu* extrasMenu;
 	QMenu* styleMenu;
@@ -109,6 +114,9 @@ private:
 	QAction* setPSFSaveFolderAction;
 	QAction* useCustomPSFFolderAction;
 	QAction* setCustomPSFFolderAction;
+
+	// Processing actions
+	QAction* deconvolveAllAction;
 
 	// Style actions
 	QList<QAction*> styleActions;

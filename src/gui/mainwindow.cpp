@@ -48,9 +48,11 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 					   StyleManager* styleManager, ApplicationController* applicationController, QWidget *parent)
 	: QMainWindow(parent), ui(new Ui::MainWindow),
 	  guiSettings(guiSettings), styleManager(styleManager), applicationController(applicationController),
-	  fileMenu(nullptr), viewMenu(nullptr), extrasMenu(nullptr), styleMenu(nullptr),
+	  fileMenu(nullptr), psfMenu(nullptr), processingMenu(nullptr),
+	  viewMenu(nullptr), extrasMenu(nullptr), styleMenu(nullptr),
 	  openImageDataAction(nullptr), openGroundTruthAction(nullptr),
 	  saveParametersAction(nullptr), loadParametersAction(nullptr), saveOutputAction(nullptr),
+	  deconvolveAllAction(nullptr),
 	  centralSplitter(nullptr), sessionViewer(nullptr), psfControlWidget(nullptr) {
 	MessageRouter::instance()->install();
 	this->ui->setupUi(this);
@@ -121,6 +123,7 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
 void MainWindow::setupMenuBar() {
 	this->setupFileMenu();
 	this->setupPSFMenu();
+	this->setupProcessingMenu();
 	this->setupViewMenu();
 	this->setupExtrasMenu();
 }
@@ -216,6 +219,21 @@ void MainWindow::setupPSFMenu() {
 	this->setCustomPSFFolderAction->setStatusTip("Set the folder containing per-patch PSF files");
 	connect(this->setCustomPSFFolderAction, &QAction::triggered, this, &MainWindow::setCustomPSFFolder);
 	this->psfMenu->addAction(this->setCustomPSFFolderAction);
+}
+
+void MainWindow::setupProcessingMenu() {
+	this->processingMenu = this->menuBar()->addMenu("P&rocessing");
+
+	this->deconvolveAllAction = new QAction("Deconvolve &All Frames", this);
+	this->deconvolveAllAction->setShortcut(QKeySequence("Ctrl+Shift+D"));
+	this->deconvolveAllAction->setStatusTip("Deconvolve all patches of every frame using stored coefficients");
+	this->deconvolveAllAction->setEnabled(false);
+	connect(this->deconvolveAllAction, &QAction::triggered, this, &MainWindow::deconvolveAll);
+	this->processingMenu->addAction(this->deconvolveAllAction);
+}
+
+void MainWindow::deconvolveAll() {
+	this->applicationController->requestBatchDeconvolution();
 }
 
 void MainWindow::loadPSF() {
@@ -340,6 +358,14 @@ void MainWindow::connectApplicationController() {
 		// Keep local copy of PSF settings in sync for the settings dialog
 		connect(this->applicationController, &ApplicationController::psfSettingsUpdated,
 				this, [this](const PSFSettings& s) { this->currentPSFSettings = s; });
+
+		// Enable batch deconvolution action when parameters are loaded
+		connect(this->applicationController, &ApplicationController::parametersLoaded,
+				this, [this]() { this->deconvolveAllAction->setEnabled(true); });
+
+		// Disable batch deconvolution action when session is closed
+		connect(this->applicationController, &ApplicationController::sessionClosed,
+				this, [this]() { this->deconvolveAllAction->setEnabled(false); });
 	}
 }
 

@@ -10,6 +10,8 @@
 #include <QDir>
 #include <QRandomGenerator>
 #include <QImage>
+#include <QProgressDialog>
+#include <QApplication>
 
 ApplicationController::ApplicationController(QObject* parent)
 	: QObject(parent), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
@@ -149,6 +151,7 @@ void ApplicationController::loadParametersFromFile(const QString& filePath)
 	if (this->parameterTable != nullptr) {
 		if (this->parameterTable->loadFromFile(filePath)) {
 			this->loadCoefficientsForCurrentPatch();
+			emit parametersLoaded();
 		}
 	}
 }
@@ -208,6 +211,109 @@ void ApplicationController::setDeconvolutionLiveMode(bool enabled)
 void ApplicationController::requestDeconvolution()
 {
 	this->runDeconvolutionOnCurrentPatch();
+}
+
+void ApplicationController::requestBatchDeconvolution()
+{
+	if (!this->hasInputData() || this->psfModule == nullptr || this->parameterTable == nullptr) {
+		LOG_WARNING() << "Cannot run batch deconvolution: missing input data or parameters";
+		return;
+	}
+
+	int frames = this->imageSession->getInputFrames();
+	int cols = this->imageSession->getPatchGridCols();
+	int rows = this->imageSession->getPatchGridRows();
+	int totalSteps = frames * rows * cols;
+
+	if (totalSteps == 0) {
+		LOG_WARNING() << "Cannot run batch deconvolution: no patches to process";
+		return;
+	}
+
+	// Store current coefficients before batch processing
+	this->storeCurrentCoefficients();
+
+	// Block PSFModule signals to prevent GUI flickering during batch
+	bool oldBlockState = this->psfModule->blockSignals(true);
+	this->suppressLiveDeconv = true;
+
+	// Create progress dialog
+	QProgressDialog progressDialog("Initializing batch deconvolution...", "Cancel", 0, totalSteps);
+	progressDialog.setWindowTitle("Batch Deconvolution");
+	progressDialog.setWindowModality(Qt::ApplicationModal);
+	progressDialog.setMinimumDuration(0);
+	progressDialog.setValue(0);
+
+	LOG_INFO() << "Starting batch deconvolution:" << frames << "frames," << cols << "x" << rows << "patches";
+
+	int step = 0;
+	bool cancelled = false;
+
+	for (int frame = 0; frame < frames && !cancelled; frame++) {
+		for (int y = 0; y < rows && !cancelled; y++) {
+			for (int x = 0; x < cols && !cancelled; x++) {
+				// Update progress label
+				progressDialog.setLabelText(
+					QString("Processing frame %1/%2, patch (%3,%4)...")
+						.arg(frame + 1).arg(frames).arg(x).arg(y));
+
+				// Load coefficients from parameter table
+				int patchIdx = this->parameterTable->patchIndex(x, y);
+				QVector<double> coeffs = this->parameterTable->getCoefficients(frame, patchIdx);
+				if (coeffs.isEmpty()) {
+					step++;
+					progressDialog.setValue(step);
+					QApplication::processEvents();
+					if (progressDialog.wasCanceled()) { cancelled = true; }
+					continue;
+				}
+
+				// Set coefficients (signals blocked, no GUI update)
+				this->psfModule->setAllCoefficients(coeffs);
+
+				// Get input patch
+				ImagePatch inputPatch = this->imageSession->getInputPatch(frame, x, y);
+				if (!inputPatch.isValid()) {
+					step++;
+					progressDialog.setValue(step);
+					QApplication::processEvents();
+					if (progressDialog.wasCanceled()) { cancelled = true; }
+					continue;
+				}
+
+				// Deconvolve
+				af::array result = this->psfModule->deconvolve(inputPatch.data);
+				if (!result.isempty()) {
+					this->imageSession->setOutputPatch(frame, x, y, result);
+				}
+
+				step++;
+				progressDialog.setValue(step);
+				QApplication::processEvents();
+				if (progressDialog.wasCanceled()) {
+					cancelled = true;
+				}
+			}
+		}
+	}
+
+	// Flush last frame to CPU
+	this->imageSession->flushOutput();
+
+	// Restore state
+	this->psfModule->blockSignals(oldBlockState);
+	this->suppressLiveDeconv = false;
+
+	// Reload current patch to restore GUI state and show result
+	this->loadCoefficientsForCurrentPatch();
+
+	if (cancelled) {
+		LOG_INFO() << "Batch deconvolution cancelled at step" << step << "of" << totalSteps;
+	} else {
+		LOG_INFO() << "Batch deconvolution completed:" << totalSteps << "patches processed";
+	}
+
+	emit batchDeconvolutionCompleted();
 }
 
 void ApplicationController::runDeconvolutionOnCurrentPatch()
