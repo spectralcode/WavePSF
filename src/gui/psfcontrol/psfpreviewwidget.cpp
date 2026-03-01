@@ -8,6 +8,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QFileDialog>
+#include <QResizeEvent>
 #include <QtMath>
 
 
@@ -157,6 +158,14 @@ bool PSFPreviewWidget::eventFilter(QObject* obj, QEvent* event)
 	}
 
 	return QWidget::eventFilter(obj, event);
+}
+
+void PSFPreviewWidget::resizeEvent(QResizeEvent* event)
+{
+	QWidget::resizeEvent(event);
+	if (!this->currentImage.isNull()) {
+		this->fitToView();
+	}
 }
 
 void PSFPreviewWidget::fitToView()

@@ -21,6 +21,7 @@ public slots:
 
 protected:
 	bool eventFilter(QObject* obj, QEvent* event) override;
+	void resizeEvent(QResizeEvent* event) override;
 
 private:
 	void fitToView();
