@@ -2,6 +2,9 @@
 
 #include <QKeyEvent>
 #include <QWheelEvent>
+#include <QContextMenuEvent>
+#include <QMenu>
+#include <QAction>
 #include <QtMath>
 #include <QMimeData>
 #include <QApplication>
@@ -193,6 +196,60 @@ void GraphicsView::wheelEvent(QWheelEvent* event) {
 	}
 
 	QGraphicsView::wheelEvent(event);
+}
+
+void GraphicsView::contextMenuEvent(QContextMenuEvent* event) {
+	QMenu menu(this);
+
+	// Coefficient operations
+	QAction* copyAction = menu.addAction(tr("Copy Coefficients"));
+	copyAction->setShortcut(QKeySequence::Copy);
+	connect(copyAction, &QAction::triggered, this, &GraphicsView::copyPressed);
+
+	QAction* pasteAction = menu.addAction(tr("Paste Coefficients"));
+	pasteAction->setShortcut(QKeySequence::Paste);
+	connect(pasteAction, &QAction::triggered, this, &GraphicsView::pastePressed);
+
+	QAction* resetAction = menu.addAction(tr("Reset Coefficients"));
+	resetAction->setShortcut(QKeySequence(Qt::Key_Delete));
+	connect(resetAction, &QAction::triggered, this, &GraphicsView::deletePressed);
+
+	menu.addSeparator();
+
+	// View transform operations
+	QAction* rotateAction = menu.addAction(tr("Rotate 90%1").arg(QChar(0x00B0)));
+	rotateAction->setShortcut(QKeySequence(Qt::Key_R));
+	connect(rotateAction, &QAction::triggered, this, [this]() { this->rotate(90); });
+
+	QAction* flipHAction = menu.addAction(tr("Flip Horizontal"));
+	flipHAction->setShortcut(QKeySequence(Qt::Key_H));
+	connect(flipHAction, &QAction::triggered, this, [this]() {
+		this->scale(1, -1);
+		this->hflipped = !this->hflipped;
+	});
+
+	QAction* flipVAction = menu.addAction(tr("Flip Vertical"));
+	flipVAction->setShortcut(QKeySequence(Qt::Key_V));
+	connect(flipVAction, &QAction::triggered, this, [this]() {
+		this->scale(-1, 1);
+		this->vflipped = !this->vflipped;
+	});
+
+	menu.addSeparator();
+
+	// Zoom operations
+	QAction* zoomInAction = menu.addAction(tr("Zoom In"));
+	zoomInAction->setShortcut(QKeySequence(Qt::Key_Plus));
+	connect(zoomInAction, &QAction::triggered, this, &GraphicsView::zoomIn);
+
+	QAction* zoomOutAction = menu.addAction(tr("Zoom Out"));
+	zoomOutAction->setShortcut(QKeySequence(Qt::Key_Minus));
+	connect(zoomOutAction, &QAction::triggered, this, &GraphicsView::zoomOut);
+
+	QAction* fitAction = menu.addAction(tr("Fit to View"));
+	connect(fitAction, &QAction::triggered, this, &GraphicsView::displayFullScene);
+
+	menu.exec(event->globalPos());
 }
 
 void GraphicsView::scaleView(qreal scaleFactor) {

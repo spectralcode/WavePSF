@@ -94,6 +94,22 @@ void ApplicationController::resetPSFCoefficients()
 	this->storeCurrentCoefficients();
 }
 
+void ApplicationController::copyCoefficients()
+{
+	this->storeCurrentCoefficients();
+	if (this->psfModule != nullptr) {
+		this->coefficientClipboard = this->psfModule->getAllCoefficients();
+	}
+}
+
+void ApplicationController::pasteCoefficients()
+{
+	if (this->coefficientClipboard.isEmpty() || this->psfModule == nullptr) return;
+	this->psfModule->setAllCoefficients(this->coefficientClipboard);
+	this->storeCurrentCoefficients();
+	emit coefficientsLoaded(this->coefficientClipboard);
+}
+
 void ApplicationController::saveParametersToFile(const QString& filePath)
 {
 	this->storeCurrentCoefficients();

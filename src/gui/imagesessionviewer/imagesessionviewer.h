@@ -63,6 +63,11 @@ signals:
 	void patchGridConfigurationRequested(int cols, int rows, int borderExtension);
 	void inputFileDropRequested(const QString& filePath);
 
+	// Coefficient operations (forwarded from viewer context menus)
+	void copyCoefficientsRequested();
+	void pasteCoefficientsRequested();
+	void resetCoefficientsRequested();
+
 private:
 	void setupUI();
 	void setupFrameControls();

@@ -35,6 +35,7 @@ private:
 	void keyPressEvent(QKeyEvent* event) override;
 	void keyReleaseEvent(QKeyEvent* event) override;
 	void wheelEvent(QWheelEvent* event) override;
+	void contextMenuEvent(QContextMenuEvent* event) override;
 	void scaleView(qreal scaleFactor);
 
 	QString getFirstFileFromUrls(const QList<QUrl>& urls) const;

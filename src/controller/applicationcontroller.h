@@ -84,6 +84,10 @@ public slots:
 	void startOptimization(const OptimizationConfig& uiConfig);
 	void cancelOptimization();
 
+	// Coefficient clipboard
+	void copyCoefficients();
+	void pasteCoefficients();
+
 private slots:
 	// Handle data changes that require session broadcast
 	void handleInputDataChanged();
@@ -140,6 +144,9 @@ private:
 	int optimizationProgressCounter;
 	QElapsedTimer progressUpdateTimer;
 	bool suppressLiveDeconv;
+
+	// Coefficient clipboard
+	QVector<double> coefficientClipboard;
 
 signals:
 	// File loading results

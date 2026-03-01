@@ -34,6 +34,7 @@ public:
 
 protected:
 	void closeEvent(QCloseEvent *event) override;
+	bool eventFilter(QObject* obj, QEvent* event) override;
 
 private slots:
 	// Style management

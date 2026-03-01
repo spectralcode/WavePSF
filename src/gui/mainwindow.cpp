@@ -24,6 +24,12 @@
 #include <QStatusBar>
 #include <QFileInfo>
 #include <QSplitter>
+#include <QKeyEvent>
+#include <QLineEdit>
+#include <QAbstractSpinBox>
+#include <QTextEdit>
+#include <QPlainTextEdit>
+#include <QApplication>
 
 namespace {
 	const char* SETTINGS_GROUP = "main_window";
@@ -67,6 +73,8 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	connect(this->styleManager, &StyleManager::styleChanged, this, &MainWindow::updateStyleMenuChecks);
 	this->updateStyleMenuChecks(this->styleManager->getStyleMode());
 
+	qApp->installEventFilter(this);
+
 	LOG_INFO() << tr("test info");
 	LOG_WARNING() << tr("test warning");
 	LOG_DEBUG() << "test debug";
@@ -79,6 +87,35 @@ MainWindow::~MainWindow() {
 void MainWindow::closeEvent(QCloseEvent *event) {
 	this->saveSettings();
 	event->accept();
+}
+
+bool MainWindow::eventFilter(QObject* obj, QEvent* event)
+{
+	if (event->type() == QEvent::KeyPress) {
+		QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
+		QWidget* focused = QApplication::focusWidget();
+		bool isTextWidget = qobject_cast<QLineEdit*>(focused)
+						 || qobject_cast<QAbstractSpinBox*>(focused)
+						 || qobject_cast<QTextEdit*>(focused)
+						 || qobject_cast<QPlainTextEdit*>(focused);
+
+		if (!isTextWidget) {
+			if (keyEvent->matches(QKeySequence::Copy)) {
+				this->applicationController->copyCoefficients();
+				return true;
+			}
+			if (keyEvent->matches(QKeySequence::Paste)) {
+				this->applicationController->pasteCoefficients();
+				return true;
+			}
+			if (keyEvent->key() == Qt::Key_Delete) {
+				this->applicationController->resetPSFCoefficients();
+				return true;
+			}
+		}
+	}
+
+	return QMainWindow::eventFilter(obj, event);
 }
 
 void MainWindow::setupMenuBar() {
@@ -237,6 +274,14 @@ void MainWindow::connectImageSessionViewer() {
 				this->sessionViewer, &ImageSessionViewer::highlightPatch);
 		connect(this->applicationController, &ApplicationController::patchGridConfigured,
 				this->sessionViewer, &ImageSessionViewer::configurePatchGrid);
+
+		// Coefficient operations from viewer context menus
+		connect(this->sessionViewer, &ImageSessionViewer::copyCoefficientsRequested,
+				this->applicationController, &ApplicationController::copyCoefficients);
+		connect(this->sessionViewer, &ImageSessionViewer::pasteCoefficientsRequested,
+				this->applicationController, &ApplicationController::pasteCoefficients);
+		connect(this->sessionViewer, &ImageSessionViewer::resetCoefficientsRequested,
+				this->applicationController, &ApplicationController::resetPSFCoefficients);
 
 		LOG_DEBUG() << "ImageSessionViewer signal connections established";
 	}

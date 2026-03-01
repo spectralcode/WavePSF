@@ -474,6 +474,14 @@ void ImageSessionViewer::connectSignals()
 
 	// Connect file drop
 	connect(this->inputViewer, &ImageDataViewer::inputFileDropRequested, this, &ImageSessionViewer::handleInputFileDropped);
+
+	// Forward coefficient operations from both viewers
+	connect(this->inputViewer, &ImageDataViewer::copyPressed, this, &ImageSessionViewer::copyCoefficientsRequested);
+	connect(this->inputViewer, &ImageDataViewer::pastePressed, this, &ImageSessionViewer::pasteCoefficientsRequested);
+	connect(this->inputViewer, &ImageDataViewer::deletePressed, this, &ImageSessionViewer::resetCoefficientsRequested);
+	connect(this->outputViewer, &ImageDataViewer::copyPressed, this, &ImageSessionViewer::copyCoefficientsRequested);
+	connect(this->outputViewer, &ImageDataViewer::pastePressed, this, &ImageSessionViewer::pasteCoefficientsRequested);
+	connect(this->outputViewer, &ImageDataViewer::deletePressed, this, &ImageSessionViewer::resetCoefficientsRequested);
 }
 
 void ImageSessionViewer::updateFrameControls()
