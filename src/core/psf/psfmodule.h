@@ -23,11 +23,13 @@ public:
 	af::array getCurrentWavefront() const;
 	af::array getCurrentPSF() const;
 	PSFSettings getPSFSettings() const;
+	bool isUsingExternalPSF() const;
 
 public slots:
 	void setCoefficient(int id, double value);
 	void setAllCoefficients(const QVector<double>& coefficients);
 	void resetCoefficients();
+	void setExternalPSF(const af::array& psf);
 	void setGridSize(int size);
 	af::array deconvolve(const af::array& input);
 
@@ -59,6 +61,8 @@ private:
 	int gridSize;
 	af::array currentWavefront;
 	af::array currentPSF;
+	af::array externalPSF;
+	bool usingExternalPSF;
 };
 
 #endif // PSFMODULE_H

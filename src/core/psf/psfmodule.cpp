@@ -8,6 +8,7 @@
 PSFModule::PSFModule(QObject* parent)
 	: QObject(parent)
 	, gridSize(128)
+	, usingExternalPSF(false)
 {
 	this->generator = new ZernikeGenerator(2, 21, this);
 	this->calculator = new PSFCalculator(0.055, 0.4, this);
@@ -36,7 +37,15 @@ af::array PSFModule::getCurrentWavefront() const
 
 af::array PSFModule::getCurrentPSF() const
 {
+	if (this->usingExternalPSF && !this->externalPSF.isempty()) {
+		return this->externalPSF;
+	}
 	return this->currentPSF;
+}
+
+bool PSFModule::isUsingExternalPSF() const
+{
+	return this->usingExternalPSF;
 }
 
 PSFSettings PSFModule::getPSFSettings() const
@@ -70,8 +79,16 @@ void PSFModule::setCoefficient(int id, double value)
 
 void PSFModule::setAllCoefficients(const QVector<double>& coefficients)
 {
+	this->usingExternalPSF = false;
 	this->generator->setAllCoefficients(coefficients);
 	this->regeneratePipeline();
+}
+
+void PSFModule::setExternalPSF(const af::array& psf)
+{
+	this->externalPSF = psf;
+	this->usingExternalPSF = true;
+	emit psfUpdated(psf);
 }
 
 void PSFModule::resetCoefficients()
@@ -90,11 +107,12 @@ void PSFModule::setGridSize(int size)
 
 af::array PSFModule::deconvolve(const af::array& input)
 {
-	if (this->currentPSF.isempty()) {
+	af::array psf = this->getCurrentPSF();
+	if (psf.isempty()) {
 		emit error(tr("No PSF available for deconvolution."));
 		return af::array();
 	}
-	return this->deconvolver->deconvolve(input, this->currentPSF);
+	return this->deconvolver->deconvolve(input, psf);
 }
 
 void PSFModule::applyPSFSettings(const PSFSettings& settings)
@@ -166,6 +184,7 @@ void PSFModule::setDeconvolutionNoiseToSignalFactor(float factor)
 
 void PSFModule::regeneratePipeline()
 {
+	this->usingExternalPSF = false;
 	try {
 		this->currentWavefront = this->generator->generateWavefront(this->gridSize);
 		emit wavefrontUpdated(this->currentWavefront);

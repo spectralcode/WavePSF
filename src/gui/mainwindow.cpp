@@ -120,6 +120,7 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
 
 void MainWindow::setupMenuBar() {
 	this->setupFileMenu();
+	this->setupPSFMenu();
 	this->setupViewMenu();
 	this->setupExtrasMenu();
 }
@@ -173,6 +174,86 @@ void MainWindow::setupFileMenu() {
 	exitAction->setStatusTip("Exit the application");
 	connect(exitAction, &QAction::triggered, this, &QWidget::close);
 	this->fileMenu->addAction(exitAction);
+}
+
+void MainWindow::setupPSFMenu() {
+	this->psfMenu = this->menuBar()->addMenu("&PSF");
+
+	this->loadPSFAction = new QAction("&Load PSF from File...", this);
+	this->loadPSFAction->setStatusTip("Load a PSF kernel from an image file");
+	connect(this->loadPSFAction, &QAction::triggered, this, &MainWindow::loadPSF);
+	this->psfMenu->addAction(this->loadPSFAction);
+
+	this->savePSFAction = new QAction("&Save PSF...", this);
+	this->savePSFAction->setStatusTip("Save the current PSF kernel as a 32-bit float TIFF");
+	connect(this->savePSFAction, &QAction::triggered, this, &MainWindow::savePSF);
+	this->psfMenu->addAction(this->savePSFAction);
+
+	this->psfMenu->addSeparator();
+
+	this->autoSavePSFAction = new QAction("&Auto Save PSF", this);
+	this->autoSavePSFAction->setCheckable(true);
+	this->autoSavePSFAction->setStatusTip("Automatically save PSF on each update");
+	connect(this->autoSavePSFAction, &QAction::toggled,
+			this->applicationController, &ApplicationController::setAutoSavePSF);
+	this->psfMenu->addAction(this->autoSavePSFAction);
+
+	this->setPSFSaveFolderAction = new QAction("Set PSF Save &Folder...", this);
+	this->setPSFSaveFolderAction->setStatusTip("Set the folder for PSF auto-save output");
+	connect(this->setPSFSaveFolderAction, &QAction::triggered, this, &MainWindow::setPSFSaveFolder);
+	this->psfMenu->addAction(this->setPSFSaveFolderAction);
+
+	this->psfMenu->addSeparator();
+
+	this->useCustomPSFFolderAction = new QAction("&Use Custom PSF Folder", this);
+	this->useCustomPSFFolderAction->setCheckable(true);
+	this->useCustomPSFFolderAction->setStatusTip("Load PSFs from folder on patch/frame switch instead of computing");
+	connect(this->useCustomPSFFolderAction, &QAction::toggled,
+			this->applicationController, &ApplicationController::setUseCustomPSFFolder);
+	this->psfMenu->addAction(this->useCustomPSFFolderAction);
+
+	this->setCustomPSFFolderAction = new QAction("Set &Custom PSF Folder...", this);
+	this->setCustomPSFFolderAction->setStatusTip("Set the folder containing per-patch PSF files");
+	connect(this->setCustomPSFFolderAction, &QAction::triggered, this, &MainWindow::setCustomPSFFolder);
+	this->psfMenu->addAction(this->setCustomPSFFolderAction);
+}
+
+void MainWindow::loadPSF() {
+	const QString filePath = QFileDialog::getOpenFileName(
+		this, "Load PSF", QString(),
+		"Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;All Files (*)");
+	if (!filePath.isEmpty()) {
+		this->applicationController->loadPSFFromFile(filePath);
+		this->statusBar()->showMessage("PSF loaded from file", 3000);
+	}
+}
+
+void MainWindow::savePSF() {
+	const QString filePath = QFileDialog::getSaveFileName(
+		this, "Save PSF", QString(),
+		"TIFF Image (*.tif)");
+	if (!filePath.isEmpty()) {
+		this->applicationController->savePSFToFile(filePath);
+		this->statusBar()->showMessage("PSF saved", 3000);
+	}
+}
+
+void MainWindow::setPSFSaveFolder() {
+	const QString dir = QFileDialog::getExistingDirectory(
+		this, "Select PSF Save Folder");
+	if (!dir.isEmpty()) {
+		this->applicationController->setPSFSaveFolder(dir);
+		this->statusBar()->showMessage("PSF save folder: " + dir, 3000);
+	}
+}
+
+void MainWindow::setCustomPSFFolder() {
+	const QString dir = QFileDialog::getExistingDirectory(
+		this, "Select Custom PSF Folder");
+	if (!dir.isEmpty()) {
+		this->applicationController->setCustomPSFFolder(dir);
+		this->statusBar()->showMessage("Custom PSF folder: " + dir, 3000);
+	}
 }
 
 void MainWindow::setupViewMenu() {

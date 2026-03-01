@@ -51,6 +51,12 @@ private slots:
 	// Settings
 	void openSettings();
 
+	// PSF operations
+	void loadPSF();
+	void savePSF();
+	void setPSFSaveFolder();
+	void setCustomPSFFolder();
+
 	// ApplicationController response handlers
 	void onInputFileLoaded(const QString& filePath);
 	void onFileLoadError(const QString& filePath, const QString& error);
@@ -58,6 +64,7 @@ private slots:
 private:
 	void setupMenuBar();
 	void setupFileMenu();
+	void setupPSFMenu();
 	void setupViewMenu();
 	void setupExtrasMenu();
 	void setupCentralWidget();
@@ -83,6 +90,7 @@ private:
 
 	// Menus
 	QMenu* fileMenu;
+	QMenu* psfMenu;
 	QMenu* viewMenu;
 	QMenu* extrasMenu;
 	QMenu* styleMenu;
@@ -93,6 +101,14 @@ private:
 	QAction* saveParametersAction;
 	QAction* loadParametersAction;
 	QAction* saveOutputAction;
+
+	// PSF actions
+	QAction* loadPSFAction;
+	QAction* savePSFAction;
+	QAction* autoSavePSFAction;
+	QAction* setPSFSaveFolderAction;
+	QAction* useCustomPSFFolderAction;
+	QAction* setCustomPSFFolderAction;
 
 	// Style actions
 	QList<QAction*> styleActions;

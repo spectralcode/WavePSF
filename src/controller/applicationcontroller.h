@@ -6,6 +6,8 @@
 #include <QVector>
 #include <QThread>
 #include <QElapsedTimer>
+#include <QMap>
+#include <QPair>
 #include <arrayfire.h>
 #include "core/psf/wavefrontparameter.h"
 #include "core/psf/psfsettings.h"
@@ -93,6 +95,14 @@ public slots:
 	// File output
 	void saveOutputToFile(const QString& filePath);
 
+	// PSF file I/O
+	void loadPSFFromFile(const QString& filePath);
+	void savePSFToFile(const QString& filePath);
+	void setAutoSavePSF(bool enabled);
+	void setPSFSaveFolder(const QString& folder);
+	void setUseCustomPSFFolder(bool enabled);
+	void setCustomPSFFolder(const QString& folder);
+
 	// Interpolation
 	void interpolateCoefficientsInX();
 	void interpolateCoefficientsInY();
@@ -162,6 +172,13 @@ private:
 
 	// Interpolation
 	TableInterpolator* tableInterpolator;
+
+	// PSF file management
+	bool autoSavePSFEnabled;
+	QString psfSaveFolder;
+	bool useCustomPSFFolder;
+	QString customPSFFolder;
+	QMap<QPair<int,int>, af::array> externalPSFOverrides;  // (frame, patchIdx) → loaded PSF
 
 signals:
 	// File loading results
