@@ -51,7 +51,9 @@ SOURCES += \
 	$$SOURCEDIR/data/wavefrontparametertable.cpp \
 	$$SOURCEDIR/core/optimization/imagemetriccalculator.cpp \
 	$$SOURCEDIR/core/optimization/optimizationworker.cpp \
-	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.cpp
+	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.cpp \
+	$$SOURCEDIR/core/interpolation/tableinterpolator.cpp \
+	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.cpp
 
 HEADERS += \
 	$$QCUSTOMPLOTDIR/qcustomplot.h \
@@ -90,7 +92,9 @@ HEADERS += \
 	$$SOURCEDIR/data/wavefrontparametertable.h \
 	$$SOURCEDIR/core/optimization/imagemetriccalculator.h \
 	$$SOURCEDIR/core/optimization/optimizationworker.h \
-	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.h
+	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.h \
+	$$SOURCEDIR/core/interpolation/tableinterpolator.h \
+	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.h
 
 FORMS += \
 	$$SOURCEDIR/gui/mainwindow.ui

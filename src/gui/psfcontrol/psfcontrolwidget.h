@@ -8,12 +8,14 @@
 #include "core/psf/wavefrontparameter.h"
 #include "core/psf/psfsettings.h"
 #include "core/optimization/optimizationworker.h"
+#include "core/interpolation/tableinterpolator.h"
 
 class CoefficientEditorWidget;
 class WavefrontPlotWidget;
 class PSFPreviewWidget;
 class DeconvolutionSettingsWidget;
 class OptimizationWidget;
+class InterpolationWidget;
 class QTabWidget;
 
 class PSFControlWidget : public QGroupBox
@@ -38,6 +40,7 @@ public slots:
 	void updateOptimizationProgress(const OptimizationProgress& progress);
 	void onOptimizationFinished(const OptimizationResult& result);
 	void onOptimizationStarted();
+	void updateInterpolationResult(const InterpolationResult& result);
 
 signals:
 	void coefficientChanged(int id, double value);
@@ -57,6 +60,13 @@ signals:
 	void optimizationCancelRequested();
 	void optimizationPatchSelectionChanged(QVector<int> patchLinearIds);
 
+	// Interpolation signals (forwarded from InterpolationWidget)
+	void interpolateInXRequested();
+	void interpolateInYRequested();
+	void interpolateInZRequested();
+	void interpolateAllInZRequested();
+	void interpolationPolynomialOrderChanged(int order);
+
 private:
 	QTabWidget* tabWidget;
 	CoefficientEditorWidget* coeffEditor;
@@ -64,6 +74,7 @@ private:
 	PSFPreviewWidget* psfPreview;
 	DeconvolutionSettingsWidget* deconvSettings;
 	OptimizationWidget* optimizationWidget;
+	InterpolationWidget* interpolationWidget;
 	PSFSettings currentSettings;
 };
 

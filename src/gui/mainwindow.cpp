@@ -355,6 +355,22 @@ void MainWindow::connectPSFControlWidget() {
 		connect(this->psfControlWidget, &PSFControlWidget::optimizationPatchSelectionChanged,
 				this->sessionViewer, &ImageSessionViewer::highlightPatches);
 
+		// Interpolation: PSFControlWidget → ApplicationController
+		connect(this->psfControlWidget, &PSFControlWidget::interpolateInXRequested,
+				this->applicationController, &ApplicationController::interpolateCoefficientsInX);
+		connect(this->psfControlWidget, &PSFControlWidget::interpolateInYRequested,
+				this->applicationController, &ApplicationController::interpolateCoefficientsInY);
+		connect(this->psfControlWidget, &PSFControlWidget::interpolateInZRequested,
+				this->applicationController, &ApplicationController::interpolateCoefficientsInZ);
+		connect(this->psfControlWidget, &PSFControlWidget::interpolateAllInZRequested,
+				this->applicationController, &ApplicationController::interpolateAllCoefficientsInZ);
+		connect(this->psfControlWidget, &PSFControlWidget::interpolationPolynomialOrderChanged,
+				this->applicationController, &ApplicationController::setInterpolationPolynomialOrder);
+
+		// Interpolation: ApplicationController → PSFControlWidget
+		connect(this->applicationController, &ApplicationController::interpolationCompleted,
+				this->psfControlWidget, &PSFControlWidget::updateInterpolationResult);
+
 		LOG_DEBUG() << "PSFControlWidget signal connections established";
 	}
 }

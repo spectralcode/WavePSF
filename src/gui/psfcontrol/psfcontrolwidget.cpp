@@ -4,6 +4,7 @@
 #include "psfpreviewwidget.h"
 #include "deconvolutionsettingswidget.h"
 #include "optimizationwidget.h"
+#include "interpolationwidget.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QTabWidget>
@@ -47,8 +48,9 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 	this->optimizationWidget = new OptimizationWidget(this->tabWidget);
 	this->tabWidget->addTab(this->optimizationWidget, tr("Optimization"));
 
-	// Placeholder tabs for future milestones
-	this->tabWidget->addTab(new QWidget(this->tabWidget), tr("Interpolation"));
+	// Interpolation tab
+	this->interpolationWidget = new InterpolationWidget(this->tabWidget);
+	this->tabWidget->addTab(this->interpolationWidget, tr("Interpolation"));
 
 	// Forward signals from coefficient editor
 	connect(this->coeffEditor, &CoefficientEditorWidget::coefficientChanged,
@@ -79,6 +81,18 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 			this, &PSFControlWidget::optimizationCancelRequested);
 	connect(this->optimizationWidget, &OptimizationWidget::patchSelectionChanged,
 			this, &PSFControlWidget::optimizationPatchSelectionChanged);
+
+	// Forward signals from interpolation widget
+	connect(this->interpolationWidget, &InterpolationWidget::interpolateInXRequested,
+			this, &PSFControlWidget::interpolateInXRequested);
+	connect(this->interpolationWidget, &InterpolationWidget::interpolateInYRequested,
+			this, &PSFControlWidget::interpolateInYRequested);
+	connect(this->interpolationWidget, &InterpolationWidget::interpolateInZRequested,
+			this, &PSFControlWidget::interpolateInZRequested);
+	connect(this->interpolationWidget, &InterpolationWidget::interpolateAllInZRequested,
+			this, &PSFControlWidget::interpolateAllInZRequested);
+	connect(this->interpolationWidget, &InterpolationWidget::polynomialOrderChanged,
+			this, &PSFControlWidget::interpolationPolynomialOrderChanged);
 }
 
 PSFControlWidget::~PSFControlWidget()
@@ -165,4 +179,9 @@ void PSFControlWidget::onOptimizationFinished(const OptimizationResult& result)
 void PSFControlWidget::onOptimizationStarted()
 {
 	this->optimizationWidget->onOptimizationStarted();
+}
+
+void PSFControlWidget::updateInterpolationResult(const InterpolationResult& result)
+{
+	this->interpolationWidget->updateInterpolationResult(result);
 }

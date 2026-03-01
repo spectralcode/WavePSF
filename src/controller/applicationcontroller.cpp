@@ -25,6 +25,7 @@ ApplicationController::ApplicationController(QObject* parent)
 	qRegisterMetaType<OptimizationConfig>("OptimizationConfig");
 	qRegisterMetaType<OptimizationProgress>("OptimizationProgress");
 	qRegisterMetaType<OptimizationResult>("OptimizationResult");
+	qRegisterMetaType<InterpolationResult>("InterpolationResult");
 }
 
 ApplicationController::~ApplicationController()
@@ -358,6 +359,7 @@ void ApplicationController::initializeComponents()
 	this->inputDataReader = new InputDataReader(this);
 	this->psfModule = new PSFModule(this);
 	this->parameterTable = new WavefrontParameterTable(this);
+	this->tableInterpolator = new TableInterpolator(this);
 }
 
 void ApplicationController::connectSessionSignals()
@@ -801,4 +803,136 @@ void ApplicationController::handleOptimizationFinished(const OptimizationResult&
 	}
 
 	emit optimizationFinished(result);
+}
+
+// --- Interpolation ---
+
+void ApplicationController::interpolateCoefficientsInX()
+{
+	if (this->parameterTable == nullptr || !this->hasInputData()) return;
+	this->storeCurrentCoefficients();
+
+	int frame = this->getCurrentFrame();
+	int patchX = this->getCurrentPatchX();
+	int patchY = this->getCurrentPatchY();
+	int width = this->parameterTable->getNumberOfPatchesInX();
+	int numCoeffs = this->parameterTable->getCoefficientsPerPatch();
+
+	QVector<InterpolationSlice> slices = this->tableInterpolator->interpolateInX(
+		this->parameterTable, frame, patchX, patchY);
+
+	// Build result for plotting
+	InterpolationResult result;
+	result.slices = slices;
+	result.totalCoefficients = numCoeffs;
+	result.axisLabel = tr("Patch X");
+
+	// Read the full interpolated row from the table
+	result.allPositions.resize(width);
+	result.allValues.resize(numCoeffs);
+	for (int x = 0; x < width; x++) {
+		result.allPositions[x] = x;
+	}
+	for (int c = 0; c < numCoeffs; c++) {
+		result.allValues[c].resize(width);
+		for (int x = 0; x < width; x++) {
+			int patch = this->parameterTable->patchIndex(x, patchY);
+			result.allValues[c][x] = this->parameterTable->getCoefficient(frame, patch, c);
+		}
+	}
+
+	this->loadCoefficientsForCurrentPatch();
+	emit coefficientsLoaded(this->psfModule->getAllCoefficients());
+	emit interpolationCompleted(result);
+}
+
+void ApplicationController::interpolateCoefficientsInY()
+{
+	if (this->parameterTable == nullptr || !this->hasInputData()) return;
+	this->storeCurrentCoefficients();
+
+	int frame = this->getCurrentFrame();
+	int patchX = this->getCurrentPatchX();
+	int patchY = this->getCurrentPatchY();
+	int height = this->parameterTable->getNumberOfPatchesInY();
+	int numCoeffs = this->parameterTable->getCoefficientsPerPatch();
+
+	QVector<InterpolationSlice> slices = this->tableInterpolator->interpolateInY(
+		this->parameterTable, frame, patchX, patchY);
+
+	InterpolationResult result;
+	result.slices = slices;
+	result.totalCoefficients = numCoeffs;
+	result.axisLabel = tr("Patch Y");
+
+	result.allPositions.resize(height);
+	result.allValues.resize(numCoeffs);
+	for (int y = 0; y < height; y++) {
+		result.allPositions[y] = y;
+	}
+	for (int c = 0; c < numCoeffs; c++) {
+		result.allValues[c].resize(height);
+		for (int y = 0; y < height; y++) {
+			int patch = this->parameterTable->patchIndex(patchX, y);
+			result.allValues[c][y] = this->parameterTable->getCoefficient(frame, patch, c);
+		}
+	}
+
+	this->loadCoefficientsForCurrentPatch();
+	emit coefficientsLoaded(this->psfModule->getAllCoefficients());
+	emit interpolationCompleted(result);
+}
+
+void ApplicationController::interpolateCoefficientsInZ()
+{
+	if (this->parameterTable == nullptr || !this->hasInputData()) return;
+	this->storeCurrentCoefficients();
+
+	int patchX = this->getCurrentPatchX();
+	int patchY = this->getCurrentPatchY();
+	int numFrames = this->parameterTable->getNumberOfFrames();
+	int numCoeffs = this->parameterTable->getCoefficientsPerPatch();
+	int patch = this->parameterTable->patchIndex(patchX, patchY);
+
+	QVector<InterpolationSlice> slices = this->tableInterpolator->interpolateInZ(
+		this->parameterTable, patchX, patchY);
+
+	InterpolationResult result;
+	result.slices = slices;
+	result.totalCoefficients = numCoeffs;
+	result.axisLabel = tr("Frame");
+
+	result.allPositions.resize(numFrames);
+	result.allValues.resize(numCoeffs);
+	for (int f = 0; f < numFrames; f++) {
+		result.allPositions[f] = f;
+	}
+	for (int c = 0; c < numCoeffs; c++) {
+		result.allValues[c].resize(numFrames);
+		for (int f = 0; f < numFrames; f++) {
+			result.allValues[c][f] = this->parameterTable->getCoefficient(f, patch, c);
+		}
+	}
+
+	this->loadCoefficientsForCurrentPatch();
+	emit coefficientsLoaded(this->psfModule->getAllCoefficients());
+	emit interpolationCompleted(result);
+}
+
+void ApplicationController::interpolateAllCoefficientsInZ()
+{
+	if (this->parameterTable == nullptr || !this->hasInputData()) return;
+	this->storeCurrentCoefficients();
+
+	this->tableInterpolator->interpolateAllInZ(this->parameterTable);
+
+	this->loadCoefficientsForCurrentPatch();
+	emit coefficientsLoaded(this->psfModule->getAllCoefficients());
+}
+
+void ApplicationController::setInterpolationPolynomialOrder(int order)
+{
+	if (this->tableInterpolator != nullptr) {
+		this->tableInterpolator->setPolynomialOrder(order);
+	}
 }

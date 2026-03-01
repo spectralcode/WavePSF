@@ -10,6 +10,7 @@
 #include "core/psf/wavefrontparameter.h"
 #include "core/psf/psfsettings.h"
 #include "core/optimization/optimizationworker.h"
+#include "core/interpolation/tableinterpolator.h"
 
 // Forward declarations
 class ImageSession;
@@ -18,6 +19,7 @@ class ImageData;
 class SettingsFileManager;
 class PSFModule;
 class WavefrontParameterTable;
+class TableInterpolator;
 
 class ApplicationController : public QObject
 {
@@ -88,6 +90,13 @@ public slots:
 	void copyCoefficients();
 	void pasteCoefficients();
 
+	// Interpolation
+	void interpolateCoefficientsInX();
+	void interpolateCoefficientsInY();
+	void interpolateCoefficientsInZ();
+	void interpolateAllCoefficientsInZ();
+	void setInterpolationPolynomialOrder(int order);
+
 private slots:
 	// Handle data changes that require session broadcast
 	void handleInputDataChanged();
@@ -148,6 +157,9 @@ private:
 	// Coefficient clipboard
 	QVector<double> coefficientClipboard;
 
+	// Interpolation
+	TableInterpolator* tableInterpolator;
+
 signals:
 	// File loading results
 	void inputFileLoaded(const QString& filePath);
@@ -182,6 +194,9 @@ signals:
 	void optimizationProgressUpdated(OptimizationProgress progress);
 	void optimizationFinished(OptimizationResult result);
 	void runOptimizationOnWorker(OptimizationConfig config);
+
+	// Interpolation results
+	void interpolationCompleted(InterpolationResult result);
 };
 
 #endif // APPLICATIONCONTROLLER_H
