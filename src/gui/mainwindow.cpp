@@ -339,6 +339,9 @@ void MainWindow::setupCentralWidget()
 	this->psfControlWidget = new PSFControlWidget(this);
 
 	this->centralSplitter = new QSplitter(Qt::Vertical, this);
+	this->centralSplitter->setChildrenCollapsible(false);
+	this->sessionViewer->setMinimumHeight(50);
+	this->psfControlWidget->setMinimumHeight(50);
 	this->centralSplitter->addWidget(this->sessionViewer);
 	this->centralSplitter->addWidget(this->psfControlWidget);
 	this->centralSplitter->setStretchFactor(0, 3);
