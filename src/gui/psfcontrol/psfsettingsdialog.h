@@ -6,9 +6,11 @@
 
 class QLineEdit;
 class QDoubleSpinBox;
+class QSpinBox;
 class QComboBox;
 class QTableWidget;
 class QPushButton;
+class QStackedWidget;
 
 class PSFSettingsDialog : public QDialog
 {
@@ -29,14 +31,26 @@ private:
 	void setupUI();
 	void populateFromSettings(const PSFSettings& settings);
 	void rebuildOverrideTable(const QVector<int>& indices);
-	bool validateNollSpec() const;
+	bool validateSettings() const;
 	void updateValidationState();
 
-	// Wavefront generator controls
+	// Generator-specific stacked widget
+	QStackedWidget* generatorStack;
+
+	// Zernike generator controls (page 0)
 	QLineEdit* nollIndicesEdit;
 	QDoubleSpinBox* globalMinSpin;
 	QDoubleSpinBox* globalMaxSpin;
 	QTableWidget* overrideTable;
+
+	// DM generator controls (page 1)
+	QSpinBox* dmRowsSpin;
+	QSpinBox* dmColsSpin;
+	QDoubleSpinBox* dmCouplingSpin;
+	QDoubleSpinBox* dmGaussianIndexSpin;
+	QDoubleSpinBox* dmCommandMinSpin;
+	QDoubleSpinBox* dmCommandMaxSpin;
+	QDoubleSpinBox* dmCommandStepSpin;
 
 	// PSF calculation controls
 	QComboBox* gridSizeCombo;

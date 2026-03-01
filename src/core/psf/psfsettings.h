@@ -8,7 +8,11 @@
 #include <QVariantMap>
 
 struct PSFSettings {
-	// --- Zernike generator settings (generator-specific) ---
+	// --- Generator identity ---
+	QString generatorTypeName = "Zernike";
+	QVariantMap generatorSettings; // generator-specific config (serialized via IWavefrontGenerator)
+
+	// --- Zernike generator settings (convenience accessors, kept for UI compatibility) ---
 	// Flexible Noll index specification: "2-21", "1-5, 7, 11", "4, 11, 15-21"
 	QString nollIndexSpec = "2-21";
 

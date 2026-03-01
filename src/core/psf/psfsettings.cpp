@@ -169,6 +169,8 @@ QVector<int> parseFrameSpec(const QString& spec)
 QVariantMap serializePSFSettings(const PSFSettings& settings)
 {
 	QVariantMap map;
+	map["generator_type_name"] = settings.generatorTypeName;
+	map["generator_settings"] = settings.generatorSettings;
 	map["noll_index_spec"] = settings.nollIndexSpec;
 	map["global_min_coefficient"] = settings.globalMinCoefficient;
 	map["global_max_coefficient"] = settings.globalMaxCoefficient;
@@ -196,6 +198,12 @@ PSFSettings deserializePSFSettings(const QVariantMap& map)
 {
 	PSFSettings settings;
 
+	if (map.contains("generator_type_name")) {
+		settings.generatorTypeName = map["generator_type_name"].toString();
+	}
+	if (map.contains("generator_settings")) {
+		settings.generatorSettings = map["generator_settings"].toMap();
+	}
 	if (map.contains("noll_index_spec")) {
 		settings.nollIndexSpec = map["noll_index_spec"].toString();
 	}

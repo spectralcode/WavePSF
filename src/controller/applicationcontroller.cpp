@@ -160,8 +160,32 @@ void ApplicationController::applyPSFSettings(const PSFSettings& settings)
 {
 	if (this->psfModule != nullptr) {
 		this->psfModule->applyPSFSettings(settings);
+		// Resize parameter table if coefficient count changed
+		this->resizeParameterTable();
+		// Re-send current coefficients so UI sliders reflect actual values
+		// (parameterDescriptorsChanged rebuilds sliders to defaults)
+		emit coefficientsLoaded(this->psfModule->getAllCoefficients());
 	}
-	emit psfSettingsUpdated(settings);
+	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
+}
+
+void ApplicationController::setGeneratorType(const QString& typeName)
+{
+	if (this->psfModule == nullptr) {
+		return;
+	}
+	if (this->psfModule->getGeneratorTypeName() == typeName) {
+		return;
+	}
+	this->psfModule->setGeneratorType(typeName);
+
+	// Clear and resize parameter table for new coefficient count
+	if (this->parameterTable != nullptr) {
+		this->parameterTable->clear();
+		this->resizeParameterTable();
+	}
+
+	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
 }
 
 // Deconvolution settings forwarding
@@ -534,6 +558,8 @@ void ApplicationController::connectPSFModuleSignals()
 				this, &ApplicationController::psfUpdated);
 		connect(this->psfModule, &PSFModule::parameterDescriptorsChanged,
 				this, &ApplicationController::psfParameterDescriptorsChanged);
+		connect(this->psfModule, &PSFModule::generatorTypeChanged,
+				this, &ApplicationController::generatorTypeChanged);
 
 		// When Noll indices change, parameter table must be cleared and resized
 		connect(this->psfModule, &PSFModule::nollIndicesChanged, this, [this]() {

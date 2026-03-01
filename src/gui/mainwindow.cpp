@@ -450,6 +450,12 @@ void MainWindow::connectPSFControlWidget() {
 		connect(this->applicationController, &ApplicationController::psfSettingsUpdated,
 				this->psfControlWidget, &PSFControlWidget::setPSFSettings);
 
+		// Generator type switching: PSFControlWidget → ApplicationController → PSFControlWidget
+		connect(this->psfControlWidget, &PSFControlWidget::generatorTypeChangeRequested,
+				this->applicationController, &ApplicationController::setGeneratorType);
+		connect(this->applicationController, &ApplicationController::generatorTypeChanged,
+				this->psfControlWidget, &PSFControlWidget::setGeneratorType);
+
 		// Optimization: PSFControlWidget → ApplicationController
 		connect(this->psfControlWidget, &PSFControlWidget::optimizationRequested,
 				this->applicationController, &ApplicationController::startOptimization);

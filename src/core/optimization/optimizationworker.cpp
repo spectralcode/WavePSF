@@ -1,6 +1,7 @@
 #include "optimizationworker.h"
 #include "imagemetriccalculator.h"
-#include "core/psf/zernikegenerator.h"
+#include "core/psf/iwavefrontgenerator.h"
+#include "core/psf/wavefrontgeneratorfactory.h"
 #include "core/psf/psfcalculator.h"
 #include "core/psf/deconvolver.h"
 #include <QRandomGenerator>
@@ -44,24 +45,16 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 	}
 
 	// Create LOCAL PSF pipeline instances on this worker thread
-	QVector<int> nollIndices = parseNollIndexSpec(config.psfSettings.nollIndexSpec);
-	if (nollIndices.isEmpty()) {
-		emit error(QStringLiteral("Invalid Noll index specification."));
+	IWavefrontGenerator* generator = WavefrontGeneratorFactory::create(
+		config.psfSettings.generatorTypeName, nullptr);
+	if (!generator) {
+		emit error(QStringLiteral("Unknown generator type: %1").arg(config.psfSettings.generatorTypeName));
 		OptimizationResult result;
 		result.wasCancelled = false;
 		emit optimizationFinished(result);
 		return;
 	}
-
-	ZernikeGenerator generator;
-	generator.setNollIndices(nollIndices);
-	generator.setGlobalRange(config.psfSettings.globalMinCoefficient,
-							 config.psfSettings.globalMaxCoefficient);
-	generator.setStepValue(config.psfSettings.coefficientStep);
-	for (auto it = config.psfSettings.coefficientRangeOverrides.constBegin();
-		 it != config.psfSettings.coefficientRangeOverrides.constEnd(); ++it) {
-		generator.setParameterRange(it.key(), it.value().first, it.value().second);
-	}
+	generator->deserializeSettings(config.psfSettings.generatorSettings);
 
 	PSFCalculator calculator(config.psfSettings.wavelengthNm / 1000.0,
 							 config.psfSettings.apertureRadius);
@@ -79,8 +72,8 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 							  const af::array& inputPatch,
 							  const af::array& groundTruthPatch) -> double {
 		try {
-			generator.setAllCoefficients(coefficients);
-			af::array wavefront = generator.generateWavefront(config.psfSettings.gridSize);
+			generator->setAllCoefficients(coefficients);
+			af::array wavefront = generator->generateWavefront(config.psfSettings.gridSize);
 			af::array psf = calculator.computePSF(wavefront);
 			af::array deconvolved = deconvolver.deconvolve(inputPatch, psf);
 			if (deconvolved.isempty()) return (std::numeric_limits<double>::max)();
@@ -121,7 +114,7 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 		}
 		// If start coefficients are still empty, use zeros
 		if (currentCoeffs.isEmpty()) {
-			int coeffCount = generator.getAllCoefficients().size();
+			int coeffCount = generator->getAllCoefficients().size();
 			currentCoeffs.fill(0.0, coeffCount);
 		}
 
@@ -197,6 +190,8 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 		jobResult.bestMetric = bestMetric;
 		finalResult.jobResults.append(jobResult);
 	}
+
+	delete generator;
 
 	finalResult.wasCancelled = this->cancelRequested.loadAcquire() != 0;
 	emit optimizationFinished(finalResult);

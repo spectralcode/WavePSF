@@ -1,5 +1,6 @@
 #include "psfmodule.h"
 #include "zernikegenerator.h"
+#include "wavefrontgeneratorfactory.h"
 #include "psfcalculator.h"
 #include "deconvolver.h"
 #include "utils/logging.h"
@@ -51,6 +52,10 @@ bool PSFModule::isUsingExternalPSF() const
 PSFSettings PSFModule::getPSFSettings() const
 {
 	PSFSettings s;
+	s.generatorTypeName = this->generator->typeName();
+	s.generatorSettings = this->generator->serializeSettings();
+
+	// Populate Zernike convenience fields for UI compatibility
 	ZernikeGenerator* zg = dynamic_cast<ZernikeGenerator*>(this->generator);
 	if (zg) {
 		s.nollIndexSpec = formatNollIndexSpec(zg->getNollIndices());
@@ -64,6 +69,11 @@ PSFSettings PSFModule::getPSFSettings() const
 	s.apertureRadius = this->calculator->getApertureRadius();
 	s.normalizationMode = static_cast<int>(this->calculator->getNormalizationMode());
 	return s;
+}
+
+QString PSFModule::getGeneratorTypeName() const
+{
+	return this->generator->typeName();
 }
 
 QVector<double> PSFModule::getAllCoefficients() const
@@ -115,11 +125,43 @@ af::array PSFModule::deconvolve(const af::array& input)
 	return this->deconvolver->deconvolve(input, psf);
 }
 
+void PSFModule::setGeneratorType(const QString& typeName)
+{
+	if (this->generator->typeName() == typeName) {
+		return;
+	}
+
+	// Save current generator settings before switching
+	QVariantMap oldSettings = this->generator->serializeSettings();
+
+	// Delete old generator and create new one
+	delete this->generator;
+	this->generator = dynamic_cast<IWavefrontGenerator*>(
+		WavefrontGeneratorFactory::create(typeName, this));
+
+	emit generatorTypeChanged(typeName);
+	emit parameterDescriptorsChanged(this->generator->getParameterDescriptors());
+	this->regeneratePipeline();
+}
+
 void PSFModule::applyPSFSettings(const PSFSettings& settings)
 {
+	// Switch generator type if needed
+	if (this->generator->typeName() != settings.generatorTypeName) {
+		delete this->generator;
+		this->generator = dynamic_cast<IWavefrontGenerator*>(
+			WavefrontGeneratorFactory::create(settings.generatorTypeName, this));
+		emit generatorTypeChanged(settings.generatorTypeName);
+	}
+
+	// Apply generator-specific settings
+	if (!settings.generatorSettings.isEmpty()) {
+		this->generator->deserializeSettings(settings.generatorSettings);
+	}
+
+	// Also apply Zernike convenience fields when the generator is Zernike
 	ZernikeGenerator* zg = dynamic_cast<ZernikeGenerator*>(this->generator);
 	bool indicesChanged = false;
-
 	if (zg) {
 		QVector<int> newIndices = parseNollIndexSpec(settings.nollIndexSpec);
 		if (zg->getNollIndices() != newIndices) {

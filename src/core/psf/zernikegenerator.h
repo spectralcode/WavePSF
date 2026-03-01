@@ -16,6 +16,9 @@ public:
 	~ZernikeGenerator() override;
 
 	// IWavefrontGenerator interface
+	QString typeName() const override;
+	QVariantMap serializeSettings() const override;
+	void deserializeSettings(const QVariantMap& settings) override;
 	QVector<WavefrontParameter> getParameterDescriptors() const override;
 	void setCoefficient(int id, double value) override;
 	double getCoefficient(int id) const override;

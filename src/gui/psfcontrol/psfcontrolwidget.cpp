@@ -5,9 +5,12 @@
 #include "deconvolutionsettingswidget.h"
 #include "optimizationwidget.h"
 #include "interpolationwidget.h"
+#include "core/psf/wavefrontgeneratorfactory.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QTabWidget>
+#include <QComboBox>
+#include <QLabel>
 
 namespace {
 	const char* SETTINGS_GROUP = "psf_control";
@@ -25,6 +28,15 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 	// PSF Generation tab
 	QWidget* generationTab = new QWidget(this->tabWidget);
 	QVBoxLayout* genMainLayout = new QVBoxLayout(generationTab);
+
+	// Generator type selector
+	QHBoxLayout* genTypeLayout = new QHBoxLayout();
+	genTypeLayout->addWidget(new QLabel(tr("Generator:"), generationTab));
+	this->generatorTypeCombo = new QComboBox(generationTab);
+	this->generatorTypeCombo->addItems(WavefrontGeneratorFactory::availableTypeNames());
+	genTypeLayout->addWidget(this->generatorTypeCombo);
+	genTypeLayout->addStretch();
+	genMainLayout->addLayout(genTypeLayout);
 
 	// Widgets row
 	QHBoxLayout* genLayout = new QHBoxLayout();
@@ -51,6 +63,10 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 	// Interpolation tab
 	this->interpolationWidget = new InterpolationWidget(this->tabWidget);
 	this->tabWidget->addTab(this->interpolationWidget, tr("Interpolation"));
+
+	// Generator type change
+	connect(this->generatorTypeCombo, QOverload<const QString&>::of(&QComboBox::currentTextChanged),
+			this, &PSFControlWidget::generatorTypeChangeRequested);
 
 	// Forward signals from coefficient editor
 	connect(this->coeffEditor, &CoefficientEditorWidget::coefficientChanged,
@@ -159,6 +175,23 @@ void PSFControlWidget::updatePSF(af::array psf)
 void PSFControlWidget::setPSFSettings(const PSFSettings& settings)
 {
 	this->currentSettings = settings;
+	// Sync combo box without triggering signal
+	this->generatorTypeCombo->blockSignals(true);
+	int idx = this->generatorTypeCombo->findText(settings.generatorTypeName);
+	if (idx >= 0) {
+		this->generatorTypeCombo->setCurrentIndex(idx);
+	}
+	this->generatorTypeCombo->blockSignals(false);
+}
+
+void PSFControlWidget::setGeneratorType(const QString& typeName)
+{
+	this->generatorTypeCombo->blockSignals(true);
+	int idx = this->generatorTypeCombo->findText(typeName);
+	if (idx >= 0) {
+		this->generatorTypeCombo->setCurrentIndex(idx);
+	}
+	this->generatorTypeCombo->blockSignals(false);
 }
 
 void PSFControlWidget::setGroundTruthAvailable(bool available)

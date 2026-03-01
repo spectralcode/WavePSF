@@ -4,8 +4,10 @@
 #include <QHBoxLayout>
 #include <QFormLayout>
 #include <QTabWidget>
+#include <QStackedWidget>
 #include <QLineEdit>
 #include <QDoubleSpinBox>
+#include <QSpinBox>
 #include <QComboBox>
 #include <QTableWidget>
 #include <QHeaderView>
@@ -28,32 +30,63 @@ PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings, QWidget* paren
 PSFSettings PSFSettingsDialog::getSettings() const
 {
 	PSFSettings s;
+	s.generatorTypeName = this->initialSettings.generatorTypeName;
 
-	// Wavefront generator
-	s.nollIndexSpec = this->nollIndicesEdit->text().trimmed();
-	s.globalMinCoefficient = this->globalMinSpin->value();
-	s.globalMaxCoefficient = this->globalMaxSpin->value();
-	s.coefficientStep = this->initialSettings.coefficientStep; // controlled by CoefficientEditorWidget
+	if (s.generatorTypeName == QLatin1String("Zernike")) {
+		// Zernike settings
+		s.nollIndexSpec = this->nollIndicesEdit->text().trimmed();
+		s.globalMinCoefficient = this->globalMinSpin->value();
+		s.globalMaxCoefficient = this->globalMaxSpin->value();
+		s.coefficientStep = this->initialSettings.coefficientStep;
 
-	// Per-Zernike overrides from table
-	for (int row = 0; row < this->overrideTable->rowCount(); ++row) {
-		QCheckBox* checkBox = qobject_cast<QCheckBox*>(
-			this->overrideTable->cellWidget(row, 2));
-		if (checkBox && checkBox->isChecked()) {
-			int nollIndex = this->overrideTable->item(row, 0)->text().toInt();
-			QDoubleSpinBox* minSpin = qobject_cast<QDoubleSpinBox*>(
-				this->overrideTable->cellWidget(row, 3));
-			QDoubleSpinBox* maxSpin = qobject_cast<QDoubleSpinBox*>(
-				this->overrideTable->cellWidget(row, 4));
-			if (minSpin && maxSpin) {
-				s.coefficientRangeOverrides[nollIndex] = qMakePair(minSpin->value(), maxSpin->value());
+		// Per-Zernike overrides from table
+		for (int row = 0; row < this->overrideTable->rowCount(); ++row) {
+			QCheckBox* checkBox = qobject_cast<QCheckBox*>(
+				this->overrideTable->cellWidget(row, 2));
+			if (checkBox && checkBox->isChecked()) {
+				int nollIndex = this->overrideTable->item(row, 0)->text().toInt();
+				QDoubleSpinBox* minSpin = qobject_cast<QDoubleSpinBox*>(
+					this->overrideTable->cellWidget(row, 3));
+				QDoubleSpinBox* maxSpin = qobject_cast<QDoubleSpinBox*>(
+					this->overrideTable->cellWidget(row, 4));
+				if (minSpin && maxSpin) {
+					s.coefficientRangeOverrides[nollIndex] = qMakePair(minSpin->value(), maxSpin->value());
+				}
 			}
 		}
+
+		// Serialize Zernike-specific settings into generatorSettings
+		QVariantMap gs;
+		gs["noll_index_spec"] = s.nollIndexSpec;
+		gs["global_min"] = s.globalMinCoefficient;
+		gs["global_max"] = s.globalMaxCoefficient;
+		gs["step"] = s.coefficientStep;
+		QVariantMap overrides;
+		for (auto it = s.coefficientRangeOverrides.constBegin();
+			 it != s.coefficientRangeOverrides.constEnd(); ++it) {
+			QVariantMap range;
+			range["min"] = it.value().first;
+			range["max"] = it.value().second;
+			overrides[QString::number(it.key())] = range;
+		}
+		gs["range_overrides"] = overrides;
+		s.generatorSettings = gs;
+	} else {
+		// Deformable Mirror settings
+		QVariantMap gs;
+		gs["actuator_rows"] = this->dmRowsSpin->value();
+		gs["actuator_cols"] = this->dmColsSpin->value();
+		gs["coupling_coefficient"] = this->dmCouplingSpin->value();
+		gs["gaussian_index"] = this->dmGaussianIndexSpin->value();
+		gs["command_min"] = this->dmCommandMinSpin->value();
+		gs["command_max"] = this->dmCommandMaxSpin->value();
+		gs["command_step"] = this->dmCommandStepSpin->value();
+		s.generatorSettings = gs;
 	}
 
-	// PSF calculation
+	// PSF calculation (common)
 	s.gridSize = this->gridSizeCombo->currentText().toInt();
-	s.wavelengthNm = this->initialSettings.wavelengthNm; // not exposed in UI
+	s.wavelengthNm = this->initialSettings.wavelengthNm;
 	s.apertureRadius = this->apertureRadiusSpin->value();
 	s.normalizationMode = this->normalizationCombo->currentIndex();
 
@@ -64,15 +97,15 @@ void PSFSettingsDialog::onNollIndicesChanged()
 {
 	this->updateValidationState();
 
-	if (this->validateNollSpec()) {
-		QVector<int> indices = parseNollIndexSpec(this->nollIndicesEdit->text());
+	QVector<int> indices = parseNollIndexSpec(this->nollIndicesEdit->text());
+	if (!indices.isEmpty()) {
 		this->rebuildOverrideTable(indices);
 	}
 }
 
 void PSFSettingsDialog::onApplyClicked()
 {
-	if (this->validateNollSpec()) {
+	if (this->validateSettings()) {
 		emit settingsApplied(this->getSettings());
 	}
 }
@@ -87,35 +120,41 @@ void PSFSettingsDialog::setupUI()
 	QWidget* wavefrontTab = new QWidget(tabWidget);
 	QVBoxLayout* wavefrontLayout = new QVBoxLayout(wavefrontTab);
 
+	this->generatorStack = new QStackedWidget(wavefrontTab);
+
+	// Page 0: Zernike settings
+	QWidget* zernikePage = new QWidget(this->generatorStack);
+	QVBoxLayout* zernikeLayout = new QVBoxLayout(zernikePage);
+
 	// Noll indices
 	QHBoxLayout* nollRow = new QHBoxLayout();
-	nollRow->addWidget(new QLabel(tr("Noll Indices:"), wavefrontTab));
-	this->nollIndicesEdit = new QLineEdit(wavefrontTab);
+	nollRow->addWidget(new QLabel(tr("Noll Indices:"), zernikePage));
+	this->nollIndicesEdit = new QLineEdit(zernikePage);
 	this->nollIndicesEdit->setPlaceholderText(tr("e.g. 2-21 or 1-5, 7, 11"));
 	this->nollIndicesEdit->setToolTip(tr("Comma-separated Noll indices and ranges.\nExamples: \"2-21\", \"1-5, 7, 11\", \"4, 11, 15-21\""));
 	connect(this->nollIndicesEdit, &QLineEdit::textChanged, this, &PSFSettingsDialog::onNollIndicesChanged);
 	nollRow->addWidget(this->nollIndicesEdit);
-	wavefrontLayout->addLayout(nollRow);
+	zernikeLayout->addLayout(nollRow);
 
 	// Global coefficient range
 	QHBoxLayout* rangeRow = new QHBoxLayout();
-	rangeRow->addWidget(new QLabel(tr("Global Range:"), wavefrontTab));
-	this->globalMinSpin = new QDoubleSpinBox(wavefrontTab);
+	rangeRow->addWidget(new QLabel(tr("Global Range:"), zernikePage));
+	this->globalMinSpin = new QDoubleSpinBox(zernikePage);
 	this->globalMinSpin->setRange(-100.0, 0.0);
 	this->globalMinSpin->setDecimals(3);
 	this->globalMinSpin->setSingleStep(0.1);
 	rangeRow->addWidget(this->globalMinSpin);
-	rangeRow->addWidget(new QLabel(tr("to"), wavefrontTab));
-	this->globalMaxSpin = new QDoubleSpinBox(wavefrontTab);
+	rangeRow->addWidget(new QLabel(tr("to"), zernikePage));
+	this->globalMaxSpin = new QDoubleSpinBox(zernikePage);
 	this->globalMaxSpin->setRange(0.0, 100.0);
 	this->globalMaxSpin->setDecimals(3);
 	this->globalMaxSpin->setSingleStep(0.1);
 	rangeRow->addWidget(this->globalMaxSpin);
-	wavefrontLayout->addLayout(rangeRow);
+	zernikeLayout->addLayout(rangeRow);
 
 	// Per-Zernike override table
-	wavefrontLayout->addWidget(new QLabel(tr("Per-Zernike Range Overrides:"), wavefrontTab));
-	this->overrideTable = new QTableWidget(wavefrontTab);
+	zernikeLayout->addWidget(new QLabel(tr("Per-Zernike Range Overrides:"), zernikePage));
+	this->overrideTable = new QTableWidget(zernikePage);
 	this->overrideTable->setColumnCount(5);
 	this->overrideTable->setHorizontalHeaderLabels({tr("Noll#"), tr("Name"), tr("Override"), tr("Min"), tr("Max")});
 	this->overrideTable->horizontalHeader()->setStretchLastSection(true);
@@ -125,8 +164,93 @@ void PSFSettingsDialog::setupUI()
 	this->overrideTable->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
 	this->overrideTable->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
 	this->overrideTable->setSelectionMode(QAbstractItemView::NoSelection);
-	wavefrontLayout->addWidget(this->overrideTable);
+	zernikeLayout->addWidget(this->overrideTable);
 
+	this->generatorStack->addWidget(zernikePage);
+
+	// Page 1: Deformable Mirror settings
+	QWidget* dmPage = new QWidget(this->generatorStack);
+	QFormLayout* dmLayout = new QFormLayout(dmPage);
+
+	this->dmRowsSpin = new QSpinBox(dmPage);
+	this->dmRowsSpin->setRange(2, 64);
+	this->dmRowsSpin->setValue(8);
+	this->dmRowsSpin->setToolTip(tr("Number of actuator rows in the grid.\nChanging this resets all actuator coefficients."));
+	dmLayout->addRow(tr("Actuator Rows:"), this->dmRowsSpin);
+
+	this->dmColsSpin = new QSpinBox(dmPage);
+	this->dmColsSpin->setRange(2, 64);
+	this->dmColsSpin->setValue(8);
+	this->dmColsSpin->setToolTip(tr("Number of actuator columns in the grid.\nChanging this resets all actuator coefficients."));
+	dmLayout->addRow(tr("Actuator Columns:"), this->dmColsSpin);
+
+	this->dmCouplingSpin = new QDoubleSpinBox(dmPage);
+	this->dmCouplingSpin->setRange(0.01, 0.50);
+	this->dmCouplingSpin->setDecimals(3);
+	this->dmCouplingSpin->setSingleStep(0.01);
+	this->dmCouplingSpin->setValue(0.15);
+	this->dmCouplingSpin->setToolTip(tr(
+		"Inter-actuator coupling (typical 0.05-0.15).\n"
+		"Fraction of peak influence reaching the adjacent actuator.\n"
+		"Higher = smoother wavefront, more overlap between actuators.\n"
+		"Lower = sharper, more localized actuator influence."));
+	dmLayout->addRow(tr("Coupling Coefficient:"), this->dmCouplingSpin);
+
+	this->dmGaussianIndexSpin = new QDoubleSpinBox(dmPage);
+	this->dmGaussianIndexSpin->setRange(1.0, 4.0);
+	this->dmGaussianIndexSpin->setDecimals(2);
+	this->dmGaussianIndexSpin->setSingleStep(0.1);
+	this->dmGaussianIndexSpin->setValue(2.0);
+	this->dmGaussianIndexSpin->setToolTip(tr(
+		"Shape exponent of the influence function (typical 1.5-2.5).\n"
+		"2.0 = standard Gaussian shape.\n"
+		"Lower = broader, flatter influence shoulders.\n"
+		"Higher = sharper, more peaked influence."));
+	dmLayout->addRow(tr("Gaussian Index:"), this->dmGaussianIndexSpin);
+
+	this->dmCommandMinSpin = new QDoubleSpinBox(dmPage);
+	this->dmCommandMinSpin->setRange(-100.0, 0.0);
+	this->dmCommandMinSpin->setDecimals(3);
+	this->dmCommandMinSpin->setSingleStep(0.1);
+	this->dmCommandMinSpin->setValue(-1.0);
+	this->dmCommandMinSpin->setToolTip(tr("Minimum actuator command value (slider lower bound)."));
+	dmLayout->addRow(tr("Command Min:"), this->dmCommandMinSpin);
+
+	this->dmCommandMaxSpin = new QDoubleSpinBox(dmPage);
+	this->dmCommandMaxSpin->setRange(0.0, 100.0);
+	this->dmCommandMaxSpin->setDecimals(3);
+	this->dmCommandMaxSpin->setSingleStep(0.1);
+	this->dmCommandMaxSpin->setValue(1.0);
+	this->dmCommandMaxSpin->setToolTip(tr("Maximum actuator command value (slider upper bound)."));
+	dmLayout->addRow(tr("Command Max:"), this->dmCommandMaxSpin);
+
+	this->dmCommandStepSpin = new QDoubleSpinBox(dmPage);
+	this->dmCommandStepSpin->setRange(0.0001, 1.0);
+	this->dmCommandStepSpin->setDecimals(4);
+	this->dmCommandStepSpin->setSingleStep(0.001);
+	this->dmCommandStepSpin->setValue(0.01);
+	this->dmCommandStepSpin->setToolTip(tr("Actuator command slider step size."));
+	dmLayout->addRow(tr("Command Step:"), this->dmCommandStepSpin);
+
+	// Auto-apply DM settings on any value change for live preview
+	connect(this->dmRowsSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+			this, &PSFSettingsDialog::onApplyClicked);
+	connect(this->dmColsSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+			this, &PSFSettingsDialog::onApplyClicked);
+	connect(this->dmCouplingSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, &PSFSettingsDialog::onApplyClicked);
+	connect(this->dmGaussianIndexSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, &PSFSettingsDialog::onApplyClicked);
+	connect(this->dmCommandMinSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, &PSFSettingsDialog::onApplyClicked);
+	connect(this->dmCommandMaxSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, &PSFSettingsDialog::onApplyClicked);
+	connect(this->dmCommandStepSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, &PSFSettingsDialog::onApplyClicked);
+
+	this->generatorStack->addWidget(dmPage);
+
+	wavefrontLayout->addWidget(this->generatorStack);
 	tabWidget->addTab(wavefrontTab, tr("Wavefront Generator"));
 
 	// --- PSF Calculation tab ---
@@ -168,12 +292,54 @@ void PSFSettingsDialog::setupUI()
 
 void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 {
-	// Block signals to prevent rebuildOverrideTable being triggered by textChanged
-	this->nollIndicesEdit->blockSignals(true);
-	this->nollIndicesEdit->setText(settings.nollIndexSpec);
-	this->nollIndicesEdit->blockSignals(false);
-	this->globalMinSpin->setValue(settings.globalMinCoefficient);
-	this->globalMaxSpin->setValue(settings.globalMaxCoefficient);
+	// Show correct generator page
+	if (settings.generatorTypeName == QLatin1String("Deformable Mirror")) {
+		this->generatorStack->setCurrentIndex(1);
+
+		// Populate DM fields
+		QVariantMap gs = settings.generatorSettings;
+		this->dmRowsSpin->setValue(gs.value("actuator_rows", 8).toInt());
+		this->dmColsSpin->setValue(gs.value("actuator_cols", 8).toInt());
+		this->dmCouplingSpin->setValue(gs.value("coupling_coefficient", 0.15).toDouble());
+		this->dmGaussianIndexSpin->setValue(gs.value("gaussian_index", 2.0).toDouble());
+		this->dmCommandMinSpin->setValue(gs.value("command_min", -1.0).toDouble());
+		this->dmCommandMaxSpin->setValue(gs.value("command_max", 1.0).toDouble());
+		this->dmCommandStepSpin->setValue(gs.value("command_step", 0.01).toDouble());
+	} else {
+		this->generatorStack->setCurrentIndex(0);
+
+		// Populate Zernike fields
+		this->nollIndicesEdit->blockSignals(true);
+		this->nollIndicesEdit->setText(settings.nollIndexSpec);
+		this->nollIndicesEdit->blockSignals(false);
+		this->globalMinSpin->setValue(settings.globalMinCoefficient);
+		this->globalMaxSpin->setValue(settings.globalMaxCoefficient);
+
+		// Build override table from Noll indices
+		QVector<int> indices = parseNollIndexSpec(settings.nollIndexSpec);
+		this->rebuildOverrideTable(indices);
+
+		// Apply stored overrides
+		for (int row = 0; row < this->overrideTable->rowCount(); ++row) {
+			int nollIndex = this->overrideTable->item(row, 0)->text().toInt();
+			if (settings.coefficientRangeOverrides.contains(nollIndex)) {
+				QCheckBox* checkBox = qobject_cast<QCheckBox*>(
+					this->overrideTable->cellWidget(row, 2));
+				QDoubleSpinBox* minSpin = qobject_cast<QDoubleSpinBox*>(
+					this->overrideTable->cellWidget(row, 3));
+				QDoubleSpinBox* maxSpin = qobject_cast<QDoubleSpinBox*>(
+					this->overrideTable->cellWidget(row, 4));
+				if (checkBox && minSpin && maxSpin) {
+					checkBox->setChecked(true);
+					minSpin->setValue(settings.coefficientRangeOverrides[nollIndex].first);
+					maxSpin->setValue(settings.coefficientRangeOverrides[nollIndex].second);
+					minSpin->setEnabled(true);
+					maxSpin->setEnabled(true);
+				}
+			}
+		}
+	}
+
 	// Grid size combo
 	int gridIdx = this->gridSizeCombo->findText(QString::number(settings.gridSize));
 	if (gridIdx >= 0) {
@@ -182,30 +348,6 @@ void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 
 	this->apertureRadiusSpin->setValue(settings.apertureRadius);
 	this->normalizationCombo->setCurrentIndex(settings.normalizationMode);
-
-	// Build override table from Noll indices
-	QVector<int> indices = parseNollIndexSpec(settings.nollIndexSpec);
-	this->rebuildOverrideTable(indices);
-
-	// Apply stored overrides
-	for (int row = 0; row < this->overrideTable->rowCount(); ++row) {
-		int nollIndex = this->overrideTable->item(row, 0)->text().toInt();
-		if (settings.coefficientRangeOverrides.contains(nollIndex)) {
-			QCheckBox* checkBox = qobject_cast<QCheckBox*>(
-				this->overrideTable->cellWidget(row, 2));
-			QDoubleSpinBox* minSpin = qobject_cast<QDoubleSpinBox*>(
-				this->overrideTable->cellWidget(row, 3));
-			QDoubleSpinBox* maxSpin = qobject_cast<QDoubleSpinBox*>(
-				this->overrideTable->cellWidget(row, 4));
-			if (checkBox && minSpin && maxSpin) {
-				checkBox->setChecked(true);
-				minSpin->setValue(settings.coefficientRangeOverrides[nollIndex].first);
-				maxSpin->setValue(settings.coefficientRangeOverrides[nollIndex].second);
-				minSpin->setEnabled(true);
-				maxSpin->setEnabled(true);
-			}
-		}
-	}
 }
 
 void PSFSettingsDialog::rebuildOverrideTable(const QVector<int>& indices)
@@ -279,21 +421,26 @@ void PSFSettingsDialog::rebuildOverrideTable(const QVector<int>& indices)
 	}
 }
 
-bool PSFSettingsDialog::validateNollSpec() const
+bool PSFSettingsDialog::validateSettings() const
 {
-	QVector<int> indices = parseNollIndexSpec(this->nollIndicesEdit->text());
-	return !indices.isEmpty();
+	if (this->initialSettings.generatorTypeName == QLatin1String("Zernike")) {
+		QVector<int> indices = parseNollIndexSpec(this->nollIndicesEdit->text());
+		return !indices.isEmpty();
+	}
+	return true; // DM settings always valid (spin boxes enforce ranges)
 }
 
 void PSFSettingsDialog::updateValidationState()
 {
-	bool valid = this->validateNollSpec();
+	bool valid = this->validateSettings();
 
-	// Visual feedback
-	if (valid) {
-		this->nollIndicesEdit->setStyleSheet(QString());
-	} else {
-		this->nollIndicesEdit->setStyleSheet(QStringLiteral("border: 1px solid red;"));
+	// Visual feedback for Zernike mode
+	if (this->initialSettings.generatorTypeName == QLatin1String("Zernike")) {
+		if (valid) {
+			this->nollIndicesEdit->setStyleSheet(QString());
+		} else {
+			this->nollIndicesEdit->setStyleSheet(QStringLiteral("border: 1px solid red;"));
+		}
 	}
 
 	this->okButton->setEnabled(valid);

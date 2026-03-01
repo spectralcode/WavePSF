@@ -17,6 +17,7 @@ class DeconvolutionSettingsWidget;
 class OptimizationWidget;
 class InterpolationWidget;
 class QTabWidget;
+class QComboBox;
 
 class PSFControlWidget : public QGroupBox
 {
@@ -36,6 +37,7 @@ public slots:
 	void updateWavefront(af::array wavefront);
 	void updatePSF(af::array psf);
 	void setPSFSettings(const PSFSettings& settings);
+	void setGeneratorType(const QString& typeName);
 	void setGroundTruthAvailable(bool available);
 	void updateOptimizationProgress(const OptimizationProgress& progress);
 	void onOptimizationFinished(const OptimizationResult& result);
@@ -45,6 +47,7 @@ public slots:
 signals:
 	void coefficientChanged(int id, double value);
 	void resetRequested();
+	void generatorTypeChangeRequested(QString typeName);
 
 	// Deconvolution settings signals (forwarded from DeconvolutionSettingsWidget)
 	void deconvAlgorithmChanged(int algorithm);
@@ -69,6 +72,7 @@ signals:
 
 private:
 	QTabWidget* tabWidget;
+	QComboBox* generatorTypeCombo;
 	CoefficientEditorWidget* coeffEditor;
 	WavefrontPlotWidget* wavefrontPlot;
 	PSFPreviewWidget* psfPreview;

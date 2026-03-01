@@ -23,6 +23,7 @@ public:
 	af::array getCurrentWavefront() const;
 	af::array getCurrentPSF() const;
 	PSFSettings getPSFSettings() const;
+	QString getGeneratorTypeName() const;
 	bool isUsingExternalPSF() const;
 
 public slots:
@@ -32,6 +33,9 @@ public slots:
 	void setExternalPSF(const af::array& psf);
 	void setGridSize(int size);
 	af::array deconvolve(const af::array& input);
+
+	// Generator switching
+	void setGeneratorType(const QString& typeName);
 
 	// PSF settings
 	void applyPSFSettings(const PSFSettings& settings);
@@ -47,6 +51,7 @@ signals:
 	void wavefrontUpdated(af::array wavefront);
 	void psfUpdated(af::array psf);
 	void parameterDescriptorsChanged(QVector<WavefrontParameter> descriptors);
+	void generatorTypeChanged(QString typeName);
 	void nollIndicesChanged();
 	void deconvolutionSettingsChanged();
 	void error(QString message);

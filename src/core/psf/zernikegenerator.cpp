@@ -1,4 +1,5 @@
 #include "zernikegenerator.h"
+#include "psfsettings.h"
 #include <QtMath>
 
 
@@ -18,6 +19,55 @@ ZernikeGenerator::ZernikeGenerator(int minNollIndex, int maxNollIndex, QObject* 
 
 ZernikeGenerator::~ZernikeGenerator()
 {
+}
+
+QString ZernikeGenerator::typeName() const
+{
+	return QStringLiteral("Zernike");
+}
+
+QVariantMap ZernikeGenerator::serializeSettings() const
+{
+	QVariantMap map;
+	map["noll_index_spec"] = formatNollIndexSpec(this->nollIndices);
+	map["global_min"] = this->globalMinValue;
+	map["global_max"] = this->globalMaxValue;
+	map["step"] = this->stepValue;
+
+	QVariantMap overrides;
+	for (auto it = this->rangeOverrides.constBegin(); it != this->rangeOverrides.constEnd(); ++it) {
+		QVariantMap range;
+		range["min"] = it.value().first;
+		range["max"] = it.value().second;
+		overrides[QString::number(it.key())] = range;
+	}
+	map["range_overrides"] = overrides;
+	return map;
+}
+
+void ZernikeGenerator::deserializeSettings(const QVariantMap& settings)
+{
+	if (settings.contains("noll_index_spec")) {
+		QVector<int> indices = parseNollIndexSpec(settings["noll_index_spec"].toString());
+		if (!indices.isEmpty()) {
+			this->setNollIndices(indices);
+		}
+	}
+	if (settings.contains("global_min") && settings.contains("global_max")) {
+		this->setGlobalRange(settings["global_min"].toDouble(), settings["global_max"].toDouble());
+	}
+	if (settings.contains("step")) {
+		this->setStepValue(settings["step"].toDouble());
+	}
+	this->clearAllParameterRanges();
+	if (settings.contains("range_overrides")) {
+		QVariantMap overrides = settings["range_overrides"].toMap();
+		for (auto it = overrides.constBegin(); it != overrides.constEnd(); ++it) {
+			QVariantMap range = it.value().toMap();
+			int nollIndex = it.key().toInt();
+			this->setParameterRange(nollIndex, range["min"].toDouble(), range["max"].toDouble());
+		}
+	}
 }
 
 QVector<WavefrontParameter> ZernikeGenerator::getParameterDescriptors() const
