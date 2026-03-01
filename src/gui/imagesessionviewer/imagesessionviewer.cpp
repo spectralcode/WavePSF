@@ -33,7 +33,6 @@ namespace {
 	const int DEFAULT_PATCH_ROWS = 4;
 	const int DEFAULT_BORDER_EXTENSION = 10;
 	const int CONTROLS_MIN_WIDTH = 250;
-	const int CONTROLS_MAX_WIDTH = 350;
 }
 
 ImageSessionViewer::ImageSessionViewer(QWidget* parent)
@@ -41,6 +40,7 @@ ImageSessionViewer::ImageSessionViewer(QWidget* parent)
 	  displayRangeMin(0.0), displayRangeMax(255.0), autoRangeEnabled(true),
 	  mainSplitter(nullptr), controlsWidget(nullptr), viewersWidget(nullptr),
 	  frameControlsGroup(nullptr), frameInfoLabel(nullptr), frameSlider(nullptr), frameSpinBox(nullptr),
+	  patchInfoLabel(nullptr), patchSlider(nullptr), patchSpinBox(nullptr),
 	  displayRangeGroup(nullptr), autoRangeCheckBox(nullptr), minValueSpinBox(nullptr), maxValueSpinBox(nullptr),
 	  patchGridGroup(nullptr), patchGridInfoLabel(nullptr), patchColsSpinBox(nullptr),
 	  patchRowsSpinBox(nullptr), borderExtensionSpinBox(nullptr),
@@ -137,7 +137,9 @@ void ImageSessionViewer::highlightPatch(int x, int y)
 {
 	// Convert x,y coordinates to linear patch ID for the viewers
 	int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEFAULT_PATCH_COLS;
+	int rows = this->imageSession != nullptr ? this->imageSession->getPatchGridRows() : DEFAULT_PATCH_ROWS;
 	int patchId = y * cols + x;
+	int totalPatches = cols * rows;
 
 	if (this->inputViewer != nullptr) {
 		this->inputViewer->highlightPatch(patchId);
@@ -145,6 +147,18 @@ void ImageSessionViewer::highlightPatch(int x, int y)
 	if (this->outputViewer != nullptr) {
 		this->outputViewer->highlightPatch(patchId);
 	}
+
+	// Update patch navigation controls
+	this->updatingControls = true;
+	this->patchSlider->setMaximum(totalPatches - 1);
+	this->patchSpinBox->setMaximum(totalPatches - 1);
+	this->patchSlider->setValue(patchId);
+	this->patchSpinBox->setValue(patchId);
+	this->patchSlider->setEnabled(true);
+	this->patchSpinBox->setEnabled(true);
+	this->patchInfoLabel->setText(QString("Patch %1 of %2  (%3, %4)").arg(patchId + 1).arg(totalPatches).arg(x).arg(y));
+	this->updatingControls = false;
+
 	this->updatePatchGridControls();
 }
 
@@ -167,6 +181,16 @@ void ImageSessionViewer::configurePatchGrid(int cols, int rows, int borderExtens
 		this->patchColsSpinBox->setValue(cols);
 		this->patchRowsSpinBox->setValue(rows);
 		this->borderExtensionSpinBox->setValue(borderExtension);
+
+		// Update patch navigation range
+		int totalPatches = cols * rows;
+		this->patchSlider->setMaximum(totalPatches - 1);
+		this->patchSpinBox->setMaximum(totalPatches - 1);
+		this->patchSlider->setValue(0);
+		this->patchSpinBox->setValue(0);
+		this->patchSlider->setEnabled(totalPatches > 0);
+		this->patchSpinBox->setEnabled(totalPatches > 0);
+		this->patchInfoLabel->setText(QString("Patch 1 of %1  (0, 0)").arg(totalPatches));
 
 		this->updatingControls = false;
 	}
@@ -193,6 +217,26 @@ void ImageSessionViewer::setFrameFromSpinBox(int frame)
 {
 	if (!this->updatingControls) {
 		emit frameChangeRequested(frame);
+	}
+}
+
+void ImageSessionViewer::setPatchFromSlider(int patchId)
+{
+	if (!this->updatingControls) {
+		int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEFAULT_PATCH_COLS;
+		int x = patchId % cols;
+		int y = patchId / cols;
+		emit patchChangeRequested(x, y);
+	}
+}
+
+void ImageSessionViewer::setPatchFromSpinBox(int patchId)
+{
+	if (!this->updatingControls) {
+		int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEFAULT_PATCH_COLS;
+		int x = patchId % cols;
+		int y = patchId / cols;
+		emit patchChangeRequested(x, y);
 	}
 }
 
@@ -299,7 +343,7 @@ void ImageSessionViewer::setupUI()
 	controlsScrollArea->setFrameShape(QFrame::NoFrame);
 	controlsScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	controlsScrollArea->setMinimumWidth(CONTROLS_MIN_WIDTH);
-	controlsScrollArea->setMaximumWidth(CONTROLS_MAX_WIDTH);
+	controlsScrollArea->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 
 	this->controlsWidget = new QWidget(controlsScrollArea);
 
@@ -341,20 +385,47 @@ void ImageSessionViewer::setupFrameControls()
 	this->frameSpinBox->setValue(0);
 	this->frameSpinBox->setEnabled(false);
 
+	// Patch info label
+	this->patchInfoLabel = new QLabel("Patch 0 of 0");
+
+	// Patch slider and spinbox
+	this->patchSlider = new QSlider(Qt::Horizontal);
+	this->patchSlider->setMinimum(0);
+	this->patchSlider->setMaximum(0);
+	this->patchSlider->setValue(0);
+	this->patchSlider->setEnabled(false);
+
+	this->patchSpinBox = new QSpinBox();
+	this->patchSpinBox->setMinimum(0);
+	this->patchSpinBox->setMaximum(0);
+	this->patchSpinBox->setValue(0);
+	this->patchSpinBox->setEnabled(false);
+
 	// Layout
 	QVBoxLayout* frameLayout = new QVBoxLayout();
 	frameLayout->addWidget(this->frameInfoLabel);
 
-	QHBoxLayout* sliderLayout = new QHBoxLayout();
-	sliderLayout->addWidget(this->frameSlider, 1);
-	sliderLayout->addWidget(this->frameSpinBox, 0);
-	frameLayout->addLayout(sliderLayout);
+	QHBoxLayout* frameSliderLayout = new QHBoxLayout();
+	frameSliderLayout->addWidget(this->frameSlider, 1);
+	frameSliderLayout->addWidget(this->frameSpinBox, 0);
+	frameLayout->addLayout(frameSliderLayout);
+
+	frameLayout->addWidget(this->patchInfoLabel);
+
+	QHBoxLayout* patchSliderLayout = new QHBoxLayout();
+	patchSliderLayout->addWidget(this->patchSlider, 1);
+	patchSliderLayout->addWidget(this->patchSpinBox, 0);
+	frameLayout->addLayout(patchSliderLayout);
 
 	this->frameControlsGroup->setLayout(frameLayout);
 
-	// Synchronize slider and spinbox
+	// Synchronize frame slider and spinbox
 	connect(this->frameSlider, &QSlider::valueChanged, this->frameSpinBox, &QSpinBox::setValue);
 	connect(this->frameSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this->frameSlider, &QSlider::setValue);
+
+	// Synchronize patch slider and spinbox
+	connect(this->patchSlider, &QSlider::valueChanged, this->patchSpinBox, &QSpinBox::setValue);
+	connect(this->patchSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this->patchSlider, &QSlider::setValue);
 }
 
 void ImageSessionViewer::setupDisplayRangeControls()
@@ -463,6 +534,10 @@ void ImageSessionViewer::connectSignals()
 	// Connect frame controls to internal slots
 	connect(this->frameSlider, &QSlider::valueChanged, this, &ImageSessionViewer::setFrameFromSlider);
 	connect(this->frameSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &ImageSessionViewer::setFrameFromSpinBox);
+
+	// Connect patch navigation controls
+	connect(this->patchSlider, &QSlider::valueChanged, this, &ImageSessionViewer::setPatchFromSlider);
+	connect(this->patchSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &ImageSessionViewer::setPatchFromSpinBox);
 
 	// Connect display range controls
 	connect(this->autoRangeCheckBox, &QCheckBox::toggled, this, &ImageSessionViewer::setAutoRange);

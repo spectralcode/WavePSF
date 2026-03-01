@@ -45,6 +45,8 @@ private slots:
 	// Internal UI interactions
 	void setFrameFromSlider(int frame);
 	void setFrameFromSpinBox(int frame);
+	void setPatchFromSlider(int patchId);
+	void setPatchFromSpinBox(int patchId);
 	void setAutoRange(bool enabled);
 	void setMinValue(double value);
 	void setMaxValue(double value);
@@ -98,6 +100,11 @@ private:
 	QLabel* frameInfoLabel;
 	QSlider* frameSlider;
 	QSpinBox* frameSpinBox;
+
+	// Patch navigation controls
+	QLabel* patchInfoLabel;
+	QSlider* patchSlider;
+	QSpinBox* patchSpinBox;
 
 	// Display range controls
 	QGroupBox* displayRangeGroup;
