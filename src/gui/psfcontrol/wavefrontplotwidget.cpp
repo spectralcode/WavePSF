@@ -1,7 +1,10 @@
 #include "wavefrontplotwidget.h"
 #include "qcustomplot.h"
+#include "gui/qcppaletteobserver.h"
 #include <QVBoxLayout>
 #include <QComboBox>
+#include <QMenu>
+#include <QAction>
 #include <QtMath>
 
 
@@ -29,8 +32,8 @@ WavefrontPlotWidget::WavefrontPlotWidget(QWidget* parent)
 	this->colorScale->setType(QCPAxis::atRight);
 	this->colorMap->setColorScale(this->colorScale);
 
-	// Default gradient (blue-white-red diverging)
-	this->applyCustomGradient();
+	// Default gradient
+	this->applyWavefrontGradient();
 
 	// Axes: visible with labels, range set on data update
 	this->plot->xAxis->setVisible(true);
@@ -57,6 +60,12 @@ WavefrontPlotWidget::WavefrontPlotWidget(QWidget* parent)
 	// Gradient selector signal
 	connect(this->gradientCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 			this, &WavefrontPlotWidget::applyGradient);
+
+	// Context menu
+	this->setupContextMenu();
+
+	// Palette-aware theming
+	new QCPPaletteObserver(this->plot);
 }
 
 WavefrontPlotWidget::~WavefrontPlotWidget()
@@ -90,7 +99,7 @@ void WavefrontPlotWidget::updatePlot(af::array wavefront)
 		}
 	}
 
-	this->colorMap->rescaleDataRange();
+	this->applyDataRange();
 	this->plot->rescaleAxes();
 	this->plot->yAxis->setScaleRatio(this->plot->xAxis, 1.0);
 	this->plot->replot();
@@ -124,8 +133,9 @@ void WavefrontPlotWidget::setupGradientCombo()
 	this->gradientCombo->addItem(tr("Jet"));
 	this->gradientCombo->addItem(tr("Hues"));
 	this->gradientCombo->addItem(tr("Blue-White-Red"));
-	this->gradientCombo->addItem(tr("Custom"));
-	this->gradientCombo->setCurrentIndex(13); // Custom is default
+	this->gradientCombo->addItem(tr("Wavefront"));
+	this->gradientCombo->addItem(tr("Seismic"));
+	this->gradientCombo->setCurrentIndex(13); // Wavefront is default
 }
 
 void WavefrontPlotWidget::applyGradient(int index)
@@ -136,8 +146,10 @@ void WavefrontPlotWidget::applyGradient(int index)
 			QCPColorGradient(static_cast<QCPColorGradient::GradientPreset>(index)));
 	} else if (index == 12) {
 		this->applyBlueWhiteRedGradient();
-	} else {
-		this->applyCustomGradient();
+	} else if (index == 13) {
+		this->applyWavefrontGradient();
+	} else if (index == 14) {
+		this->applySeismicGradient();
 	}
 	this->plot->replot();
 }
@@ -151,7 +163,7 @@ void WavefrontPlotWidget::applyBlueWhiteRedGradient()
 	this->colorMap->setGradient(gradient);
 }
 
-void WavefrontPlotWidget::applyCustomGradient()
+void WavefrontPlotWidget::applyWavefrontGradient()
 {
 	QCPColorGradient gradient;
 	gradient.setColorStopAt(0.0, Qt::darkBlue);
@@ -162,4 +174,63 @@ void WavefrontPlotWidget::applyCustomGradient()
 	gradient.setColorStopAt(1.0, Qt::yellow);
 	gradient.setColorInterpolation(QCPColorGradient::ciRGB);
 	this->colorMap->setGradient(gradient);
+}
+
+void WavefrontPlotWidget::applySeismicGradient()
+{
+	// Matplotlib "seismic" colormap: dark blue → blue → white → red → dark red
+	QCPColorGradient gradient;
+	gradient.setColorStopAt(0.0,  QColor(0, 0, 77));
+	gradient.setColorStopAt(0.25, QColor(0, 0, 255));
+	gradient.setColorStopAt(0.5,  QColor(255, 255, 255));
+	gradient.setColorStopAt(0.75, QColor(255, 0, 0));
+	gradient.setColorStopAt(1.0,  QColor(128, 0, 0));
+	gradient.setColorInterpolation(QCPColorGradient::ciRGB);
+	this->colorMap->setGradient(gradient);
+}
+
+void WavefrontPlotWidget::setupContextMenu()
+{
+	this->plot->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(this->plot, &QWidget::customContextMenuRequested,
+			this, &WavefrontPlotWidget::showContextMenu);
+
+	this->contextMenu = new QMenu(this);
+
+	this->autoScaleAction = new QAction("Auto-Scale Range", this);
+	this->autoScaleAction->setCheckable(true);
+	this->autoScaleAction->setChecked(true);
+	connect(this->autoScaleAction, &QAction::toggled, this, [this]() {
+		this->applyDataRange();
+		this->plot->replot();
+	});
+	this->contextMenu->addAction(this->autoScaleAction);
+
+	this->symmetricZeroAction = new QAction("Symmetric Zero", this);
+	this->symmetricZeroAction->setCheckable(true);
+	this->symmetricZeroAction->setChecked(true);
+	connect(this->symmetricZeroAction, &QAction::toggled, this, [this]() {
+		this->applyDataRange();
+		this->plot->replot();
+	});
+	this->contextMenu->addAction(this->symmetricZeroAction);
+}
+
+void WavefrontPlotWidget::showContextMenu(const QPoint& pos)
+{
+	this->contextMenu->exec(this->plot->mapToGlobal(pos));
+}
+
+void WavefrontPlotWidget::applyDataRange()
+{
+	if (this->autoScaleAction->isChecked()) {
+		this->colorMap->rescaleDataRange();
+	}
+	if (this->symmetricZeroAction->isChecked()) {
+		QCPRange dataRange = this->colorMap->dataRange();
+		double maxAbs = qMax(qAbs(dataRange.lower), qAbs(dataRange.upper));
+		if (maxAbs > 0.0) {
+			this->colorMap->setDataRange(QCPRange(-maxAbs, maxAbs));
+		}
+	}
 }

@@ -94,7 +94,8 @@ HEADERS += \
 	$$SOURCEDIR/core/optimization/optimizationworker.h \
 	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.h \
 	$$SOURCEDIR/core/interpolation/tableinterpolator.h \
-	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.h
+	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.h \
+	$$SOURCEDIR/gui/qcppaletteobserver.h
 
 FORMS += \
 	$$SOURCEDIR/gui/mainwindow.ui

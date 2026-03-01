@@ -8,6 +8,8 @@ class QCustomPlot;
 class QCPColorMap;
 class QCPColorScale;
 class QComboBox;
+class QAction;
+class QMenu;
 
 class WavefrontPlotWidget : public QWidget
 {
@@ -23,16 +25,24 @@ private slots:
 	void resetView();
 	void enforceAspectRatio();
 	void applyGradient(int index);
+	void showContextMenu(const QPoint& pos);
 
 private:
 	void setupGradientCombo();
+	void setupContextMenu();
 	void applyBlueWhiteRedGradient();
-	void applyCustomGradient();
+	void applyWavefrontGradient();
+	void applySeismicGradient();
+	void applyDataRange();
 
 	QCustomPlot* plot;
 	QCPColorMap* colorMap;
 	QCPColorScale* colorScale;
 	QComboBox* gradientCombo;
+
+	QMenu* contextMenu;
+	QAction* autoScaleAction;
+	QAction* symmetricZeroAction;
 };
 
 #endif // WAVEFRONTPLOTWIDGET_H

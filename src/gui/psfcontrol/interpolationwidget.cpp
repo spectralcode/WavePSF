@@ -1,5 +1,6 @@
 #include "interpolationwidget.h"
 #include "qcustomplot.h"
+#include "gui/qcppaletteobserver.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
@@ -103,6 +104,9 @@ void InterpolationWidget::setupUI()
 
 	this->plot->legend->setVisible(true);
 	this->plot->legend->setFont(QFont(font().family(), 8));
+
+	// Palette-aware theming
+	new QCPPaletteObserver(this->plot);
 
 	// Layout assembly
 	mainLayout->addWidget(controlsWidget, 0);

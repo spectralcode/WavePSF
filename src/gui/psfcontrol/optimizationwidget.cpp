@@ -2,6 +2,7 @@
 #include "core/optimization/imagemetriccalculator.h"
 #include "core/psf/psfsettings.h"
 #include "qcustomplot.h"
+#include "gui/qcppaletteobserver.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -306,6 +307,9 @@ void OptimizationWidget::setupPlotSection(QVBoxLayout* layout)
 	this->metricPlot->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(this->metricPlot, &QWidget::customContextMenuRequested,
 			this, &OptimizationWidget::showPlotContextMenu);
+
+	// Palette-aware theming
+	new QCPPaletteObserver(this->metricPlot);
 
 	layout->addWidget(this->metricPlot);
 }
