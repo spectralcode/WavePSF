@@ -37,6 +37,8 @@ private slots:
 
 private:
 	void setupUI();
+	void installScrollGuard(QWidget* widget);
+	bool eventFilter(QObject* obj, QEvent* event) override;
 
 	QComboBox* algorithmComboBox;
 	QSpinBox* iterationsSpinBox;

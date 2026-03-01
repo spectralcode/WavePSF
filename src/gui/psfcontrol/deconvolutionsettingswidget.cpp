@@ -1,6 +1,7 @@
 #include "deconvolutionsettingswidget.h"
 #include "core/psf/deconvolver.h"
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QFormLayout>
 #include <QComboBox>
 #include <QSpinBox>
@@ -9,6 +10,8 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QFrame>
+#include <QScrollArea>
+#include <QEvent>
 
 namespace {
 	const char* SETTINGS_GROUP = "deconvolution_settings";
@@ -27,68 +30,87 @@ DeconvolutionSettingsWidget::~DeconvolutionSettingsWidget()
 
 void DeconvolutionSettingsWidget::setupUI()
 {
-	QVBoxLayout* mainLayout = new QVBoxLayout(this);
+	QHBoxLayout* mainLayout = new QHBoxLayout(this);
+
+	QScrollArea* scrollArea = new QScrollArea(this);
+	scrollArea->setWidgetResizable(true);
+	scrollArea->setFrameShape(QFrame::NoFrame);
+	scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	scrollArea->setMinimumWidth(220);
+	scrollArea->setMaximumWidth(380);
+
+	QWidget* controlsWidget = new QWidget(scrollArea);
+	QVBoxLayout* controlsLayout = new QVBoxLayout(controlsWidget);
 
 	// Form layout for algorithm parameters
 	QFormLayout* formLayout = new QFormLayout();
 
 	// Algorithm selection
-	this->algorithmComboBox = new QComboBox(this);
+	this->algorithmComboBox = new QComboBox(controlsWidget);
 	this->algorithmComboBox->addItems(Deconvolver::getAlgorithmNames());
+	this->installScrollGuard(this->algorithmComboBox);
 	formLayout->addRow(tr("Algorithm:"), this->algorithmComboBox);
 
 	// Iterations
-	this->iterationsLabel = new QLabel(tr("Iterations:"), this);
-	this->iterationsSpinBox = new QSpinBox(this);
+	this->iterationsLabel = new QLabel(tr("Iterations:"), controlsWidget);
+	this->iterationsSpinBox = new QSpinBox(controlsWidget);
 	this->iterationsSpinBox->setRange(1, 10240);
 	this->iterationsSpinBox->setValue(128);
+	this->installScrollGuard(this->iterationsSpinBox);
 	formLayout->addRow(this->iterationsLabel, this->iterationsSpinBox);
 
 	// Relaxation factor (Landweber)
-	this->relaxationLabel = new QLabel(tr("Relaxation Factor:"), this);
-	this->relaxationFactorSpinBox = new QDoubleSpinBox(this);
+	this->relaxationLabel = new QLabel(tr("Relaxation Factor:"), controlsWidget);
+	this->relaxationFactorSpinBox = new QDoubleSpinBox(controlsWidget);
 	this->relaxationFactorSpinBox->setRange(0.0001, 1000.0);
 	this->relaxationFactorSpinBox->setDecimals(4);
 	this->relaxationFactorSpinBox->setValue(0.65);
 	this->relaxationFactorSpinBox->setSingleStep(0.01);
+	this->installScrollGuard(this->relaxationFactorSpinBox);
 	formLayout->addRow(this->relaxationLabel, this->relaxationFactorSpinBox);
 
 	// Regularization factor (Tikhonov)
-	this->regularizationLabel = new QLabel(tr("Regularization:"), this);
-	this->regularizationFactorSpinBox = new QDoubleSpinBox(this);
+	this->regularizationLabel = new QLabel(tr("Regularization:"), controlsWidget);
+	this->regularizationFactorSpinBox = new QDoubleSpinBox(controlsWidget);
 	this->regularizationFactorSpinBox->setRange(0.0001, 1.0);
 	this->regularizationFactorSpinBox->setDecimals(4);
 	this->regularizationFactorSpinBox->setValue(0.005);
 	this->regularizationFactorSpinBox->setSingleStep(0.001);
+	this->installScrollGuard(this->regularizationFactorSpinBox);
 	formLayout->addRow(this->regularizationLabel, this->regularizationFactorSpinBox);
 
 	// Noise-to-signal factor (Wiener)
-	this->noiseToSignalLabel = new QLabel(tr("NSR Factor:"), this);
-	this->noiseToSignalFactorSpinBox = new QDoubleSpinBox(this);
+	this->noiseToSignalLabel = new QLabel(tr("NSR Factor:"), controlsWidget);
+	this->noiseToSignalFactorSpinBox = new QDoubleSpinBox(controlsWidget);
 	this->noiseToSignalFactorSpinBox->setRange(0.0001, 1.0);
 	this->noiseToSignalFactorSpinBox->setDecimals(4);
 	this->noiseToSignalFactorSpinBox->setValue(0.01);
 	this->noiseToSignalFactorSpinBox->setSingleStep(0.001);
+	this->installScrollGuard(this->noiseToSignalFactorSpinBox);
 	formLayout->addRow(this->noiseToSignalLabel, this->noiseToSignalFactorSpinBox);
 
-	mainLayout->addLayout(formLayout);
+	controlsLayout->addLayout(formLayout);
 
 	// Separator
-	QFrame* separator = new QFrame(this);
+	QFrame* separator = new QFrame(controlsWidget);
 	separator->setFrameShape(QFrame::HLine);
 	separator->setFrameShadow(QFrame::Sunken);
-	mainLayout->addWidget(separator);
+	controlsLayout->addWidget(separator);
 
 	// Live mode checkbox
-	this->liveModeCheckBox = new QCheckBox(tr("Live Deconvolution"), this);
+	this->liveModeCheckBox = new QCheckBox(tr("Live Deconvolution"), controlsWidget);
 	this->liveModeCheckBox->setChecked(false);
-	mainLayout->addWidget(this->liveModeCheckBox);
+	controlsLayout->addWidget(this->liveModeCheckBox);
 
 	// Deconvolve button
-	this->deconvolveButton = new QPushButton(tr("Deconvolve"), this);
-	mainLayout->addWidget(this->deconvolveButton);
+	this->deconvolveButton = new QPushButton(tr("Deconvolve"), controlsWidget);
+	controlsLayout->addWidget(this->deconvolveButton);
 
-	mainLayout->addStretch();
+	controlsLayout->addStretch();
+
+	scrollArea->setWidget(controlsWidget);
+	mainLayout->addWidget(scrollArea, 0);
+	mainLayout->addStretch(1);
 
 	// Set initial visibility
 	this->updateParameterVisibility(0);
@@ -197,4 +219,22 @@ void DeconvolutionSettingsWidget::setSettings(const QVariantMap& settings)
 	if (settings.contains("liveMode")) {
 		this->liveModeCheckBox->setChecked(settings.value("liveMode").toBool());
 	}
+}
+
+void DeconvolutionSettingsWidget::installScrollGuard(QWidget* widget)
+{
+	widget->setFocusPolicy(Qt::StrongFocus);
+	widget->installEventFilter(this);
+}
+
+bool DeconvolutionSettingsWidget::eventFilter(QObject* obj, QEvent* event)
+{
+	if (event->type() == QEvent::Wheel) {
+		QWidget* widget = qobject_cast<QWidget*>(obj);
+		if (widget && !widget->hasFocus()) {
+			event->ignore();
+			return true;
+		}
+	}
+	return QWidget::eventFilter(obj, event);
 }

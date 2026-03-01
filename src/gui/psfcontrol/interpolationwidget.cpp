@@ -8,6 +8,9 @@
 #include <QPushButton>
 #include <QSpinBox>
 #include <QLabel>
+#include <QScrollArea>
+#include <QFrame>
+#include <QEvent>
 
 InterpolationWidget::InterpolationWidget(QWidget* parent)
 	: QWidget(parent)
@@ -24,10 +27,15 @@ void InterpolationWidget::setupUI()
 {
 	QHBoxLayout* mainLayout = new QHBoxLayout(this);
 
-	// Left side: controls
-	QWidget* controlsWidget = new QWidget(this);
-	controlsWidget->setMinimumWidth(220);
-	controlsWidget->setMaximumWidth(300);
+	// Left side: controls in scroll area
+	QScrollArea* scrollArea = new QScrollArea(this);
+	scrollArea->setWidgetResizable(true);
+	scrollArea->setFrameShape(QFrame::NoFrame);
+	scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	scrollArea->setMinimumWidth(220);
+	scrollArea->setMaximumWidth(300);
+
+	QWidget* controlsWidget = new QWidget(scrollArea);
 	QVBoxLayout* controlsLayout = new QVBoxLayout(controlsWidget);
 
 	// Polynomial order
@@ -38,6 +46,7 @@ void InterpolationWidget::setupUI()
 	this->polynomialOrderSpinBox = new QSpinBox(settingsGroup);
 	this->polynomialOrderSpinBox->setRange(1, 6);
 	this->polynomialOrderSpinBox->setValue(3);
+	this->installScrollGuard(this->polynomialOrderSpinBox);
 	settingsLayout->addWidget(this->polynomialOrderSpinBox, 0, 1);
 
 	controlsLayout->addWidget(settingsGroup);
@@ -73,6 +82,7 @@ void InterpolationWidget::setupUI()
 	this->coefficientSpinBox->setRange(0, 0);
 	this->coefficientSpinBox->setValue(0);
 	this->coefficientSpinBox->setEnabled(false);
+	this->installScrollGuard(this->coefficientSpinBox);
 	plotControlLayout->addWidget(this->coefficientSpinBox, 0, 1);
 
 	controlsLayout->addWidget(plotGroup);
@@ -109,7 +119,8 @@ void InterpolationWidget::setupUI()
 	new QCPPaletteObserver(this->plot);
 
 	// Layout assembly
-	mainLayout->addWidget(controlsWidget, 0);
+	scrollArea->setWidget(controlsWidget);
+	mainLayout->addWidget(scrollArea, 0);
 	mainLayout->addWidget(this->plot, 1);
 
 	// Connections
@@ -181,4 +192,22 @@ void InterpolationWidget::updatePlot()
 	this->plot->xAxis->setLabel(this->lastResult.axisLabel);
 	this->plot->rescaleAxes();
 	this->plot->replot();
+}
+
+void InterpolationWidget::installScrollGuard(QWidget* widget)
+{
+	widget->setFocusPolicy(Qt::StrongFocus);
+	widget->installEventFilter(this);
+}
+
+bool InterpolationWidget::eventFilter(QObject* obj, QEvent* event)
+{
+	if (event->type() == QEvent::Wheel) {
+		QWidget* widget = qobject_cast<QWidget*>(obj);
+		if (widget && !widget->hasFocus()) {
+			event->ignore();
+			return true;
+		}
+	}
+	return QWidget::eventFilter(obj, event);
 }

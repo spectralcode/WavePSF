@@ -38,12 +38,15 @@ OptimizationWidget::~OptimizationWidget()
 
 void OptimizationWidget::setupUI()
 {
-	QVBoxLayout* mainLayout = new QVBoxLayout(this);
+	QHBoxLayout* mainLayout = new QHBoxLayout(this);
 
-	// Use scroll area so the widget works in limited space
+	// Left side: controls in scroll area
 	QScrollArea* scrollArea = new QScrollArea(this);
 	scrollArea->setWidgetResizable(true);
 	scrollArea->setFrameShape(QFrame::NoFrame);
+	scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	scrollArea->setMinimumWidth(220);
+	scrollArea->setMaximumWidth(380);
 
 	QWidget* scrollContent = new QWidget(scrollArea);
 	QVBoxLayout* contentLayout = new QVBoxLayout(scrollContent);
@@ -56,11 +59,15 @@ void OptimizationWidget::setupUI()
 	this->setupCoefficientSection(contentLayout);
 	this->setupControlSection(contentLayout);
 	this->setupStatusSection(contentLayout);
-	this->setupPlotSection(contentLayout);
 
 	contentLayout->addStretch();
 	scrollArea->setWidget(scrollContent);
-	mainLayout->addWidget(scrollArea);
+
+	// Right side: metric plot
+	this->setupPlotSection();
+
+	mainLayout->addWidget(scrollArea, 0);
+	mainLayout->addWidget(this->metricPlot, 1);
 }
 
 void OptimizationWidget::setupModeSection(QVBoxLayout* layout)
@@ -286,11 +293,9 @@ void OptimizationWidget::setupStatusSection(QVBoxLayout* layout)
 	layout->addWidget(statusGroup);
 }
 
-void OptimizationWidget::setupPlotSection(QVBoxLayout* layout)
+void OptimizationWidget::setupPlotSection()
 {
 	this->metricPlot = new QCustomPlot(this);
-	this->metricPlot->setMinimumHeight(120);
-	this->metricPlot->setMaximumHeight(200);
 	this->metricPlot->addGraph();
 	this->metricPlot->xAxis->setLabel(tr("Iteration"));
 	this->metricPlot->yAxis->setLabel(tr("Metric"));
@@ -310,8 +315,6 @@ void OptimizationWidget::setupPlotSection(QVBoxLayout* layout)
 
 	// Palette-aware theming
 	new QCPPaletteObserver(this->metricPlot);
-
-	layout->addWidget(this->metricPlot);
 }
 
 void OptimizationWidget::onModeChanged(int index)

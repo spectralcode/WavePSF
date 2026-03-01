@@ -62,7 +62,7 @@ private:
 	void setupCoefficientSection(QVBoxLayout* layout);
 	void setupControlSection(QVBoxLayout* layout);
 	void setupStatusSection(QVBoxLayout* layout);
-	void setupPlotSection(QVBoxLayout* layout);
+	void setupPlotSection();
 
 	void installScrollGuard(QWidget* widget);
 	bool eventFilter(QObject* obj, QEvent* event) override;

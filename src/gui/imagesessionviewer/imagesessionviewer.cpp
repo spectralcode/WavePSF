@@ -14,6 +14,8 @@
 #include <QCheckBox>
 #include <QDoubleSpinBox>
 #include <QTimer>
+#include <QScrollArea>
+#include <QFrame>
 
 namespace {
 	const char* SETTINGS_GROUP = "image_session_viewer";
@@ -291,10 +293,15 @@ void ImageSessionViewer::setupUI()
 	this->setupPatchGridControls();
 	this->setupImageViewers();
 
-	// Create controls widget
-	this->controlsWidget = new QWidget();
-	this->controlsWidget->setMinimumWidth(CONTROLS_MIN_WIDTH);
-	this->controlsWidget->setMaximumWidth(CONTROLS_MAX_WIDTH);
+	// Create controls widget in scroll area
+	QScrollArea* controlsScrollArea = new QScrollArea();
+	controlsScrollArea->setWidgetResizable(true);
+	controlsScrollArea->setFrameShape(QFrame::NoFrame);
+	controlsScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	controlsScrollArea->setMinimumWidth(CONTROLS_MIN_WIDTH);
+	controlsScrollArea->setMaximumWidth(CONTROLS_MAX_WIDTH);
+
+	this->controlsWidget = new QWidget(controlsScrollArea);
 
 	QVBoxLayout* controlsLayout = new QVBoxLayout(this->controlsWidget);
 	controlsLayout->addWidget(this->frameControlsGroup);
@@ -302,8 +309,10 @@ void ImageSessionViewer::setupUI()
 	controlsLayout->addWidget(this->patchGridGroup);
 	controlsLayout->addStretch();
 
+	controlsScrollArea->setWidget(this->controlsWidget);
+
 	// Add to splitter
-	this->mainSplitter->addWidget(this->controlsWidget);
+	this->mainSplitter->addWidget(controlsScrollArea);
 	this->mainSplitter->addWidget(this->viewersWidget);
 	this->mainSplitter->setStretchFactor(0, 0); // Controls don't stretch
 	this->mainSplitter->setStretchFactor(1, 1); // Viewers stretch

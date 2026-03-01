@@ -32,6 +32,8 @@ private slots:
 private:
 	void setupUI();
 	void updatePlot();
+	void installScrollGuard(QWidget* widget);
+	bool eventFilter(QObject* obj, QEvent* event) override;
 
 	// Controls
 	QSpinBox* polynomialOrderSpinBox;
