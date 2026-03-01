@@ -103,7 +103,7 @@ const QMap<StyleManager::StyleMode, StyleManager::StyleInfo>& StyleManager::getS
 void StyleManager::loadSettings() {
 	QVariantMap settings = this->guiSettings->getStoredSettings(SETTINGS_GROUP);
 
-	int styleInt = settings.value(STYLE_MODE_KEY, static_cast<int>(System)).toInt();
+	int styleInt = settings.value(STYLE_MODE_KEY, static_cast<int>(DarkFusion)).toInt();
 	this->currentStyle = static_cast<StyleMode>(styleInt);
 }
 
