@@ -47,6 +47,10 @@ public:
 	static int getNollM(int nollIndex);
 	static QString getName(int nollIndex);
 
+	// Noll index spec parsing/formatting
+	static QVector<int> parseNollIndexSpec(const QString& spec);
+	static QString formatNollIndexSpec(const QVector<int>& indices);
+
 private:
 	struct ZernikeBasis {
 		int nollIndex;

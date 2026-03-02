@@ -107,7 +107,7 @@ void PSFSettingsDialog::onNollIndicesChanged()
 {
 	this->updateValidationState();
 
-	QVector<int> indices = parseNollIndexSpec(this->nollIndicesEdit->text());
+	QVector<int> indices = ZernikeGenerator::parseNollIndexSpec(this->nollIndicesEdit->text());
 	if (!indices.isEmpty()) {
 		this->rebuildOverrideTable(indices);
 	}
@@ -343,7 +343,7 @@ void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 	this->globalMinSpin->setValue(settings.globalMinCoefficient);
 	this->globalMaxSpin->setValue(settings.globalMaxCoefficient);
 
-	QVector<int> indices = parseNollIndexSpec(settings.nollIndexSpec);
+	QVector<int> indices = ZernikeGenerator::parseNollIndexSpec(settings.nollIndexSpec);
 	this->rebuildOverrideTable(indices);
 
 	for (int row = 0; row < this->overrideTable->rowCount(); ++row) {
@@ -459,7 +459,7 @@ void PSFSettingsDialog::rebuildOverrideTable(const QVector<int>& indices)
 bool PSFSettingsDialog::validateSettings() const
 {
 	if (this->initialSettings.generatorTypeName == QLatin1String("Zernike")) {
-		QVector<int> indices = parseNollIndexSpec(this->nollIndicesEdit->text());
+		QVector<int> indices = ZernikeGenerator::parseNollIndexSpec(this->nollIndicesEdit->text());
 		return !indices.isEmpty();
 	}
 	return true; // DM settings always valid (spin boxes enforce ranges)

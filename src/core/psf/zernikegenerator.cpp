@@ -1,6 +1,7 @@
 #include "zernikegenerator.h"
-#include "psfsettings.h"
+#include <QStringList>
 #include <QtMath>
+#include <algorithm>
 
 
 ZernikeGenerator::ZernikeGenerator(int minNollIndex, int maxNollIndex, QObject* parent)
@@ -319,4 +320,77 @@ af::array ZernikeGenerator::evaluateBasisOnGrid(const ZernikeBasis& basis, const
 	af::array mask = (r <= 1.0f).as(f32);
 
 	return normFactor * radial * angular * mask;
+}
+
+QVector<int> ZernikeGenerator::parseNollIndexSpec(const QString& spec)
+{
+	QVector<int> result;
+	QStringList parts = spec.split(',', QString::SkipEmptyParts);
+
+	for (const QString& part : qAsConst(parts)) {
+		QString trimmed = part.trimmed();
+		if (trimmed.isEmpty()) {
+			continue;
+		}
+
+		int dashIndex = trimmed.indexOf('-');
+		if (dashIndex > 0) {
+			// Range: "2-21"
+			bool okStart = false, okEnd = false;
+			int start = trimmed.left(dashIndex).trimmed().toInt(&okStart);
+			int end = trimmed.mid(dashIndex + 1).trimmed().toInt(&okEnd);
+			if (okStart && okEnd && start >= 1 && end >= start) {
+				for (int i = start; i <= end; ++i) {
+					if (!result.contains(i)) {
+						result.append(i);
+					}
+				}
+			}
+		} else {
+			// Single index: "7"
+			bool ok = false;
+			int val = trimmed.toInt(&ok);
+			if (ok && val >= 1 && !result.contains(val)) {
+				result.append(val);
+			}
+		}
+	}
+
+	std::sort(result.begin(), result.end());
+	return result;
+}
+
+QString ZernikeGenerator::formatNollIndexSpec(const QVector<int>& indices)
+{
+	if (indices.isEmpty()) {
+		return QString();
+	}
+
+	QStringList parts;
+	int rangeStart = indices[0];
+	int rangeEnd = indices[0];
+
+	for (int i = 1; i < indices.size(); ++i) {
+		if (indices[i] == rangeEnd + 1) {
+			rangeEnd = indices[i];
+		} else {
+			// Flush current range
+			if (rangeStart == rangeEnd) {
+				parts.append(QString::number(rangeStart));
+			} else {
+				parts.append(QString("%1-%2").arg(rangeStart).arg(rangeEnd));
+			}
+			rangeStart = indices[i];
+			rangeEnd = indices[i];
+		}
+	}
+
+	// Flush last range
+	if (rangeStart == rangeEnd) {
+		parts.append(QString::number(rangeStart));
+	} else {
+		parts.append(QString("%1-%2").arg(rangeStart).arg(rangeEnd));
+	}
+
+	return parts.join(", ");
 }

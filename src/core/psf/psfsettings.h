@@ -29,16 +29,7 @@ struct PSFSettings {
 	int normalizationMode = 0;      // 0=Sum, 1=Peak, 2=None
 };
 
-// Parse Noll index spec string into sorted list of indices
-// Examples: "2-21" -> {2,3,...,21}, "1-5, 7, 11" -> {1,2,3,4,5,7,11}
-QVector<int> parseNollIndexSpec(const QString& spec);
-
-// Convert sorted list of indices back to compact spec string
-// Examples: {2,3,4,5,7,11} -> "2-5, 7, 11"
-QString formatNollIndexSpec(const QVector<int>& indices);
-
 // Parse 0-based index spec string into sorted list of indices
-// Same as parseNollIndexSpec but accepts 0-based values
 // Examples: "0-3, 5, 7-10" -> {0,1,2,3,5,7,8,9,10}
 QVector<int> parseIndexSpec(const QString& spec);
 

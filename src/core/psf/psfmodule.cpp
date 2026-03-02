@@ -58,7 +58,7 @@ PSFSettings PSFModule::getPSFSettings() const
 	// Populate Zernike convenience fields for UI compatibility
 	ZernikeGenerator* zg = dynamic_cast<ZernikeGenerator*>(this->generator);
 	if (zg) {
-		s.nollIndexSpec = formatNollIndexSpec(zg->getNollIndices());
+		s.nollIndexSpec = ZernikeGenerator::formatNollIndexSpec(zg->getNollIndices());
 		s.globalMinCoefficient = zg->getGlobalMinValue();
 		s.globalMaxCoefficient = zg->getGlobalMaxValue();
 		s.coefficientStep = zg->getStepValue();
@@ -163,7 +163,7 @@ void PSFModule::applyPSFSettings(const PSFSettings& settings)
 	ZernikeGenerator* zg = dynamic_cast<ZernikeGenerator*>(this->generator);
 	bool indicesChanged = false;
 	if (zg) {
-		QVector<int> newIndices = parseNollIndexSpec(settings.nollIndexSpec);
+		QVector<int> newIndices = ZernikeGenerator::parseNollIndexSpec(settings.nollIndexSpec);
 		if (zg->getNollIndices() != newIndices) {
 			zg->setNollIndices(newIndices);
 			indicesChanged = true;
