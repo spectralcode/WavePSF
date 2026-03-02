@@ -69,6 +69,9 @@ signals:
 	void pasteCoefficientsRequested();
 	void resetCoefficientsRequested();
 
+	// Settings propagation
+	void patchGridConfigurationRequested(int cols, int rows, int borderExtension);
+
 private:
 	void setupUI();
 	void setupFrameControls();

@@ -95,6 +95,7 @@ void ImageSessionViewer::setSettings(const QVariantMap& settingsMap)
 	//update internal state and apply settings
 	this->setDisplaySettings(autoRange, minV, maxV);
 	this->configurePatchGrid(cols, rows, border);
+	emit patchGridConfigurationRequested(cols, rows, border);
 
 	if (settingsMap.contains(RIGHT_SPLITTER_STATE_KEY) && this->rightSplitter) {
 		this->rightSplitter->restoreState(settingsMap.value(RIGHT_SPLITTER_STATE_KEY).toByteArray());

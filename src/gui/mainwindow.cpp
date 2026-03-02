@@ -388,6 +388,8 @@ void MainWindow::connectImageSessionViewer() {
 				this->applicationController, &ApplicationController::setCurrentPatch);
 		connect(this->sessionViewer, &ImageSessionViewer::inputFileDropRequested,
 				this->applicationController, &ApplicationController::requestOpenInputFile);
+		connect(this->sessionViewer, &ImageSessionViewer::patchGridConfigurationRequested,
+				this->applicationController, &ApplicationController::configurePatchGrid);
 
 		// ApplicationController state changes → ImageSessionViewer updates
 		connect(this->applicationController, &ApplicationController::imageSessionChanged,
