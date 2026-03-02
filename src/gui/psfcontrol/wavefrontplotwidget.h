@@ -21,6 +21,9 @@ public:
 public slots:
 	void updatePlot(af::array wavefront);
 
+protected:
+	void showEvent(QShowEvent* event) override;
+
 private slots:
 	void resetView();
 	void enforceAspectRatio();

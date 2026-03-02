@@ -168,6 +168,14 @@ void PSFPreviewWidget::resizeEvent(QResizeEvent* event)
 	}
 }
 
+void PSFPreviewWidget::showEvent(QShowEvent* event)
+{
+	QWidget::showEvent(event);
+	if (!this->currentImage.isNull()) {
+		this->fitToView();
+	}
+}
+
 void PSFPreviewWidget::fitToView()
 {
 	this->scene->setSceneRect(this->scene->itemsBoundingRect());

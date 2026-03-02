@@ -9,6 +9,7 @@ class QDoubleSpinBox;
 class QSpinBox;
 class QComboBox;
 class QTableWidget;
+class QCheckBox;
 class QPushButton;
 class QStackedWidget;
 
@@ -16,12 +17,18 @@ class PSFSettingsDialog : public QDialog
 {
 	Q_OBJECT
 public:
-	explicit PSFSettingsDialog(const PSFSettings& settings, QWidget* parent = nullptr);
+	explicit PSFSettingsDialog(const PSFSettings& settings,
+							   bool autoRange, double displayMin, double displayMax,
+							   QWidget* parent = nullptr);
 
 	PSFSettings getSettings() const;
+	bool getAutoRange() const;
+	double getDisplayMin() const;
+	double getDisplayMax() const;
 
 signals:
 	void settingsApplied(PSFSettings settings);
+	void displaySettingsApplied(bool autoRange, double min, double max);
 
 private slots:
 	void onNollIndicesChanged();
@@ -56,6 +63,11 @@ private:
 	QComboBox* gridSizeCombo;
 	QDoubleSpinBox* apertureRadiusSpin;
 	QComboBox* normalizationCombo;
+
+	// Display controls
+	QCheckBox* displayAutoRangeCheck;
+	QDoubleSpinBox* displayMinSpin;
+	QDoubleSpinBox* displayMaxSpin;
 
 	// Buttons
 	QPushButton* okButton;

@@ -1,56 +1,30 @@
 #include "psfcontrolwidget.h"
-#include "coefficienteditorwidget.h"
-#include "wavefrontplotwidget.h"
-#include "psfpreviewwidget.h"
 #include "deconvolutionsettingswidget.h"
 #include "optimizationwidget.h"
 #include "interpolationwidget.h"
-#include "core/psf/wavefrontgeneratorfactory.h"
 #include <QVBoxLayout>
-#include <QHBoxLayout>
+#include <QGridLayout>
 #include <QTabWidget>
-#include <QComboBox>
 #include <QLabel>
+#include <QSpinBox>
 
 namespace {
 	const char* SETTINGS_GROUP = "psf_control";
+	const int DEFAULT_PATCH_COLS = 4;
+	const int DEFAULT_PATCH_ROWS = 4;
+	const int DEFAULT_BORDER_EXTENSION = 10;
 }
 
 
 PSFControlWidget::PSFControlWidget(QWidget* parent)
-	: QGroupBox(tr("PSF Control"), parent)
+	: QWidget(parent)
+	, updatingPatchGrid(false)
 {
 	QVBoxLayout* mainLayout = new QVBoxLayout(this);
+	mainLayout->setContentsMargins(0, 0, 0, 0);
 
 	this->tabWidget = new QTabWidget(this);
 	mainLayout->addWidget(this->tabWidget);
-
-	// PSF Generation tab
-	QWidget* generationTab = new QWidget(this->tabWidget);
-	QVBoxLayout* genMainLayout = new QVBoxLayout(generationTab);
-
-	// Generator type selector
-	QHBoxLayout* genTypeLayout = new QHBoxLayout();
-	genTypeLayout->addWidget(new QLabel(tr("Generator:"), generationTab));
-	this->generatorTypeCombo = new QComboBox(generationTab);
-	this->generatorTypeCombo->addItems(WavefrontGeneratorFactory::availableTypeNames());
-	genTypeLayout->addWidget(this->generatorTypeCombo);
-	genTypeLayout->addStretch();
-	genMainLayout->addLayout(genTypeLayout);
-
-	// Widgets row
-	QHBoxLayout* genLayout = new QHBoxLayout();
-
-	this->coeffEditor = new CoefficientEditorWidget(generationTab);
-	this->wavefrontPlot = new WavefrontPlotWidget(generationTab);
-	this->psfPreview = new PSFPreviewWidget(generationTab);
-
-	genLayout->addWidget(this->coeffEditor, 1);
-	genLayout->addWidget(this->wavefrontPlot, 1);
-	genLayout->addWidget(this->psfPreview, 1);
-	genMainLayout->addLayout(genLayout, 1);
-
-	this->tabWidget->addTab(generationTab, tr("PSF Generation"));
 
 	// Deconvolution settings tab
 	this->deconvSettings = new DeconvolutionSettingsWidget(this->tabWidget);
@@ -64,15 +38,48 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 	this->interpolationWidget = new InterpolationWidget(this->tabWidget);
 	this->tabWidget->addTab(this->interpolationWidget, tr("Interpolation"));
 
-	// Generator type change
-	connect(this->generatorTypeCombo, QOverload<const QString&>::of(&QComboBox::currentTextChanged),
-			this, &PSFControlWidget::generatorTypeChangeRequested);
+	// Patch Grid tab
+	QWidget* patchGridTab = new QWidget(this->tabWidget);
+	QVBoxLayout* patchLayout = new QVBoxLayout(patchGridTab);
 
-	// Forward signals from coefficient editor
-	connect(this->coeffEditor, &CoefficientEditorWidget::coefficientChanged,
-			this, &PSFControlWidget::coefficientChanged);
-	connect(this->coeffEditor, &CoefficientEditorWidget::resetRequested,
-			this, &PSFControlWidget::resetRequested);
+	this->patchGridInfoLabel = new QLabel(tr("Current patch: (0, 0)"), patchGridTab);
+	patchLayout->addWidget(this->patchGridInfoLabel);
+
+	QGridLayout* gridControlsLayout = new QGridLayout();
+	gridControlsLayout->addWidget(new QLabel(tr("Columns:"), patchGridTab), 0, 0);
+	this->patchColsSpinBox = new QSpinBox(patchGridTab);
+	this->patchColsSpinBox->setMinimum(1);
+	this->patchColsSpinBox->setMaximum(32);
+	this->patchColsSpinBox->setValue(DEFAULT_PATCH_COLS);
+	gridControlsLayout->addWidget(this->patchColsSpinBox, 0, 1);
+
+	gridControlsLayout->addWidget(new QLabel(tr("Rows:"), patchGridTab), 1, 0);
+	this->patchRowsSpinBox = new QSpinBox(patchGridTab);
+	this->patchRowsSpinBox->setMinimum(1);
+	this->patchRowsSpinBox->setMaximum(32);
+	this->patchRowsSpinBox->setValue(DEFAULT_PATCH_ROWS);
+	gridControlsLayout->addWidget(this->patchRowsSpinBox, 1, 1);
+
+	gridControlsLayout->addWidget(new QLabel(tr("Border Extension:"), patchGridTab), 2, 0);
+	this->borderExtensionSpinBox = new QSpinBox(patchGridTab);
+	this->borderExtensionSpinBox->setMinimum(0);
+	this->borderExtensionSpinBox->setMaximum(100);
+	this->borderExtensionSpinBox->setValue(DEFAULT_BORDER_EXTENSION);
+	this->borderExtensionSpinBox->setSuffix(tr(" px"));
+	gridControlsLayout->addWidget(this->borderExtensionSpinBox, 2, 1);
+
+	patchLayout->addLayout(gridControlsLayout);
+	patchLayout->addStretch();
+
+	this->tabWidget->addTab(patchGridTab, tr("Patch Grid"));
+
+	// Connect patch grid spinboxes
+	connect(this->patchColsSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+			this, &PSFControlWidget::applyPatchGridSettings);
+	connect(this->patchRowsSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+			this, &PSFControlWidget::applyPatchGridSettings);
+	connect(this->borderExtensionSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+			this, &PSFControlWidget::applyPatchGridSettings);
 
 	// Forward signals from deconvolution settings
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::algorithmChanged,
@@ -124,72 +131,23 @@ QString PSFControlWidget::getName() const
 	return QLatin1String(SETTINGS_GROUP);
 }
 
-PSFSettings PSFControlWidget::getPSFSettings() const
-{
-	return this->currentSettings;
-}
-
 QVariantMap PSFControlWidget::getSettings() const
 {
 	QVariantMap settings;
-	settings.insert("coefficients", this->coeffEditor->getSettings());
 	settings.insert("deconvolution", this->deconvSettings->getSettings());
 	settings.insert("optimization", this->optimizationWidget->getSettings());
-	settings.insert("psf_settings", serializePSFSettings(this->currentSettings));
 	return settings;
 }
 
 void PSFControlWidget::setSettings(const QVariantMap& settings)
 {
-	this->coeffEditor->setSettings(settings.value("coefficients").toMap());
 	this->deconvSettings->setSettings(settings.value("deconvolution").toMap());
 	this->optimizationWidget->setSettings(settings.value("optimization").toMap());
-	if (settings.contains("psf_settings")) {
-		this->currentSettings = deserializePSFSettings(settings.value("psf_settings").toMap());
-	}
 }
 
 void PSFControlWidget::setParameterDescriptors(QVector<WavefrontParameter> descriptors)
 {
-	this->coeffEditor->setParameterDescriptors(descriptors);
 	this->optimizationWidget->setParameterDescriptors(descriptors);
-}
-
-void PSFControlWidget::setCoefficients(const QVector<double>& values)
-{
-	this->coeffEditor->setValues(values);
-}
-
-void PSFControlWidget::updateWavefront(af::array wavefront)
-{
-	this->wavefrontPlot->updatePlot(wavefront);
-}
-
-void PSFControlWidget::updatePSF(af::array psf)
-{
-	this->psfPreview->updateImage(psf);
-}
-
-void PSFControlWidget::setPSFSettings(const PSFSettings& settings)
-{
-	this->currentSettings = settings;
-	// Sync combo box without triggering signal
-	this->generatorTypeCombo->blockSignals(true);
-	int idx = this->generatorTypeCombo->findText(settings.generatorTypeName);
-	if (idx >= 0) {
-		this->generatorTypeCombo->setCurrentIndex(idx);
-	}
-	this->generatorTypeCombo->blockSignals(false);
-}
-
-void PSFControlWidget::setGeneratorType(const QString& typeName)
-{
-	this->generatorTypeCombo->blockSignals(true);
-	int idx = this->generatorTypeCombo->findText(typeName);
-	if (idx >= 0) {
-		this->generatorTypeCombo->setCurrentIndex(idx);
-	}
-	this->generatorTypeCombo->blockSignals(false);
 }
 
 void PSFControlWidget::setGroundTruthAvailable(bool available)
@@ -215,4 +173,28 @@ void PSFControlWidget::onOptimizationStarted()
 void PSFControlWidget::updateInterpolationResult(const InterpolationResult& result)
 {
 	this->interpolationWidget->updateInterpolationResult(result);
+}
+
+void PSFControlWidget::updateCurrentPatch(int x, int y)
+{
+	this->patchGridInfoLabel->setText(QString("Current patch: (%1, %2)").arg(x).arg(y));
+}
+
+void PSFControlWidget::setPatchGridConfiguration(int cols, int rows, int borderExtension)
+{
+	this->updatingPatchGrid = true;
+	this->patchColsSpinBox->setValue(cols);
+	this->patchRowsSpinBox->setValue(rows);
+	this->borderExtensionSpinBox->setValue(borderExtension);
+	this->updatingPatchGrid = false;
+}
+
+void PSFControlWidget::applyPatchGridSettings()
+{
+	if (!this->updatingPatchGrid) {
+		emit patchGridConfigurationRequested(
+			this->patchColsSpinBox->value(),
+			this->patchRowsSpinBox->value(),
+			this->borderExtensionSpinBox->value());
+	}
 }

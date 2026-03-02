@@ -46,6 +46,7 @@ SOURCES += \
 	$$SOURCEDIR/gui/psfcontrol/coefficienteditorwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/wavefrontplotwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/psfpreviewwidget.cpp \
+	$$SOURCEDIR/gui/psfcontrol/psfgenerationwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/psfcontrolwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/deconvolutionsettingswidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/psfsettingsdialog.cpp \
@@ -91,6 +92,7 @@ HEADERS += \
 	$$SOURCEDIR/gui/psfcontrol/coefficienteditorwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/wavefrontplotwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/psfpreviewwidget.h \
+	$$SOURCEDIR/gui/psfcontrol/psfgenerationwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/psfcontrolwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/deconvolutionsettingswidget.h \
 	$$SOURCEDIR/gui/psfcontrol/psfsettingsdialog.h \

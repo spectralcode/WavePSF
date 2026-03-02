@@ -20,8 +20,8 @@ QT_END_NAMESPACE
 class SettingsFileManager;
 class ApplicationController;
 class ImageSessionViewer;
+class PSFGenerationWidget;
 class PSFControlWidget;
-class QSplitter;
 
 class MainWindow : public QMainWindow {
 	Q_OBJECT
@@ -74,6 +74,7 @@ private:
 	void setupCentralWidget();
 	void connectApplicationController();
 	void connectImageSessionViewer();
+	void connectPSFGenerationWidget();
 	void connectPSFControlWidget();
 	void loadSettings();
 	void saveSettings();
@@ -128,8 +129,8 @@ private:
 	PSFSettings currentPSFSettings;
 
 	// Main widgets
-	QSplitter* centralSplitter;
 	ImageSessionViewer* sessionViewer;
+	PSFGenerationWidget* psfGenerationWidget;
 	PSFControlWidget* psfControlWidget;
 
 signals:

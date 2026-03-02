@@ -4,15 +4,11 @@
 #include "utils/logging.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
-#include <QGridLayout>
 #include <QLabel>
 #include <QSlider>
 #include <QSpinBox>
 #include <QGroupBox>
-#include <QPushButton>
 #include <QSplitter>
-#include <QCheckBox>
-#include <QDoubleSpinBox>
 #include <QTimer>
 #include "gui/verticalscrollarea.h"
 
@@ -24,6 +20,7 @@ namespace {
 	const char* PATCH_GRID_COLS_KEY = "patchGridCols";
 	const char* PATCH_GRID_ROWS_KEY = "patchGridRows";
 	const char* PATCH_BORDER_EXTENSION_KEY = "patchBorderExtension";
+	const char* RIGHT_SPLITTER_STATE_KEY = "right_splitter_state";
 
 	const bool	DEFAULT_AUTO_RANGE = true;
 	const double DEFAULT_MIN = 0.0;
@@ -36,23 +33,31 @@ namespace {
 ImageSessionViewer::ImageSessionViewer(QWidget* parent)
 	: QWidget(parent), imageSession(nullptr),
 	  displayRangeMin(0.0), displayRangeMax(255.0), autoRangeEnabled(true),
-	  mainSplitter(nullptr), controlsWidget(nullptr), viewersWidget(nullptr),
-	  frameControlsGroup(nullptr), frameInfoLabel(nullptr), frameSlider(nullptr), frameSpinBox(nullptr),
-	  patchInfoLabel(nullptr), patchSlider(nullptr), patchSpinBox(nullptr),
-	  displayRangeGroup(nullptr), autoRangeCheckBox(nullptr), minValueSpinBox(nullptr), maxValueSpinBox(nullptr),
-	  patchGridGroup(nullptr), patchGridInfoLabel(nullptr), patchColsSpinBox(nullptr),
-	  patchRowsSpinBox(nullptr), borderExtensionSpinBox(nullptr),
+	  mainSplitter(nullptr), controlsWidget(nullptr), sidebarLayout(nullptr), rightSplitter(nullptr), viewersWidget(nullptr),
+	  frameControlsGroup(nullptr), frameSlider(nullptr), frameSpinBox(nullptr),
+	  patchSlider(nullptr), patchSpinBox(nullptr),
 	  inputViewer(nullptr), outputViewer(nullptr), updatingControls(false)
 {
 	this->setupUI();
 	this->connectSignals();
 	//this->updateFrameControls();
-	//this->updatePatchGridControls();
 }
 
 ImageSessionViewer::~ImageSessionViewer()
 {
 	// Qt parent-child system handles cleanup
+}
+
+void ImageSessionViewer::addSidebarWidget(QWidget* widget)
+{
+	this->sidebarLayout->addWidget(widget);
+}
+
+void ImageSessionViewer::addBottomPanel(QWidget* widget)
+{
+	this->rightSplitter->addWidget(widget);
+	this->rightSplitter->setStretchFactor(0, 3); // viewers
+	this->rightSplitter->setStretchFactor(1, 1); // bottom panel
 }
 
 QString ImageSessionViewer::getName() const
@@ -69,6 +74,9 @@ QVariantMap ImageSessionViewer::getSettings() const
 	settingsMap.insert(PATCH_GRID_COLS_KEY, this->imageSession->getPatchGridCols());
 	settingsMap.insert(PATCH_GRID_ROWS_KEY, this->imageSession->getPatchGridRows());
 	settingsMap.insert(PATCH_BORDER_EXTENSION_KEY, this->imageSession->getPatchBorderExtension());
+	if (this->rightSplitter) {
+		settingsMap.insert(RIGHT_SPLITTER_STATE_KEY, this->rightSplitter->saveState());
+	}
 
 	return settingsMap;
 }
@@ -85,13 +93,12 @@ void ImageSessionViewer::setSettings(const QVariantMap& settingsMap)
 	const int border = settingsMap.value(PATCH_BORDER_EXTENSION_KEY, DEFAULT_BORDER_EXTENSION).toInt();
 
 	//update internal state and apply settings
-	this->autoRangeEnabled = autoRange;
-	this->displayRangeMin = minV;
-	this->displayRangeMax = maxV;
-	this->autoRangeCheckBox->setChecked(this->autoRangeEnabled);
-	this->minValueSpinBox->setValue(this->displayRangeMin);
-	this->maxValueSpinBox->setValue(this->displayRangeMax);
+	this->setDisplaySettings(autoRange, minV, maxV);
 	this->configurePatchGrid(cols, rows, border);
+
+	if (settingsMap.contains(RIGHT_SPLITTER_STATE_KEY) && this->rightSplitter) {
+		this->rightSplitter->restoreState(settingsMap.value(RIGHT_SPLITTER_STATE_KEY).toByteArray());
+	}
 }
 
 void ImageSessionViewer::updateImageSession(ImageSession* imageSession)
@@ -154,10 +161,7 @@ void ImageSessionViewer::highlightPatch(int x, int y)
 	this->patchSpinBox->setValue(patchId);
 	this->patchSlider->setEnabled(true);
 	this->patchSpinBox->setEnabled(true);
-	this->patchInfoLabel->setText(QString("Patch %1 of %2  (%3, %4)").arg(patchId + 1).arg(totalPatches).arg(x).arg(y));
 	this->updatingControls = false;
-
-	this->updatePatchGridControls();
 }
 
 void ImageSessionViewer::highlightPatches(const QVector<int>& patchLinearIds)
@@ -172,13 +176,10 @@ void ImageSessionViewer::highlightPatches(const QVector<int>& patchLinearIds)
 
 void ImageSessionViewer::configurePatchGrid(int cols, int rows, int borderExtension)
 {
+	Q_UNUSED(borderExtension);
+
 	if (!this->updatingControls) {
 		this->updatingControls = true;
-
-		// Update patch grid controls
-		this->patchColsSpinBox->setValue(cols);
-		this->patchRowsSpinBox->setValue(rows);
-		this->borderExtensionSpinBox->setValue(borderExtension);
 
 		// Update patch navigation range
 		int totalPatches = cols * rows;
@@ -188,7 +189,6 @@ void ImageSessionViewer::configurePatchGrid(int cols, int rows, int borderExtens
 		this->patchSpinBox->setValue(0);
 		this->patchSlider->setEnabled(totalPatches > 0);
 		this->patchSpinBox->setEnabled(totalPatches > 0);
-		this->patchInfoLabel->setText(QString("Patch 1 of %1  (0, 0)").arg(totalPatches));
 
 		this->updatingControls = false;
 	}
@@ -200,8 +200,6 @@ void ImageSessionViewer::configurePatchGrid(int cols, int rows, int borderExtens
 	if (this->outputViewer != nullptr) {
 		this->outputViewer->configurePatchGrid(cols, rows);
 	}
-
-	this->updatePatchGridControls();
 }
 
 void ImageSessionViewer::setFrameFromSlider(int frame)
@@ -238,55 +236,39 @@ void ImageSessionViewer::setPatchFromSpinBox(int patchId)
 	}
 }
 
-void ImageSessionViewer::setAutoRange(bool enabled)
+void ImageSessionViewer::setDisplaySettings(bool autoRange, double min, double max)
 {
-	this->autoRangeEnabled = enabled;
+	this->autoRangeEnabled = autoRange;
+	this->displayRangeMin = min;
+	this->displayRangeMax = max;
 
-	// Apply to both viewers
 	if (this->inputViewer != nullptr) {
-		this->inputViewer->setAutoRange(enabled);
+		this->inputViewer->setAutoRange(autoRange);
+		if (!autoRange) {
+			this->inputViewer->setDisplayRange(min, max);
+		}
 	}
 	if (this->outputViewer != nullptr) {
-		this->outputViewer->setAutoRange(enabled);
-	}
-
-	// Enable/disable manual controls
-	this->minValueSpinBox->setEnabled(!enabled);
-	this->maxValueSpinBox->setEnabled(!enabled);
-}
-
-void ImageSessionViewer::setMinValue(double value)
-{
-	this->displayRangeMin = value;
-
-	// Apply to both viewers
-	if (this->inputViewer != nullptr) {
-		this->inputViewer->setDisplayRange(value, this->maxValueSpinBox->value());
-	}
-	if (this->outputViewer != nullptr) {
-		this->outputViewer->setDisplayRange(value, this->maxValueSpinBox->value());
+		this->outputViewer->setAutoRange(autoRange);
+		if (!autoRange) {
+			this->outputViewer->setDisplayRange(min, max);
+		}
 	}
 }
 
-void ImageSessionViewer::setMaxValue(double value)
+bool ImageSessionViewer::getAutoRangeEnabled() const
 {
-	this->displayRangeMax = value;
-
-	// Apply to both viewers
-	if (this->inputViewer != nullptr) {
-		this->inputViewer->setDisplayRange(this->minValueSpinBox->value(), value);
-	}
-	if (this->outputViewer != nullptr) {
-		this->outputViewer->setDisplayRange(this->minValueSpinBox->value(), value);
-	}
+	return this->autoRangeEnabled;
 }
 
-void ImageSessionViewer::applyPatchGridSettings()
+double ImageSessionViewer::getDisplayRangeMin() const
 {
-	int cols = this->patchColsSpinBox->value();
-	int rows = this->patchRowsSpinBox->value();
-	int border = this->borderExtensionSpinBox->value();
-	emit patchGridConfigurationRequested(cols, rows, border);
+	return this->displayRangeMin;
+}
+
+double ImageSessionViewer::getDisplayRangeMax() const
+{
+	return this->displayRangeMax;
 }
 
 void ImageSessionViewer::handleInputPatchSelected(int patchId)
@@ -331,8 +313,6 @@ void ImageSessionViewer::setupUI()
 	this->mainSplitter = new QSplitter(Qt::Horizontal, this);
 
 	this->setupFrameControls();
-	this->setupDisplayRangeControls();
-	this->setupPatchGridControls();
 	this->setupImageViewers();
 
 	// Create controls widget in scroll area
@@ -340,19 +320,22 @@ void ImageSessionViewer::setupUI()
 
 	this->controlsWidget = new QWidget(controlsScrollArea);
 
-	QVBoxLayout* controlsLayout = new QVBoxLayout(this->controlsWidget);
-	controlsLayout->addWidget(this->frameControlsGroup);
-	controlsLayout->addWidget(this->displayRangeGroup);
-	controlsLayout->addWidget(this->patchGridGroup);
-	controlsLayout->addStretch();
+	this->sidebarLayout = new QVBoxLayout(this->controlsWidget);
+	this->sidebarLayout->setContentsMargins(3, 3, 3, 0);
+	//this->sidebarLayout->setContentsMargins(0, 0, 0, 0);
+	this->sidebarLayout->addWidget(this->frameControlsGroup);
 
 	controlsScrollArea->setWidget(this->controlsWidget);
 
-	// Add to splitter
+	// Wrap viewers in vertical splitter (bottom panel added later via addBottomPanel)
+	this->rightSplitter = new QSplitter(Qt::Vertical);
+	this->rightSplitter->addWidget(this->viewersWidget);
+
+	// Add to main horizontal splitter
 	this->mainSplitter->addWidget(controlsScrollArea);
-	this->mainSplitter->addWidget(this->viewersWidget);
-	this->mainSplitter->setStretchFactor(0, 0); // Controls don't stretch
-	this->mainSplitter->setStretchFactor(1, 1); // Viewers stretch
+	this->mainSplitter->addWidget(this->rightSplitter);
+	this->mainSplitter->setStretchFactor(0, 1); // Sidebar
+	this->mainSplitter->setStretchFactor(1, 2); // Viewers + bottom panel
 
 	mainLayout->addWidget(this->mainSplitter);
 	this->setLayout(mainLayout);
@@ -361,9 +344,6 @@ void ImageSessionViewer::setupUI()
 void ImageSessionViewer::setupFrameControls()
 {
 	this->frameControlsGroup = new QGroupBox("Frame Navigation");
-
-	// Frame info label
-	this->frameInfoLabel = new QLabel("No data loaded");
 
 	// Frame slider and spinbox
 	this->frameSlider = new QSlider(Qt::Horizontal);
@@ -378,9 +358,6 @@ void ImageSessionViewer::setupFrameControls()
 	this->frameSpinBox->setValue(0);
 	this->frameSpinBox->setEnabled(false);
 
-	// Patch info label
-	this->patchInfoLabel = new QLabel("Patch 0 of 0");
-
 	// Patch slider and spinbox
 	this->patchSlider = new QSlider(Qt::Horizontal);
 	this->patchSlider->setMinimum(0);
@@ -394,21 +371,21 @@ void ImageSessionViewer::setupFrameControls()
 	this->patchSpinBox->setValue(0);
 	this->patchSpinBox->setEnabled(false);
 
-	// Layout
+	// Layout: label | slider | spinbox per row
 	QVBoxLayout* frameLayout = new QVBoxLayout();
-	frameLayout->addWidget(this->frameInfoLabel);
+	frameLayout->setContentsMargins(3, 3, 3, 3);
 
-	QHBoxLayout* frameSliderLayout = new QHBoxLayout();
-	frameSliderLayout->addWidget(this->frameSlider, 1);
-	frameSliderLayout->addWidget(this->frameSpinBox, 0);
-	frameLayout->addLayout(frameSliderLayout);
+	QHBoxLayout* frameRow = new QHBoxLayout();
+	frameRow->addWidget(new QLabel(tr("Frame:")));
+	frameRow->addWidget(this->frameSlider, 1);
+	frameRow->addWidget(this->frameSpinBox, 0);
+	frameLayout->addLayout(frameRow);
 
-	frameLayout->addWidget(this->patchInfoLabel);
-
-	QHBoxLayout* patchSliderLayout = new QHBoxLayout();
-	patchSliderLayout->addWidget(this->patchSlider, 1);
-	patchSliderLayout->addWidget(this->patchSpinBox, 0);
-	frameLayout->addLayout(patchSliderLayout);
+	QHBoxLayout* patchRow = new QHBoxLayout();
+	patchRow->addWidget(new QLabel(tr("Patch:")));
+	patchRow->addWidget(this->patchSlider, 1);
+	patchRow->addWidget(this->patchSpinBox, 0);
+	frameLayout->addLayout(patchRow);
 
 	this->frameControlsGroup->setLayout(frameLayout);
 
@@ -421,87 +398,6 @@ void ImageSessionViewer::setupFrameControls()
 	connect(this->patchSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this->patchSlider, &QSlider::setValue);
 }
 
-void ImageSessionViewer::setupDisplayRangeControls()
-{
-	this->displayRangeGroup = new QGroupBox(tr("Display Range"));
-
-	// Auto range checkbox
-	this->autoRangeCheckBox = new QCheckBox(tr("Auto Range"));
-	this->autoRangeCheckBox->setChecked(this->autoRangeEnabled);
-
-	// Min value control
-	QLabel* minLabel = new QLabel(tr("Min:"));
-	this->minValueSpinBox = new QDoubleSpinBox();
-	this->minValueSpinBox->setRange(-99999.0, 99999.0);
-	this->minValueSpinBox->setDecimals(2);
-	this->minValueSpinBox->setValue(this->displayRangeMin);
-	this->minValueSpinBox->setEnabled(!this->autoRangeEnabled);
-
-	// Max value control
-	QLabel* maxLabel = new QLabel(tr("Max:"));
-	this->maxValueSpinBox = new QDoubleSpinBox();
-	this->maxValueSpinBox->setRange(-99999.0, 99999.0);
-	this->maxValueSpinBox->setDecimals(2);
-	this->maxValueSpinBox->setValue(this->displayRangeMax);
-	this->maxValueSpinBox->setEnabled(!this->autoRangeEnabled);
-
-	// Layout
-	QVBoxLayout* rangeLayout = new QVBoxLayout();
-	rangeLayout->addWidget(this->autoRangeCheckBox);
-
-	QGridLayout* valuesLayout = new QGridLayout();
-	valuesLayout->addWidget(minLabel, 0, 0);
-	valuesLayout->addWidget(this->minValueSpinBox, 0, 1);
-	valuesLayout->addWidget(maxLabel, 1, 0);
-	valuesLayout->addWidget(this->maxValueSpinBox, 1, 1);
-
-	rangeLayout->addLayout(valuesLayout);
-	this->displayRangeGroup->setLayout(rangeLayout);
-}
-
-void ImageSessionViewer::setupPatchGridControls()
-{
-	this->patchGridGroup = new QGroupBox("Patch Grid Configuration");
-
-	// Info label
-	this->patchGridInfoLabel = new QLabel("Current patch: (0, 0)");
-
-	// Grid configuration controls
-	QLabel* colsLabel = new QLabel("Columns:");
-	this->patchColsSpinBox = new QSpinBox();
-	this->patchColsSpinBox->setMinimum(1);
-	this->patchColsSpinBox->setMaximum(32);
-	this->patchColsSpinBox->setValue(DEFAULT_PATCH_COLS);
-
-	QLabel* rowsLabel = new QLabel("Rows:");
-	this->patchRowsSpinBox = new QSpinBox();
-	this->patchRowsSpinBox->setMinimum(1);
-	this->patchRowsSpinBox->setMaximum(32);
-	this->patchRowsSpinBox->setValue(DEFAULT_PATCH_ROWS);
-
-	QLabel* borderLabel = new QLabel("Border Extension:");
-	this->borderExtensionSpinBox = new QSpinBox();
-	this->borderExtensionSpinBox->setMinimum(0);
-	this->borderExtensionSpinBox->setMaximum(100);
-	this->borderExtensionSpinBox->setValue(DEFAULT_BORDER_EXTENSION);
-	this->borderExtensionSpinBox->setSuffix(" px");
-
-	// Layout
-	QVBoxLayout* patchLayout = new QVBoxLayout();
-	patchLayout->addWidget(this->patchGridInfoLabel);
-
-	QGridLayout* gridControlsLayout = new QGridLayout();
-	gridControlsLayout->addWidget(colsLabel, 0, 0);
-	gridControlsLayout->addWidget(this->patchColsSpinBox, 0, 1);
-	gridControlsLayout->addWidget(rowsLabel, 1, 0);
-	gridControlsLayout->addWidget(this->patchRowsSpinBox, 1, 1);
-	gridControlsLayout->addWidget(borderLabel, 2, 0);
-	gridControlsLayout->addWidget(this->borderExtensionSpinBox, 2, 1);
-
-	patchLayout->addLayout(gridControlsLayout);
-
-	this->patchGridGroup->setLayout(patchLayout);
-}
 
 void ImageSessionViewer::setupImageViewers()
 {
@@ -531,16 +427,6 @@ void ImageSessionViewer::connectSignals()
 	// Connect patch navigation controls
 	connect(this->patchSlider, &QSlider::valueChanged, this, &ImageSessionViewer::setPatchFromSlider);
 	connect(this->patchSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &ImageSessionViewer::setPatchFromSpinBox);
-
-	// Connect display range controls
-	connect(this->autoRangeCheckBox, &QCheckBox::toggled, this, &ImageSessionViewer::setAutoRange);
-	connect(this->minValueSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &ImageSessionViewer::setMinValue);
-	connect(this->maxValueSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &ImageSessionViewer::setMaxValue);
-
-	// Connect patch grid controls for immediate updates
-	connect(this->patchColsSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &ImageSessionViewer::applyPatchGridSettings);
-	connect(this->patchRowsSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &ImageSessionViewer::applyPatchGridSettings);
-	connect(this->borderExtensionSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &ImageSessionViewer::applyPatchGridSettings);
 
 	// Connect patch selection signals
 	connect(this->inputViewer, &ImageDataViewer::patchSelectionChanged, this, &ImageSessionViewer::handleInputPatchSelected);
@@ -577,9 +463,6 @@ void ImageSessionViewer::updateFrameControls()
 		this->frameSlider->setValue(currentFrame);
 		this->frameSpinBox->setValue(currentFrame);
 
-		// Update info
-		this->frameInfoLabel->setText(QString("Frame %1 of %2").arg(currentFrame + 1).arg(totalFrames));
-
 		// Enable controls
 		this->frameSlider->setEnabled(true);
 		this->frameSpinBox->setEnabled(true);
@@ -593,21 +476,6 @@ void ImageSessionViewer::updateFrameControls()
 		this->frameSpinBox->setValue(0);
 		this->frameSlider->setEnabled(false);
 		this->frameSpinBox->setEnabled(false);
-		this->frameInfoLabel->setText("No data loaded");
-	}
-}
-
-void ImageSessionViewer::updatePatchGridControls()
-{
-	if (this->imageSession != nullptr) {
-		int currentPatchX = this->imageSession->getCurrentPatch().x();
-		int currentPatchY = this->imageSession->getCurrentPatch().y();
-
-		if (currentPatchX >= 0 && currentPatchY >= 0) {
-			this->patchGridInfoLabel->setText(QString("Current patch: (%1, %2)").arg(currentPatchX).arg(currentPatchY));
-		} else {
-			this->patchGridInfoLabel->setText("Current patch: (0, 0)");
-		}
 	}
 }
 
@@ -644,17 +512,16 @@ void ImageSessionViewer::syncViewersToSession()
 		}
 
 		// Apply current display range settings to both viewers
-		bool autoRange = this->autoRangeCheckBox->isChecked();
 		if (this->inputViewer != nullptr) {
-			this->inputViewer->setAutoRange(autoRange);
-			if (!autoRange) {
-				this->inputViewer->setDisplayRange(this->minValueSpinBox->value(), this->maxValueSpinBox->value());
+			this->inputViewer->setAutoRange(this->autoRangeEnabled);
+			if (!this->autoRangeEnabled) {
+				this->inputViewer->setDisplayRange(this->displayRangeMin, this->displayRangeMax);
 			}
 		}
 		if (this->outputViewer != nullptr) {
-			this->outputViewer->setAutoRange(autoRange);
-			if (!autoRange) {
-				this->outputViewer->setDisplayRange(this->minValueSpinBox->value(), this->maxValueSpinBox->value());
+			this->outputViewer->setAutoRange(this->autoRangeEnabled);
+			if (!this->autoRangeEnabled) {
+				this->outputViewer->setDisplayRange(this->displayRangeMin, this->displayRangeMax);
 			}
 		}
 	}

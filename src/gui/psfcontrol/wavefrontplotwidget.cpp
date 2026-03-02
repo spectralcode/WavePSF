@@ -6,6 +6,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QtMath>
+#include <QShowEvent>
 #include "gui/plotutils.h"
 
 
@@ -104,6 +105,12 @@ void WavefrontPlotWidget::updatePlot(af::array wavefront)
 	this->plot->rescaleAxes();
 	this->enforceAspectRatio();
 	this->plot->replot();
+}
+
+void WavefrontPlotWidget::showEvent(QShowEvent* event)
+{
+	QWidget::showEvent(event);
+	this->resetView();
 }
 
 void WavefrontPlotWidget::resetView()
