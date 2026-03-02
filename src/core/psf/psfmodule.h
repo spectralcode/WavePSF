@@ -64,6 +64,7 @@ private:
 	Deconvolver* deconvolver;
 
 	int gridSize;
+	QVector<WavefrontParameter> cachedDescriptors;
 	af::array currentWavefront;
 	af::array currentPSF;
 	af::array externalPSF;

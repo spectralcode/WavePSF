@@ -183,8 +183,12 @@ void PSFModule::applyPSFSettings(const PSFSettings& settings)
 	this->calculator->setNormalizationMode(
 		static_cast<PSFCalculator::NormalizationMode>(settings.normalizationMode));
 
-	// Re-broadcast descriptors (ranges or indices may have changed)
-	emit parameterDescriptorsChanged(this->generator->getParameterDescriptors());
+	// Only re-broadcast descriptors if they actually changed
+	QVector<WavefrontParameter> newDescriptors = this->generator->getParameterDescriptors();
+	if (newDescriptors != this->cachedDescriptors) {
+		this->cachedDescriptors = newDescriptors;
+		emit parameterDescriptorsChanged(newDescriptors);
+	}
 
 	// Regenerate pipeline
 	this->regeneratePipeline();
