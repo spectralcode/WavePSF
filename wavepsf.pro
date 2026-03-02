@@ -56,7 +56,8 @@ SOURCES += \
 	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.cpp \
 	$$SOURCEDIR/core/interpolation/tableinterpolator.cpp \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.cpp \
-	$$SOURCEDIR/gui/verticalscrollarea.cpp
+	$$SOURCEDIR/gui/verticalscrollarea.cpp \
+	$$SOURCEDIR/gui/plotutils.cpp
 
 HEADERS += \
 	$$QCUSTOMPLOTDIR/qcustomplot.h \
@@ -101,7 +102,8 @@ HEADERS += \
 	$$SOURCEDIR/core/interpolation/tableinterpolator.h \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.h \
 	$$SOURCEDIR/gui/qcppaletteobserver.h \
-	$$SOURCEDIR/gui/verticalscrollarea.h
+	$$SOURCEDIR/gui/verticalscrollarea.h \
+	$$SOURCEDIR/gui/plotutils.h
 
 FORMS += \
 	$$SOURCEDIR/gui/mainwindow.ui

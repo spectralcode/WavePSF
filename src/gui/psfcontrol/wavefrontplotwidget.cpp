@@ -6,6 +6,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QtMath>
+#include "gui/plotutils.h"
 
 
 WavefrontPlotWidget::WavefrontPlotWidget(QWidget* parent)
@@ -203,6 +204,14 @@ void WavefrontPlotWidget::setupContextMenu()
 
 	this->contextMenu = new QMenu(this);
 
+	QAction* saveAction = new QAction(tr("Save Plot as..."), this);
+	connect(saveAction, &QAction::triggered, this, [this]() {
+		PlotUtils::saveColorMapToDisk(this->plot, this->colorMap, this);
+	});
+	this->contextMenu->addAction(saveAction);
+
+	this->contextMenu->addSeparator();
+
 	this->autoScaleAction = new QAction("Auto-Scale Range", this);
 	this->autoScaleAction->setCheckable(true);
 	this->autoScaleAction->setChecked(true);
@@ -220,6 +229,28 @@ void WavefrontPlotWidget::setupContextMenu()
 		this->plot->replot();
 	});
 	this->contextMenu->addAction(this->symmetricZeroAction);
+
+	this->contextMenu->addSeparator();
+
+	this->showGridAction = new QAction(tr("Show Grid"), this);
+	this->showGridAction->setCheckable(true);
+	this->showGridAction->setChecked(true);
+	connect(this->showGridAction, &QAction::toggled, this, [this](bool checked) {
+		this->plot->xAxis->grid()->setVisible(checked);
+		this->plot->yAxis->grid()->setVisible(checked);
+		this->plot->replot();
+	});
+	this->contextMenu->addAction(this->showGridAction);
+
+	this->showAxisAction = new QAction(tr("Show Axis"), this);
+	this->showAxisAction->setCheckable(true);
+	this->showAxisAction->setChecked(true);
+	connect(this->showAxisAction, &QAction::toggled, this, [this](bool checked) {
+		this->plot->xAxis->setVisible(checked);
+		this->plot->yAxis->setVisible(checked);
+		this->plot->replot();
+	});
+	this->contextMenu->addAction(this->showAxisAction);
 }
 
 void WavefrontPlotWidget::showContextMenu(const QPoint& pos)

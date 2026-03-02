@@ -10,6 +10,8 @@
 #include <QLabel>
 #include "gui/verticalscrollarea.h"
 #include <QEvent>
+#include <QMenu>
+#include "gui/plotutils.h"
 
 InterpolationWidget::InterpolationWidget(QWidget* parent)
 	: QWidget(parent)
@@ -109,6 +111,11 @@ void InterpolationWidget::setupUI()
 	this->plot->legend->setVisible(true);
 	this->plot->legend->setFont(QFont(font().family(), 8));
 
+	// Context menu
+	this->plot->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(this->plot, &QWidget::customContextMenuRequested,
+			this, &InterpolationWidget::showPlotContextMenu);
+
 	// Palette-aware theming
 	new QCPPaletteObserver(this->plot);
 
@@ -204,4 +211,14 @@ bool InterpolationWidget::eventFilter(QObject* obj, QEvent* event)
 		}
 	}
 	return QWidget::eventFilter(obj, event);
+}
+
+void InterpolationWidget::showPlotContextMenu(const QPoint& pos)
+{
+	QMenu menu(this);
+	QAction* saveAction = menu.addAction(tr("Save Plot as..."));
+	connect(saveAction, &QAction::triggered, this, [this]() {
+		PlotUtils::savePlotToDisk(this->plot, this);
+	});
+	menu.exec(this->plot->mapToGlobal(pos));
 }

@@ -43,6 +43,8 @@ private:
 	QMenu* contextMenu;
 	QAction* autoScaleAction;
 	QAction* symmetricZeroAction;
+	QAction* showGridAction;
+	QAction* showAxisAction;
 };
 
 #endif // WAVEFRONTPLOTWIDGET_H

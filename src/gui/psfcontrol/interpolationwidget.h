@@ -28,6 +28,7 @@ signals:
 
 private slots:
 	void onCoefficientSelectionChanged(int index);
+	void showPlotContextMenu(const QPoint& pos);
 
 private:
 	void setupUI();

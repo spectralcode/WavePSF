@@ -19,6 +19,7 @@
 #include "gui/verticalscrollarea.h"
 #include <QEvent>
 #include <QMenu>
+#include "gui/plotutils.h"
 
 namespace {
 	const char* SETTINGS_GROUP = "optimization";
@@ -405,6 +406,11 @@ void OptimizationWidget::resetPlotView()
 void OptimizationWidget::showPlotContextMenu(const QPoint& pos)
 {
 	QMenu menu(this);
+	QAction* saveAction = menu.addAction(tr("Save Plot as..."));
+	connect(saveAction, &QAction::triggered, this, [this]() {
+		PlotUtils::savePlotToDisk(this->metricPlot, this);
+	});
+	menu.addSeparator();
 	QAction* resetAction = menu.addAction(tr("Reset View"));
 	connect(resetAction, &QAction::triggered, this, &OptimizationWidget::resetPlotView);
 	menu.exec(this->metricPlot->mapToGlobal(pos));
