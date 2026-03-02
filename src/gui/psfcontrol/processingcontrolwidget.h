@@ -1,5 +1,5 @@
-#ifndef PSFCONTROLWIDGET_H
-#define PSFCONTROLWIDGET_H
+#ifndef PROCESSINGCONTROLWIDGET_H
+#define PROCESSINGCONTROLWIDGET_H
 
 #include <QWidget>
 #include <QVector>
@@ -15,12 +15,12 @@ class QTabWidget;
 class QLabel;
 class QSpinBox;
 
-class PSFControlWidget : public QWidget
+class ProcessingControlWidget : public QWidget
 {
 	Q_OBJECT
 public:
-	explicit PSFControlWidget(QWidget* parent = nullptr);
-	~PSFControlWidget() override;
+	explicit ProcessingControlWidget(QWidget* parent = nullptr);
+	~ProcessingControlWidget() override;
 
 	QString getName() const;
 	QVariantMap getSettings() const;
@@ -81,4 +81,4 @@ private:
 	bool updatingPatchGrid;
 };
 
-#endif // PSFCONTROLWIDGET_H
+#endif // PROCESSINGCONTROLWIDGET_H

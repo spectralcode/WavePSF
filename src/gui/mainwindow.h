@@ -21,7 +21,7 @@ class SettingsFileManager;
 class ApplicationController;
 class ImageSessionViewer;
 class PSFGenerationWidget;
-class PSFControlWidget;
+class ProcessingControlWidget;
 
 class MainWindow : public QMainWindow {
 	Q_OBJECT
@@ -75,7 +75,7 @@ private:
 	void connectApplicationController();
 	void connectImageSessionViewer();
 	void connectPSFGenerationWidget();
-	void connectPSFControlWidget();
+	void connectProcessingControlWidget();
 	void loadSettings();
 	void saveSettings();
 
@@ -131,7 +131,7 @@ private:
 	// Main widgets
 	ImageSessionViewer* sessionViewer;
 	PSFGenerationWidget* psfGenerationWidget;
-	PSFControlWidget* psfControlWidget;
+	ProcessingControlWidget* processingControlWidget;
 
 signals:
 

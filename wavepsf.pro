@@ -47,7 +47,7 @@ SOURCES += \
 	$$SOURCEDIR/gui/psfcontrol/wavefrontplotwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/psfpreviewwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/psfgenerationwidget.cpp \
-	$$SOURCEDIR/gui/psfcontrol/psfcontrolwidget.cpp \
+	$$SOURCEDIR/gui/psfcontrol/processingcontrolwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/deconvolutionsettingswidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/psfsettingsdialog.cpp \
 	$$SOURCEDIR/core/psf/psfsettings.cpp \
@@ -93,7 +93,7 @@ HEADERS += \
 	$$SOURCEDIR/gui/psfcontrol/wavefrontplotwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/psfpreviewwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/psfgenerationwidget.h \
-	$$SOURCEDIR/gui/psfcontrol/psfcontrolwidget.h \
+	$$SOURCEDIR/gui/psfcontrol/processingcontrolwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/deconvolutionsettingswidget.h \
 	$$SOURCEDIR/gui/psfcontrol/psfsettingsdialog.h \
 	$$SOURCEDIR/core/psf/psfsettings.h \

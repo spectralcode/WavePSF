@@ -1,4 +1,4 @@
-#include "psfcontrolwidget.h"
+#include "processingcontrolwidget.h"
 #include "deconvolutionsettingswidget.h"
 #include "optimizationwidget.h"
 #include "interpolationwidget.h"
@@ -16,7 +16,7 @@ namespace {
 }
 
 
-PSFControlWidget::PSFControlWidget(QWidget* parent)
+ProcessingControlWidget::ProcessingControlWidget(QWidget* parent)
 	: QWidget(parent)
 	, updatingPatchGrid(false)
 {
@@ -75,63 +75,63 @@ PSFControlWidget::PSFControlWidget(QWidget* parent)
 
 	// Connect patch grid spinboxes
 	connect(this->patchColsSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
-			this, &PSFControlWidget::applyPatchGridSettings);
+			this, &ProcessingControlWidget::applyPatchGridSettings);
 	connect(this->patchRowsSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
-			this, &PSFControlWidget::applyPatchGridSettings);
+			this, &ProcessingControlWidget::applyPatchGridSettings);
 	connect(this->borderExtensionSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
-			this, &PSFControlWidget::applyPatchGridSettings);
+			this, &ProcessingControlWidget::applyPatchGridSettings);
 
 	// Forward signals from deconvolution settings
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::algorithmChanged,
-			this, &PSFControlWidget::deconvAlgorithmChanged);
+			this, &ProcessingControlWidget::deconvAlgorithmChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::iterationsChanged,
-			this, &PSFControlWidget::deconvIterationsChanged);
+			this, &ProcessingControlWidget::deconvIterationsChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::relaxationFactorChanged,
-			this, &PSFControlWidget::deconvRelaxationFactorChanged);
+			this, &ProcessingControlWidget::deconvRelaxationFactorChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::regularizationFactorChanged,
-			this, &PSFControlWidget::deconvRegularizationFactorChanged);
+			this, &ProcessingControlWidget::deconvRegularizationFactorChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::noiseToSignalFactorChanged,
-			this, &PSFControlWidget::deconvNoiseToSignalFactorChanged);
+			this, &ProcessingControlWidget::deconvNoiseToSignalFactorChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::liveModeChanged,
-			this, &PSFControlWidget::deconvLiveModeChanged);
+			this, &ProcessingControlWidget::deconvLiveModeChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::deconvolutionRequested,
-			this, &PSFControlWidget::deconvolutionRequested);
+			this, &ProcessingControlWidget::deconvolutionRequested);
 
 	// Forward signals from optimization widget
 	connect(this->optimizationWidget, &OptimizationWidget::optimizationRequested,
-			this, &PSFControlWidget::optimizationRequested);
+			this, &ProcessingControlWidget::optimizationRequested);
 	connect(this->optimizationWidget, &OptimizationWidget::optimizationCancelRequested,
-			this, &PSFControlWidget::optimizationCancelRequested);
+			this, &ProcessingControlWidget::optimizationCancelRequested);
 	connect(this->optimizationWidget, &OptimizationWidget::patchSelectionChanged,
-			this, &PSFControlWidget::optimizationPatchSelectionChanged);
+			this, &ProcessingControlWidget::optimizationPatchSelectionChanged);
 	connect(this->optimizationWidget, &OptimizationWidget::livePreviewSettingsChanged,
-			this, &PSFControlWidget::optimizationLivePreviewChanged);
+			this, &ProcessingControlWidget::optimizationLivePreviewChanged);
 	connect(this->optimizationWidget, &OptimizationWidget::saParametersChanged,
-			this, &PSFControlWidget::optimizationSAParametersChanged);
+			this, &ProcessingControlWidget::optimizationSAParametersChanged);
 
 	// Forward signals from interpolation widget
 	connect(this->interpolationWidget, &InterpolationWidget::interpolateInXRequested,
-			this, &PSFControlWidget::interpolateInXRequested);
+			this, &ProcessingControlWidget::interpolateInXRequested);
 	connect(this->interpolationWidget, &InterpolationWidget::interpolateInYRequested,
-			this, &PSFControlWidget::interpolateInYRequested);
+			this, &ProcessingControlWidget::interpolateInYRequested);
 	connect(this->interpolationWidget, &InterpolationWidget::interpolateInZRequested,
-			this, &PSFControlWidget::interpolateInZRequested);
+			this, &ProcessingControlWidget::interpolateInZRequested);
 	connect(this->interpolationWidget, &InterpolationWidget::interpolateAllInZRequested,
-			this, &PSFControlWidget::interpolateAllInZRequested);
+			this, &ProcessingControlWidget::interpolateAllInZRequested);
 	connect(this->interpolationWidget, &InterpolationWidget::polynomialOrderChanged,
-			this, &PSFControlWidget::interpolationPolynomialOrderChanged);
+			this, &ProcessingControlWidget::interpolationPolynomialOrderChanged);
 }
 
-PSFControlWidget::~PSFControlWidget()
+ProcessingControlWidget::~ProcessingControlWidget()
 {
 }
 
-QString PSFControlWidget::getName() const
+QString ProcessingControlWidget::getName() const
 {
 	return QLatin1String(SETTINGS_GROUP);
 }
 
-QVariantMap PSFControlWidget::getSettings() const
+QVariantMap ProcessingControlWidget::getSettings() const
 {
 	QVariantMap settings;
 	settings.insert("deconvolution", this->deconvSettings->getSettings());
@@ -139,48 +139,48 @@ QVariantMap PSFControlWidget::getSettings() const
 	return settings;
 }
 
-void PSFControlWidget::setSettings(const QVariantMap& settings)
+void ProcessingControlWidget::setSettings(const QVariantMap& settings)
 {
 	this->deconvSettings->setSettings(settings.value("deconvolution").toMap());
 	this->optimizationWidget->setSettings(settings.value("optimization").toMap());
 }
 
-void PSFControlWidget::setParameterDescriptors(QVector<WavefrontParameter> descriptors)
+void ProcessingControlWidget::setParameterDescriptors(QVector<WavefrontParameter> descriptors)
 {
 	this->optimizationWidget->setParameterDescriptors(descriptors);
 }
 
-void PSFControlWidget::setGroundTruthAvailable(bool available)
+void ProcessingControlWidget::setGroundTruthAvailable(bool available)
 {
 	this->optimizationWidget->setGroundTruthAvailable(available);
 }
 
-void PSFControlWidget::updateOptimizationProgress(const OptimizationProgress& progress)
+void ProcessingControlWidget::updateOptimizationProgress(const OptimizationProgress& progress)
 {
 	this->optimizationWidget->updateProgress(progress);
 }
 
-void PSFControlWidget::onOptimizationFinished(const OptimizationResult& result)
+void ProcessingControlWidget::onOptimizationFinished(const OptimizationResult& result)
 {
 	this->optimizationWidget->onOptimizationFinished(result);
 }
 
-void PSFControlWidget::onOptimizationStarted()
+void ProcessingControlWidget::onOptimizationStarted()
 {
 	this->optimizationWidget->onOptimizationStarted();
 }
 
-void PSFControlWidget::updateInterpolationResult(const InterpolationResult& result)
+void ProcessingControlWidget::updateInterpolationResult(const InterpolationResult& result)
 {
 	this->interpolationWidget->updateInterpolationResult(result);
 }
 
-void PSFControlWidget::updateCurrentPatch(int x, int y)
+void ProcessingControlWidget::updateCurrentPatch(int x, int y)
 {
 	this->patchGridInfoLabel->setText(QString("Current patch: (%1, %2)").arg(x).arg(y));
 }
 
-void PSFControlWidget::setPatchGridConfiguration(int cols, int rows, int borderExtension)
+void ProcessingControlWidget::setPatchGridConfiguration(int cols, int rows, int borderExtension)
 {
 	this->updatingPatchGrid = true;
 	this->patchColsSpinBox->setValue(cols);
@@ -189,7 +189,7 @@ void PSFControlWidget::setPatchGridConfiguration(int cols, int rows, int borderE
 	this->updatingPatchGrid = false;
 }
 
-void PSFControlWidget::applyPatchGridSettings()
+void ProcessingControlWidget::applyPatchGridSettings()
 {
 	if (!this->updatingPatchGrid) {
 		emit patchGridConfigurationRequested(

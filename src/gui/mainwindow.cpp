@@ -4,7 +4,7 @@
 #include "controller/applicationcontroller.h"
 #include "gui/imagesessionviewer/imagesessionviewer.h"
 #include "gui/psfcontrol/psfgenerationwidget.h"
-#include "gui/psfcontrol/psfcontrolwidget.h"
+#include "gui/psfcontrol/processingcontrolwidget.h"
 #include "gui/psfcontrol/psfsettingsdialog.h"
 #include "utils/logging.h"
 #include "utils/supportedfilechecker.h"
@@ -53,7 +53,7 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	  saveParametersAction(nullptr), loadParametersAction(nullptr), saveOutputAction(nullptr),
 	  deconvolveAllAction(nullptr),
 	  sessionViewer(nullptr),
-	  psfGenerationWidget(nullptr), psfControlWidget(nullptr) {
+	  psfGenerationWidget(nullptr), processingControlWidget(nullptr) {
 	MessageRouter::instance()->install();
 	this->ui->setupUi(this);
 	this->setupMenuBar();
@@ -61,7 +61,7 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	this->connectApplicationController();
 	this->connectImageSessionViewer();
 	this->connectPSFGenerationWidget();
-	this->connectPSFControlWidget();
+	this->connectProcessingControlWidget();
 	this->loadSettings();
 
 	// Apply loaded PSF settings to the controller (loadSettings only deserializes
@@ -351,8 +351,8 @@ void MainWindow::setupCentralWidget()
 	this->sessionViewer->addSidebarWidget(this->psfGenerationWidget);
 
 	// Bottom panel below viewers: 3-tab control widget (Deconvolution, Optimization, Interpolation)
-	this->psfControlWidget = new PSFControlWidget();
-	this->sessionViewer->addBottomPanel(this->psfControlWidget);
+	this->processingControlWidget = new ProcessingControlWidget();
+	this->sessionViewer->addBottomPanel(this->processingControlWidget);
 
 	this->setCentralWidget(this->sessionViewer);
 }
@@ -445,29 +445,29 @@ void MainWindow::connectPSFGenerationWidget() {
 	LOG_DEBUG() << "PSFGenerationWidget signal connections established";
 }
 
-void MainWindow::connectPSFControlWidget() {
+void MainWindow::connectProcessingControlWidget() {
 	if (this->applicationController == nullptr) return;
 
-	auto* ctrl = this->psfControlWidget;
+	auto* ctrl = this->processingControlWidget;
 
-	// Parameter descriptors → PSFControlWidget (for optimization widget)
+	// Parameter descriptors → ProcessingControlWidget (for optimization widget)
 	connect(this->applicationController, &ApplicationController::psfParameterDescriptorsChanged,
-			ctrl, &PSFControlWidget::setParameterDescriptors);
+			ctrl, &ProcessingControlWidget::setParameterDescriptors);
 
 	// --- Deconvolution signals ---
-	connect(ctrl, &PSFControlWidget::deconvAlgorithmChanged,
+	connect(ctrl, &ProcessingControlWidget::deconvAlgorithmChanged,
 			this->applicationController, &ApplicationController::setDeconvolutionAlgorithm);
-	connect(ctrl, &PSFControlWidget::deconvIterationsChanged,
+	connect(ctrl, &ProcessingControlWidget::deconvIterationsChanged,
 			this->applicationController, &ApplicationController::setDeconvolutionIterations);
-	connect(ctrl, &PSFControlWidget::deconvRelaxationFactorChanged,
+	connect(ctrl, &ProcessingControlWidget::deconvRelaxationFactorChanged,
 			this->applicationController, &ApplicationController::setDeconvolutionRelaxationFactor);
-	connect(ctrl, &PSFControlWidget::deconvRegularizationFactorChanged,
+	connect(ctrl, &ProcessingControlWidget::deconvRegularizationFactorChanged,
 			this->applicationController, &ApplicationController::setDeconvolutionRegularizationFactor);
-	connect(ctrl, &PSFControlWidget::deconvNoiseToSignalFactorChanged,
+	connect(ctrl, &ProcessingControlWidget::deconvNoiseToSignalFactorChanged,
 			this->applicationController, &ApplicationController::setDeconvolutionNoiseToSignalFactor);
-	connect(ctrl, &PSFControlWidget::deconvLiveModeChanged,
+	connect(ctrl, &ProcessingControlWidget::deconvLiveModeChanged,
 			this->applicationController, &ApplicationController::setDeconvolutionLiveMode);
-	connect(ctrl, &PSFControlWidget::deconvolutionRequested,
+	connect(ctrl, &ProcessingControlWidget::deconvolutionRequested,
 			this->applicationController, &ApplicationController::requestDeconvolution);
 
 	// Deconvolution completed → refresh output viewer
@@ -475,56 +475,56 @@ void MainWindow::connectPSFControlWidget() {
 			this->sessionViewer, &ImageSessionViewer::refreshOutputViewer);
 
 	// --- Optimization signals ---
-	connect(ctrl, &PSFControlWidget::optimizationRequested,
+	connect(ctrl, &ProcessingControlWidget::optimizationRequested,
 			this->applicationController, &ApplicationController::startOptimization);
-	connect(ctrl, &PSFControlWidget::optimizationCancelRequested,
+	connect(ctrl, &ProcessingControlWidget::optimizationCancelRequested,
 			this->applicationController, &ApplicationController::cancelOptimization);
-	connect(ctrl, &PSFControlWidget::optimizationLivePreviewChanged,
+	connect(ctrl, &ProcessingControlWidget::optimizationLivePreviewChanged,
 			this->applicationController, &ApplicationController::updateOptimizationLivePreview);
-	connect(ctrl, &PSFControlWidget::optimizationSAParametersChanged,
+	connect(ctrl, &ProcessingControlWidget::optimizationSAParametersChanged,
 			this->applicationController, &ApplicationController::updateOptimizationSAParameters);
 
 	connect(this->applicationController, &ApplicationController::optimizationStarted,
-			ctrl, &PSFControlWidget::onOptimizationStarted);
+			ctrl, &ProcessingControlWidget::onOptimizationStarted);
 	connect(this->applicationController, &ApplicationController::optimizationProgressUpdated,
-			ctrl, &PSFControlWidget::updateOptimizationProgress);
+			ctrl, &ProcessingControlWidget::updateOptimizationProgress);
 	connect(this->applicationController, &ApplicationController::optimizationFinished,
-			ctrl, &PSFControlWidget::onOptimizationFinished);
+			ctrl, &ProcessingControlWidget::onOptimizationFinished);
 
-	// Ground truth availability → PSFControlWidget
+	// Ground truth availability → ProcessingControlWidget
 	connect(this->applicationController, &ApplicationController::groundTruthFileLoaded,
 			this, [this](const QString&) {
-				this->psfControlWidget->setGroundTruthAvailable(true);
+				this->processingControlWidget->setGroundTruthAvailable(true);
 			});
 
 	// Multi-patch highlighting from optimization widget
-	connect(ctrl, &PSFControlWidget::optimizationPatchSelectionChanged,
+	connect(ctrl, &ProcessingControlWidget::optimizationPatchSelectionChanged,
 			this->sessionViewer, &ImageSessionViewer::highlightPatches);
 
 	// --- Interpolation signals ---
-	connect(ctrl, &PSFControlWidget::interpolateInXRequested,
+	connect(ctrl, &ProcessingControlWidget::interpolateInXRequested,
 			this->applicationController, &ApplicationController::interpolateCoefficientsInX);
-	connect(ctrl, &PSFControlWidget::interpolateInYRequested,
+	connect(ctrl, &ProcessingControlWidget::interpolateInYRequested,
 			this->applicationController, &ApplicationController::interpolateCoefficientsInY);
-	connect(ctrl, &PSFControlWidget::interpolateInZRequested,
+	connect(ctrl, &ProcessingControlWidget::interpolateInZRequested,
 			this->applicationController, &ApplicationController::interpolateCoefficientsInZ);
-	connect(ctrl, &PSFControlWidget::interpolateAllInZRequested,
+	connect(ctrl, &ProcessingControlWidget::interpolateAllInZRequested,
 			this->applicationController, &ApplicationController::interpolateAllCoefficientsInZ);
-	connect(ctrl, &PSFControlWidget::interpolationPolynomialOrderChanged,
+	connect(ctrl, &ProcessingControlWidget::interpolationPolynomialOrderChanged,
 			this->applicationController, &ApplicationController::setInterpolationPolynomialOrder);
 
 	connect(this->applicationController, &ApplicationController::interpolationCompleted,
-			ctrl, &PSFControlWidget::updateInterpolationResult);
+			ctrl, &ProcessingControlWidget::updateInterpolationResult);
 
 	// --- Patch grid signals ---
-	connect(ctrl, &PSFControlWidget::patchGridConfigurationRequested,
+	connect(ctrl, &ProcessingControlWidget::patchGridConfigurationRequested,
 			this->applicationController, &ApplicationController::configurePatchGrid);
 	connect(this->applicationController, &ApplicationController::patchGridConfigured,
-			ctrl, &PSFControlWidget::setPatchGridConfiguration);
+			ctrl, &ProcessingControlWidget::setPatchGridConfiguration);
 	connect(this->applicationController, &ApplicationController::patchChanged,
-			ctrl, &PSFControlWidget::updateCurrentPatch);
+			ctrl, &ProcessingControlWidget::updateCurrentPatch);
 
-	LOG_DEBUG() << "PSFControlWidget signal connections established";
+	LOG_DEBUG() << "ProcessingControlWidget signal connections established";
 }
 
 void MainWindow::openImageData() {
@@ -679,7 +679,7 @@ void MainWindow::loadSettings() {
 	this->consoleWidget()->setSettings(this->guiSettings->getStoredSettings(this->consoleWidget()->getName()));
 	this->sessionViewer->setSettings(this->guiSettings->getStoredSettings(this->sessionViewer->getName()));
 	this->psfGenerationWidget->setSettings(this->guiSettings->getStoredSettings(this->psfGenerationWidget->getName()));
-	this->psfControlWidget->setSettings(this->guiSettings->getStoredSettings(this->psfControlWidget->getName()));
+	this->processingControlWidget->setSettings(this->guiSettings->getStoredSettings(this->processingControlWidget->getName()));
 }
 
 void MainWindow::saveSettings() {
@@ -700,7 +700,7 @@ void MainWindow::saveSettings() {
 	this->guiSettings->storeSettings(this->consoleWidget()->getName(), this->consoleWidget()->getSettings());
 	this->guiSettings->storeSettings(this->sessionViewer->getName(), this->sessionViewer->getSettings());
 	this->guiSettings->storeSettings(this->psfGenerationWidget->getName(), this->psfGenerationWidget->getSettings());
-	this->guiSettings->storeSettings(this->psfControlWidget->getName(), this->psfControlWidget->getSettings());
+	this->guiSettings->storeSettings(this->processingControlWidget->getName(), this->processingControlWidget->getSettings());
 }
 
 MessageConsoleWidget *MainWindow::consoleWidget() const
