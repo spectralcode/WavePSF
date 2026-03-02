@@ -4,11 +4,14 @@
 #include <QWidget>
 #include <QVariantMap>
 #include <QVector>
+#include <QMap>
 #include <QElapsedTimer>
 #include "core/psf/wavefrontparameter.h"
 #include "core/optimization/optimizationworker.h"
+#include "core/optimization/ioptimizer.h"
 
 class QVBoxLayout;
+class QFormLayout;
 class QComboBox;
 class QSpinBox;
 class QDoubleSpinBox;
@@ -42,9 +45,7 @@ signals:
 	void optimizationCancelRequested();
 	void patchSelectionChanged(QVector<int> patchLinearIds);
 	void livePreviewSettingsChanged(bool enabled, int interval);
-	void saParametersChanged(double endTemp, double coolingFactor,
-							 double startPerturb, double endPerturb,
-							 int itersPerTemp);
+	void algorithmParametersChanged(QVariantMap params);
 
 private slots:
 	void onModeChanged(int index);
@@ -55,7 +56,8 @@ private slots:
 	void onPatchTextChanged(const QString& text);
 	void resetPlotView();
 	void showPlotContextMenu(const QPoint& pos);
-	void emitSAParametersChanged();
+	void onAlgorithmChanged(int index);
+	void emitAlgorithmParametersChanged();
 	void emitLivePreviewSettingsChanged();
 
 private:
@@ -63,12 +65,15 @@ private:
 	void setupModeSection(QVBoxLayout* layout);
 	void setupBatchSection(QVBoxLayout* layout);
 	void setupInitialValuesSection(QVBoxLayout* layout);
-	void setupSAParametersSection(QVBoxLayout* layout);
+	void setupAlgorithmSection(QVBoxLayout* layout);
 	void setupMetricSection(QVBoxLayout* layout);
 	void setupCoefficientSection(QVBoxLayout* layout);
 	void setupControlSection(QVBoxLayout* layout);
 	void setupStatusSection(QVBoxLayout* layout);
 	void setupPlotSection();
+
+	void rebuildAlgorithmParameterWidgets(const QString& algorithmName);
+	QVariantMap readAlgorithmParameters() const;
 
 	void installScrollGuard(QWidget* widget);
 	bool eventFilter(QObject* obj, QEvent* event) override;
@@ -95,13 +100,13 @@ private:
 	QLabel* sourceParamLabel;
 	QSpinBox* sourceParamSpinBox;
 
-	// SA parameters
-	QDoubleSpinBox* startTempSpinBox;
-	QDoubleSpinBox* endTempSpinBox;
-	QDoubleSpinBox* coolingFactorSpinBox;
-	QDoubleSpinBox* startPerturbanceSpinBox;
-	QDoubleSpinBox* endPerturbanceSpinBox;
-	QSpinBox* itersPerTempSpinBox;
+	// Algorithm selection + dynamic parameters
+	QComboBox* algorithmComboBox;
+	QGroupBox* algorithmParamsGroup;
+	QFormLayout* algorithmParamsLayout;
+	QMap<QString, QWidget*> algorithmParamWidgets;
+	QVector<OptimizerParameter> currentAlgorithmDescriptors;
+	QMap<QString, QVariantMap> cachedAlgorithmParameters;
 
 	// Metric
 	QComboBox* metricModeComboBox;
@@ -122,7 +127,7 @@ private:
 	// Status
 	QLabel* statusLabel;
 	QLabel* batchStatusLabel;
-	QLabel* temperatureLabel;
+	QLabel* algorithmStatusLabel;
 	QLabel* iterationLabel;
 	QLabel* bestMetricLabel;
 

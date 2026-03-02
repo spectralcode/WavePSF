@@ -1,16 +1,17 @@
 #include "optimizationworker.h"
+#include "ioptimizer.h"
+#include "optimizerfactory.h"
 #include "imagemetriccalculator.h"
 #include "core/psf/iwavefrontgenerator.h"
 #include "core/psf/wavefrontgeneratorfactory.h"
 #include "core/psf/psfcalculator.h"
 #include "core/psf/deconvolver.h"
-#include <QRandomGenerator>
-#include <QtMath>
 #include <limits>
 
 
 OptimizationWorker::OptimizationWorker(QObject* parent)
 	: QObject(parent)
+	, currentOptimizer(nullptr)
 {
 	this->cancelRequested.storeRelease(0);
 }
@@ -24,16 +25,12 @@ void OptimizationWorker::requestCancel()
 	this->cancelRequested.storeRelease(1);
 }
 
-void OptimizationWorker::updateLiveSAParameters(double endTemp, double coolingFactor,
-												double startPerturb, double endPerturb,
-												int itersPerTemp)
+void OptimizationWorker::updateLiveAlgorithmParameters(const QVariantMap& params)
 {
-	QMutexLocker locker(&this->liveParamsMutex);
-	this->liveEndTemperature = endTemp;
-	this->liveCoolingFactor = coolingFactor;
-	this->liveStartPerturbance = startPerturb;
-	this->liveEndPerturbance = endPerturb;
-	this->liveIterationsPerTemperature = itersPerTemp;
+	QMutexLocker locker(&this->optimizerMutex);
+	if (this->currentOptimizer != nullptr) {
+		this->currentOptimizer->updateLiveParameters(params);
+	}
 }
 
 void OptimizationWorker::runOptimization(const OptimizationConfig& config)
@@ -104,19 +101,17 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 		}
 	};
 
+	// Create optimizer
+	IOptimizer* optimizer = OptimizerFactory::create(config.algorithmName);
+	optimizer->deserializeSettings(config.algorithmSettings);
+	{
+		QMutexLocker locker(&this->optimizerMutex);
+		this->currentOptimizer = optimizer;
+	}
+
 	OptimizationResult finalResult;
 	finalResult.totalOuterIterations = 0;
 	finalResult.wasCancelled = false;
-
-	// Initialize live-updatable SA parameters from config
-	{
-		QMutexLocker locker(&this->liveParamsMutex);
-		this->liveEndTemperature = config.endTemperature;
-		this->liveCoolingFactor = config.coolingFactor;
-		this->liveStartPerturbance = config.startPerturbance;
-		this->liveEndPerturbance = config.endPerturbance;
-		this->liveIterationsPerTemperature = config.iterationsPerTemperature;
-	}
 
 	// Process each job
 	for (int jobIdx = 0; jobIdx < config.jobs.size(); ++jobIdx) {
@@ -127,136 +122,67 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 
 		const OptimizationJob& job = config.jobs[jobIdx];
 
-		// Initialize SA state for this job
-		QVector<double> currentCoeffs = job.startCoefficients;
-		// Source=5: use previous job's best result as starting point
+		// Determine start coefficients
+		QVector<double> startCoeffs = job.startCoefficients;
 		if (config.startCoefficientSource == 5 && jobIdx > 0 &&
 			!finalResult.jobResults.isEmpty()) {
-			currentCoeffs = finalResult.jobResults.last().bestCoefficients;
+			startCoeffs = finalResult.jobResults.last().bestCoefficients;
 		}
-		// If start coefficients are still empty, use zeros
-		if (currentCoeffs.isEmpty()) {
+		if (startCoeffs.isEmpty()) {
 			int coeffCount = generator->getAllCoefficients().size();
-			currentCoeffs.fill(0.0, coeffCount);
+			startCoeffs.fill(0.0, coeffCount);
 		}
 
-		QVector<double> bestCoeffs = currentCoeffs;
-		QVector<double> oldCoeffs = currentCoeffs;
-		double temperature = config.startTemperature;
-		double metricOld = (std::numeric_limits<double>::max)();
-		double bestMetric = metricOld;
-		int outerIteration = 0;
+		// Build objective function for this job
+		auto objective = [&](const QVector<double>& coefficients) -> double {
+			return evaluateMetric(coefficients, job.inputPatch, job.groundTruthPatch);
+		};
 
-		// Local copies of live-updatable SA parameters
-		double saEndTemp = config.endTemperature;
-		double saCoolingFactor = config.coolingFactor;
-		double saStartPerturb = config.startPerturbance;
-		double saEndPerturb = config.endPerturbance;
-		int saItersPerTemp = config.iterationsPerTemperature;
+		// Build progress callback
+		auto progressCb = [&](const OptimizerProgress& optProg) {
+			finalResult.totalOuterIterations = optProg.iteration;
 
-		// SA main loop
-		while (temperature > saEndTemp && !this->cancelRequested.loadAcquire()) {
-			for (int i = 0; i < saItersPerTemp; ++i) {
-				if (this->cancelRequested.loadAcquire()) break;
-
-				// Evaluate current coefficients
-				double metricNew = evaluateMetric(currentCoeffs, job.inputPatch, job.groundTruthPatch);
-
-				// Metropolis acceptance criterion
-				if (metricNew < metricOld) {
-					// Accept improvement
-					metricOld = metricNew;
-					bestCoeffs = currentCoeffs;
-					bestMetric = metricNew;
-					oldCoeffs = currentCoeffs;
-				} else {
-					double deltaMetric = metricNew - metricOld;
-					double acceptProb = qExp(-deltaMetric / temperature);
-					if (acceptProb > this->randomDouble(0.0, 1.0)) {
-						// Accept worse solution probabilistically
-						metricOld = metricNew;
-						oldCoeffs = currentCoeffs;
-					} else {
-						// Reject: revert to old
-						currentCoeffs = oldCoeffs;
-					}
-				}
-
-				// Perturb for next iteration (scale perturbance with temperature)
-				double t = (temperature - saEndTemp) / (config.startTemperature - saEndTemp);
-				double basePerturbance = saEndPerturb + t * (saStartPerturb - saEndPerturb);
-				double iterPerturbance = basePerturbance / (i + 1.0);
-				if (iterPerturbance < 0.00005) iterPerturbance = 0.00005;
-				this->perturbCoefficients(currentCoeffs, config.selectedCoefficientIndices,
-										  iterPerturbance, config.minBounds, config.maxBounds);
-			}
-
-			// Cool down
-			temperature *= saCoolingFactor;
-			outerIteration++;
-			finalResult.totalOuterIterations++;
-
-			// Read live parameter updates from main thread
-			{
-				QMutexLocker locker(&this->liveParamsMutex);
-				saEndTemp = this->liveEndTemperature;
-				saCoolingFactor = this->liveCoolingFactor;
-				saStartPerturb = this->liveStartPerturbance;
-				saEndPerturb = this->liveEndPerturbance;
-				saItersPerTemp = this->liveIterationsPerTemperature;
-			}
-
-			// Report progress
 			OptimizationProgress progress;
 			progress.currentJobIndex = jobIdx;
 			progress.totalJobs = config.jobs.size();
-			progress.outerIteration = outerIteration;
-			progress.currentMetric = metricOld;
-			progress.bestMetric = bestMetric;
-			progress.temperature = temperature;
+			progress.outerIteration = optProg.iteration;
+			progress.currentMetric = optProg.currentMetric;
+			progress.bestMetric = optProg.bestMetric;
+			progress.algorithmStatus = optProg.algorithmStatus;
 			progress.currentFrameNr = job.frameNr;
 			progress.currentPatchX = job.patchX;
 			progress.currentPatchY = job.patchY;
-			progress.currentBestCoefficients = bestCoeffs;
-			progress.currentCoefficients = currentCoeffs;
+			progress.currentBestCoefficients = optProg.bestCoefficients;
+			progress.currentCoefficients = optProg.currentCoefficients;
 			emit progressUpdated(progress);
-		}
+		};
 
-		// Store result for this job
+		OptimizerResult jobOptResult = optimizer->run(
+			objective,
+			startCoeffs,
+			config.selectedCoefficientIndices,
+			config.minBounds,
+			config.maxBounds,
+			this->cancelRequested,
+			progressCb);
+
 		OptimizationJobResult jobResult;
 		jobResult.frameNr = job.frameNr;
 		jobResult.patchX = job.patchX;
 		jobResult.patchY = job.patchY;
-		jobResult.bestCoefficients = bestCoeffs;
-		jobResult.bestMetric = bestMetric;
+		jobResult.bestCoefficients = jobOptResult.bestCoefficients;
+		jobResult.bestMetric = jobOptResult.bestMetric;
 		finalResult.jobResults.append(jobResult);
 	}
 
+	// Cleanup
+	{
+		QMutexLocker locker(&this->optimizerMutex);
+		this->currentOptimizer = nullptr;
+	}
+	delete optimizer;
 	delete generator;
 
 	finalResult.wasCancelled = this->cancelRequested.loadAcquire() != 0;
 	emit optimizationFinished(finalResult);
-}
-
-void OptimizationWorker::perturbCoefficients(QVector<double>& coefficients,
-											 const QVector<int>& selectedIndices,
-											 double perturbance,
-											 const QVector<double>& minBounds,
-											 const QVector<double>& maxBounds)
-{
-	for (int idx : selectedIndices) {
-		if (idx < 0 || idx >= coefficients.size()) continue;
-		double current = coefficients[idx];
-		double newVal = this->randomDouble(current - perturbance, current + perturbance);
-		double lo = (idx < minBounds.size()) ? minBounds[idx] : -0.3;
-		double hi = (idx < maxBounds.size()) ? maxBounds[idx] : 0.3;
-		newVal = qBound(lo, newVal, hi);
-		coefficients[idx] = newVal;
-	}
-}
-
-double OptimizationWorker::randomDouble(double low, double high)
-{
-	double r = QRandomGenerator::global()->generateDouble(); // [0, 1)
-	return low + r * (high - low);
 }

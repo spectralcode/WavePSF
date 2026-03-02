@@ -51,9 +51,7 @@ signals:
 	void optimizationCancelRequested();
 	void optimizationPatchSelectionChanged(QVector<int> patchLinearIds);
 	void optimizationLivePreviewChanged(bool enabled, int interval);
-	void optimizationSAParametersChanged(double endTemp, double coolingFactor,
-										 double startPerturb, double endPerturb,
-										 int itersPerTemp);
+	void optimizationAlgorithmParametersChanged(QVariantMap params);
 
 	// Interpolation signals
 	void interpolateInXRequested();

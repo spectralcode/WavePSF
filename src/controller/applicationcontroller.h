@@ -91,9 +91,7 @@ public slots:
 	void startOptimization(const OptimizationConfig& uiConfig);
 	void cancelOptimization();
 	void updateOptimizationLivePreview(bool enabled, int interval);
-	void updateOptimizationSAParameters(double endTemp, double coolingFactor,
-										double startPerturb, double endPerturb,
-										int itersPerTemp);
+	void updateOptimizationAlgorithmParameters(const QVariantMap& params);
 
 	// Coefficient clipboard
 	void copyCoefficients();

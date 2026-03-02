@@ -1,5 +1,6 @@
 #include "optimizationwidget.h"
 #include "core/optimization/imagemetriccalculator.h"
+#include "core/optimization/optimizerfactory.h"
 #include "core/psf/psfsettings.h"
 #include "qcustomplot.h"
 #include "gui/qcppaletteobserver.h"
@@ -50,7 +51,7 @@ void OptimizationWidget::setupUI()
 	this->setupModeSection(contentLayout);
 	this->setupBatchSection(contentLayout);
 	this->setupInitialValuesSection(contentLayout);
-	this->setupSAParametersSection(contentLayout);
+	this->setupAlgorithmSection(contentLayout);
 	this->setupMetricSection(contentLayout);
 	this->setupCoefficientSection(contentLayout);
 	this->setupControlSection(contentLayout);
@@ -141,70 +142,29 @@ void OptimizationWidget::setupInitialValuesSection(QVBoxLayout* layout)
 	this->onStartCoefficientSourceChanged(0);
 }
 
-void OptimizationWidget::setupSAParametersSection(QVBoxLayout* layout)
+void OptimizationWidget::setupAlgorithmSection(QVBoxLayout* layout)
 {
-	QGroupBox* saGroup = new QGroupBox(tr("Simulated Annealing"), this);
-	QFormLayout* saForm = new QFormLayout(saGroup);
+	QHBoxLayout* algoLayout = new QHBoxLayout();
+	algoLayout->addWidget(new QLabel(tr("Algorithm:"), this));
 
-	this->startTempSpinBox = new QDoubleSpinBox(saGroup);
-	this->startTempSpinBox->setRange(0.001, 1000.0);
-	this->startTempSpinBox->setDecimals(3);
-	this->startTempSpinBox->setValue(1.0);
-	this->startTempSpinBox->setSingleStep(0.1);
-	this->installScrollGuard(this->startTempSpinBox);
-	saForm->addRow(tr("Start Temperature:"), this->startTempSpinBox);
+	this->algorithmComboBox = new QComboBox(this);
+	this->algorithmComboBox->addItems(OptimizerFactory::availableTypeNames());
+	this->installScrollGuard(this->algorithmComboBox);
+	algoLayout->addWidget(this->algorithmComboBox);
+	algoLayout->addStretch();
 
-	this->endTempSpinBox = new QDoubleSpinBox(saGroup);
-	this->endTempSpinBox->setRange(0.00001, 100.0);
-	this->endTempSpinBox->setDecimals(5);
-	this->endTempSpinBox->setValue(0.001);
-	this->endTempSpinBox->setSingleStep(0.001);
-	this->installScrollGuard(this->endTempSpinBox);
-	saForm->addRow(tr("End Temperature:"), this->endTempSpinBox);
+	layout->addLayout(algoLayout);
 
-	this->coolingFactorSpinBox = new QDoubleSpinBox(saGroup);
-	this->coolingFactorSpinBox->setRange(0.01, 0.9999);
-	this->coolingFactorSpinBox->setDecimals(4);
-	this->coolingFactorSpinBox->setValue(0.95);
-	this->coolingFactorSpinBox->setSingleStep(0.01);
-	this->installScrollGuard(this->coolingFactorSpinBox);
-	saForm->addRow(tr("Cooling Factor:"), this->coolingFactorSpinBox);
+	// Dynamic parameters group box
+	this->algorithmParamsGroup = new QGroupBox(this);
+	this->algorithmParamsLayout = new QFormLayout(this->algorithmParamsGroup);
+	layout->addWidget(this->algorithmParamsGroup);
 
-	this->startPerturbanceSpinBox = new QDoubleSpinBox(saGroup);
-	this->startPerturbanceSpinBox->setRange(0.0001, 10.0);
-	this->startPerturbanceSpinBox->setDecimals(4);
-	this->startPerturbanceSpinBox->setValue(0.05);
-	this->startPerturbanceSpinBox->setSingleStep(0.01);
-	this->installScrollGuard(this->startPerturbanceSpinBox);
-	saForm->addRow(tr("Start Perturbance:"), this->startPerturbanceSpinBox);
+	// Build initial parameter widgets for default algorithm
+	this->rebuildAlgorithmParameterWidgets(this->algorithmComboBox->currentText());
 
-	this->endPerturbanceSpinBox = new QDoubleSpinBox(saGroup);
-	this->endPerturbanceSpinBox->setRange(0.0001, 10.0);
-	this->endPerturbanceSpinBox->setDecimals(4);
-	this->endPerturbanceSpinBox->setValue(0.001);
-	this->endPerturbanceSpinBox->setSingleStep(0.001);
-	this->installScrollGuard(this->endPerturbanceSpinBox);
-	saForm->addRow(tr("End Perturbance:"), this->endPerturbanceSpinBox);
-
-	this->itersPerTempSpinBox = new QSpinBox(saGroup);
-	this->itersPerTempSpinBox->setRange(1, 10000);
-	this->itersPerTempSpinBox->setValue(10);
-	this->installScrollGuard(this->itersPerTempSpinBox);
-	saForm->addRow(tr("Iterations/Temperature:"), this->itersPerTempSpinBox);
-
-	layout->addWidget(saGroup);
-
-	// Live SA parameter updates during optimization
-	connect(this->endTempSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-			this, &OptimizationWidget::emitSAParametersChanged);
-	connect(this->coolingFactorSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-			this, &OptimizationWidget::emitSAParametersChanged);
-	connect(this->startPerturbanceSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-			this, &OptimizationWidget::emitSAParametersChanged);
-	connect(this->endPerturbanceSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-			this, &OptimizationWidget::emitSAParametersChanged);
-	connect(this->itersPerTempSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
-			this, &OptimizationWidget::emitSAParametersChanged);
+	connect(this->algorithmComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, &OptimizationWidget::onAlgorithmChanged);
 }
 
 void OptimizationWidget::setupMetricSection(QVBoxLayout* layout)
@@ -305,10 +265,10 @@ void OptimizationWidget::setupStatusSection(QVBoxLayout* layout)
 	statusLayout->addWidget(this->statusLabel);
 
 	QHBoxLayout* detailLayout = new QHBoxLayout();
-	this->temperatureLabel = new QLabel(tr("T: ---"), statusGroup);
+	this->algorithmStatusLabel = new QLabel(tr("---"), statusGroup);
 	this->iterationLabel = new QLabel(tr("Iter: ---"), statusGroup);
 	this->bestMetricLabel = new QLabel(tr("Best: ---"), statusGroup);
-	detailLayout->addWidget(this->temperatureLabel);
+	detailLayout->addWidget(this->algorithmStatusLabel);
 	detailLayout->addWidget(this->iterationLabel);
 	detailLayout->addWidget(this->bestMetricLabel);
 	detailLayout->addStretch();
@@ -416,6 +376,102 @@ void OptimizationWidget::showPlotContextMenu(const QPoint& pos)
 	menu.exec(this->metricPlot->mapToGlobal(pos));
 }
 
+void OptimizationWidget::onAlgorithmChanged(int index)
+{
+	QString name = this->algorithmComboBox->itemText(index);
+	this->rebuildAlgorithmParameterWidgets(name);
+}
+
+void OptimizationWidget::rebuildAlgorithmParameterWidgets(const QString& algorithmName)
+{
+	// Save current parameter values to cache before destroying widgets
+	if (!this->algorithmParamWidgets.isEmpty()) {
+		QString oldName = this->algorithmParamsGroup->title();
+		if (!oldName.isEmpty()) {
+			this->cachedAlgorithmParameters.insert(oldName, this->readAlgorithmParameters());
+		}
+	}
+
+	// Clear old widgets
+	while (this->algorithmParamsLayout->count() > 0) {
+		QLayoutItem* item = this->algorithmParamsLayout->takeAt(0);
+		if (item->widget()) {
+			item->widget()->deleteLater();
+		}
+		delete item;
+	}
+	this->algorithmParamWidgets.clear();
+
+	// Create temporary optimizer to get descriptors
+	IOptimizer* tempOptimizer = OptimizerFactory::create(algorithmName);
+	this->currentAlgorithmDescriptors = tempOptimizer->getParameterDescriptors();
+	delete tempOptimizer;
+
+	this->algorithmParamsGroup->setTitle(algorithmName);
+
+	for (const OptimizerParameter& param : qAsConst(this->currentAlgorithmDescriptors)) {
+		if (param.decimals == 0) {
+			// Integer parameter -> QSpinBox
+			QSpinBox* spinBox = new QSpinBox(this->algorithmParamsGroup);
+			spinBox->setRange(static_cast<int>(param.minValue), static_cast<int>(param.maxValue));
+			spinBox->setSingleStep(static_cast<int>(param.step));
+			spinBox->setValue(static_cast<int>(param.defaultValue));
+			if (!param.tooltip.isEmpty()) spinBox->setToolTip(param.tooltip);
+			this->installScrollGuard(spinBox);
+			this->algorithmParamsLayout->addRow(param.name + ":", spinBox);
+			this->algorithmParamWidgets.insert(param.key, spinBox);
+
+			connect(spinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+					this, &OptimizationWidget::emitAlgorithmParametersChanged);
+		} else {
+			// Floating point parameter -> QDoubleSpinBox
+			QDoubleSpinBox* spinBox = new QDoubleSpinBox(this->algorithmParamsGroup);
+			spinBox->setRange(param.minValue, param.maxValue);
+			spinBox->setDecimals(param.decimals);
+			spinBox->setSingleStep(param.step);
+			spinBox->setValue(param.defaultValue);
+			if (!param.tooltip.isEmpty()) spinBox->setToolTip(param.tooltip);
+			this->installScrollGuard(spinBox);
+			this->algorithmParamsLayout->addRow(param.name + ":", spinBox);
+			this->algorithmParamWidgets.insert(param.key, spinBox);
+
+			connect(spinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+					this, &OptimizationWidget::emitAlgorithmParametersChanged);
+		}
+	}
+
+	// Restore cached values if available
+	QVariantMap cached = this->cachedAlgorithmParameters.value(algorithmName);
+	if (!cached.isEmpty()) {
+		for (auto it = cached.constBegin(); it != cached.constEnd(); ++it) {
+			QWidget* widget = this->algorithmParamWidgets.value(it.key(), nullptr);
+			if (!widget) continue;
+			QDoubleSpinBox* dSpin = qobject_cast<QDoubleSpinBox*>(widget);
+			if (dSpin) { dSpin->setValue(it.value().toDouble()); continue; }
+			QSpinBox* iSpin = qobject_cast<QSpinBox*>(widget);
+			if (iSpin) { iSpin->setValue(it.value().toInt()); }
+		}
+	}
+}
+
+QVariantMap OptimizationWidget::readAlgorithmParameters() const
+{
+	QVariantMap params;
+	for (auto it = this->algorithmParamWidgets.constBegin();
+		 it != this->algorithmParamWidgets.constEnd(); ++it) {
+		QDoubleSpinBox* dSpin = qobject_cast<QDoubleSpinBox*>(it.value());
+		if (dSpin) {
+			params.insert(it.key(), dSpin->value());
+			continue;
+		}
+		QSpinBox* iSpin = qobject_cast<QSpinBox*>(it.value());
+		if (iSpin) {
+			params.insert(it.key(), iSpin->value());
+		}
+	}
+	return params;
+}
+
 void OptimizationWidget::setParameterDescriptors(const QVector<WavefrontParameter>& descriptors)
 {
 	this->parameterDescriptors = descriptors;
@@ -436,8 +492,6 @@ void OptimizationWidget::setParameterDescriptors(const QVector<WavefrontParamete
 void OptimizationWidget::setGroundTruthAvailable(bool available)
 {
 	this->groundTruthAvailable = available;
-	// Enable/disable reference comparison option
-	// Index 1 is "Reference Comparison"
 	if (!available && this->metricModeComboBox->currentIndex() == 1) {
 		this->metricModeComboBox->setCurrentIndex(0);
 	}
@@ -445,7 +499,7 @@ void OptimizationWidget::setGroundTruthAvailable(bool available)
 
 void OptimizationWidget::updateProgress(const OptimizationProgress& progress)
 {
-	this->temperatureLabel->setText(QString("T: %1").arg(progress.temperature, 0, 'g', 4));
+	this->algorithmStatusLabel->setText(progress.algorithmStatus);
 	this->iterationLabel->setText(QString("Iter: %1").arg(progress.outerIteration));
 	this->bestMetricLabel->setText(QString("Best: %1").arg(progress.bestMetric, 0, 'g', 6));
 
@@ -508,13 +562,9 @@ OptimizationConfig OptimizationWidget::buildConfig() const
 {
 	OptimizationConfig config;
 
-	// SA parameters
-	config.startTemperature = this->startTempSpinBox->value();
-	config.endTemperature = this->endTempSpinBox->value();
-	config.coolingFactor = this->coolingFactorSpinBox->value();
-	config.startPerturbance = this->startPerturbanceSpinBox->value();
-	config.endPerturbance = this->endPerturbanceSpinBox->value();
-	config.iterationsPerTemperature = this->itersPerTempSpinBox->value();
+	// Algorithm
+	config.algorithmName = this->algorithmComboBox->currentText();
+	config.algorithmSettings = this->readAlgorithmParameters();
 
 	// Convert user-entered parameter IDs to 0-based array indices
 	QVector<int> requestedIds = parseIndexSpec(this->coefficientSpecLineEdit->text());
@@ -541,7 +591,7 @@ OptimizationConfig OptimizationWidget::buildConfig() const
 	config.patchSpec = this->patchesLineEdit->text();
 	config.frameSpec = this->framesLineEdit->text();
 
-	// Initial values (always available)
+	// Initial values
 	config.startCoefficientSource = this->startCoeffSourceComboBox->currentIndex();
 	config.sourceParam = this->sourceParamSpinBox->value();
 
@@ -560,17 +610,13 @@ void OptimizationWidget::setRunning(bool running)
 	this->modeComboBox->setEnabled(!running);
 	this->batchGroup->setEnabled(!running);
 	this->initialValuesGroup->setEnabled(!running);
+	this->algorithmComboBox->setEnabled(!running);
 }
 
-void OptimizationWidget::emitSAParametersChanged()
+void OptimizationWidget::emitAlgorithmParametersChanged()
 {
 	if (this->isRunning) {
-		emit saParametersChanged(
-			this->endTempSpinBox->value(),
-			this->coolingFactorSpinBox->value(),
-			this->startPerturbanceSpinBox->value(),
-			this->endPerturbanceSpinBox->value(),
-			this->itersPerTempSpinBox->value());
+		emit algorithmParametersChanged(this->readAlgorithmParameters());
 	}
 }
 
@@ -592,12 +638,21 @@ QVariantMap OptimizationWidget::getSettings() const
 {
 	QVariantMap settings;
 	settings.insert("mode", this->modeComboBox->currentIndex());
-	settings.insert("startTemperature", this->startTempSpinBox->value());
-	settings.insert("endTemperature", this->endTempSpinBox->value());
-	settings.insert("coolingFactor", this->coolingFactorSpinBox->value());
-	settings.insert("startPerturbance", this->startPerturbanceSpinBox->value());
-	settings.insert("endPerturbance", this->endPerturbanceSpinBox->value());
-	settings.insert("itersPerTemp", this->itersPerTempSpinBox->value());
+	settings.insert("algorithmName", this->algorithmComboBox->currentText());
+
+	// Save all cached algorithm parameters plus the current widget values
+	QVariantMap allAlgoParams = QVariantMap();
+	for (auto it = this->cachedAlgorithmParameters.constBegin();
+		 it != this->cachedAlgorithmParameters.constEnd(); ++it) {
+		allAlgoParams.insert(it.key(), it.value());
+	}
+	// Overwrite with live widget values for the active algorithm
+	QString currentAlgo = this->algorithmComboBox->currentText();
+	allAlgoParams.insert(currentAlgo, this->readAlgorithmParameters());
+	settings.insert("allAlgorithmParameters", allAlgoParams);
+
+	// Keep for backward compatibility
+	settings.insert("algorithmSettings", this->readAlgorithmParameters());
 	settings.insert("metricMode", this->metricModeComboBox->currentIndex());
 	settings.insert("metricType", this->metricTypeComboBox->currentIndex());
 	settings.insert("metricMultiplier", this->metricMultiplierSpinBox->value());
@@ -614,16 +669,48 @@ QVariantMap OptimizationWidget::getSettings() const
 void OptimizationWidget::setSettings(const QVariantMap& settings)
 {
 	this->modeComboBox->setCurrentIndex(settings.value("mode", 0).toInt());
-	this->startTempSpinBox->setValue(settings.value("startTemperature", 0.1).toDouble());
-	this->endTempSpinBox->setValue(settings.value("endTemperature", 0.001).toDouble());
-	this->coolingFactorSpinBox->setValue(settings.value("coolingFactor", 0.95).toDouble());
-	if (settings.contains("startPerturbance")) {
-		this->startPerturbanceSpinBox->setValue(settings.value("startPerturbance").toDouble());
-	} else {
-		this->startPerturbanceSpinBox->setValue(settings.value("perturbance", 0.05).toDouble());
+
+	// Algorithm selection (triggers rebuild of parameter widgets)
+	QString algoName = settings.value("algorithmName", "Simulated Annealing").toString();
+	int algoIdx = this->algorithmComboBox->findText(algoName);
+	if (algoIdx >= 0) {
+		this->algorithmComboBox->setCurrentIndex(algoIdx);
 	}
-	this->endPerturbanceSpinBox->setValue(settings.value("endPerturbance", 0.001).toDouble());
-	this->itersPerTempSpinBox->setValue(settings.value("itersPerTemp", 1).toInt());
+
+	// Restore full algorithm parameter cache
+	QVariantMap allAlgoParams = settings.value("allAlgorithmParameters").toMap();
+	if (!allAlgoParams.isEmpty()) {
+		for (auto it = allAlgoParams.constBegin(); it != allAlgoParams.constEnd(); ++it) {
+			this->cachedAlgorithmParameters.insert(it.key(), it.value().toMap());
+		}
+	}
+
+	// Determine current algorithm settings (with backward compatibility)
+	QVariantMap algoSettings = allAlgoParams.value(algoName).toMap();
+	if (algoSettings.isEmpty()) {
+		algoSettings = settings.value("algorithmSettings").toMap();
+	}
+	if (algoSettings.isEmpty() && settings.contains("startTemperature")) {
+		// Legacy SA settings - convert to new format
+		algoSettings.insert("startTemperature", settings.value("startTemperature"));
+		algoSettings.insert("endTemperature", settings.value("endTemperature"));
+		algoSettings.insert("coolingFactor", settings.value("coolingFactor"));
+		algoSettings.insert("startPerturbance", settings.value("startPerturbance",
+						settings.value("perturbance")));
+		algoSettings.insert("endPerturbance", settings.value("endPerturbance"));
+		algoSettings.insert("iterationsPerTemperature", settings.value("itersPerTemp"));
+	}
+
+	// Apply saved values to the dynamic widgets
+	for (auto it = algoSettings.constBegin(); it != algoSettings.constEnd(); ++it) {
+		QWidget* widget = this->algorithmParamWidgets.value(it.key(), nullptr);
+		if (!widget) continue;
+		QDoubleSpinBox* dSpin = qobject_cast<QDoubleSpinBox*>(widget);
+		if (dSpin) { dSpin->setValue(it.value().toDouble()); continue; }
+		QSpinBox* iSpin = qobject_cast<QSpinBox*>(widget);
+		if (iSpin) { iSpin->setValue(it.value().toInt()); }
+	}
+
 	this->metricModeComboBox->setCurrentIndex(settings.value("metricMode", 1).toInt());
 	this->metricTypeComboBox->setCurrentIndex(settings.value("metricType", 1).toInt());
 	this->metricMultiplierSpinBox->setValue(settings.value("metricMultiplier", -100.0).toDouble());

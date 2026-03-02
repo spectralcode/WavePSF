@@ -106,8 +106,8 @@ ProcessingControlWidget::ProcessingControlWidget(QWidget* parent)
 			this, &ProcessingControlWidget::optimizationPatchSelectionChanged);
 	connect(this->optimizationWidget, &OptimizationWidget::livePreviewSettingsChanged,
 			this, &ProcessingControlWidget::optimizationLivePreviewChanged);
-	connect(this->optimizationWidget, &OptimizationWidget::saParametersChanged,
-			this, &ProcessingControlWidget::optimizationSAParametersChanged);
+	connect(this->optimizationWidget, &OptimizationWidget::algorithmParametersChanged,
+			this, &ProcessingControlWidget::optimizationAlgorithmParametersChanged);
 
 	// Forward signals from interpolation widget
 	connect(this->interpolationWidget, &InterpolationWidget::interpolateInXRequested,

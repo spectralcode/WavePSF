@@ -500,8 +500,8 @@ void MainWindow::connectProcessingControlWidget() {
 			this->applicationController, &ApplicationController::cancelOptimization);
 	connect(ctrl, &ProcessingControlWidget::optimizationLivePreviewChanged,
 			this->applicationController, &ApplicationController::updateOptimizationLivePreview);
-	connect(ctrl, &ProcessingControlWidget::optimizationSAParametersChanged,
-			this->applicationController, &ApplicationController::updateOptimizationSAParameters);
+	connect(ctrl, &ProcessingControlWidget::optimizationAlgorithmParametersChanged,
+			this->applicationController, &ApplicationController::updateOptimizationAlgorithmParameters);
 
 	connect(this->applicationController, &ApplicationController::optimizationStarted,
 			ctrl, &ProcessingControlWidget::onOptimizationStarted);

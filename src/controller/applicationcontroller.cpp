@@ -800,13 +800,10 @@ void ApplicationController::updateOptimizationLivePreview(bool enabled, int inte
 	}
 }
 
-void ApplicationController::updateOptimizationSAParameters(double endTemp, double coolingFactor,
-														   double startPerturb, double endPerturb,
-														   int itersPerTemp)
+void ApplicationController::updateOptimizationAlgorithmParameters(const QVariantMap& params)
 {
 	if (this->optimizationWorker != nullptr) {
-		this->optimizationWorker->updateLiveSAParameters(
-			endTemp, coolingFactor, startPerturb, endPerturb, itersPerTemp);
+		this->optimizationWorker->updateLiveAlgorithmParameters(params);
 	}
 }
 

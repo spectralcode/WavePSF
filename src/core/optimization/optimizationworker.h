@@ -10,6 +10,8 @@
 #include <arrayfire.h>
 #include "core/psf/psfsettings.h"
 
+class IOptimizer;
+
 // Single optimization job (one patch on one frame)
 struct OptimizationJob {
 	int frameNr = 0;
@@ -21,13 +23,9 @@ struct OptimizationJob {
 };
 
 struct OptimizationConfig {
-	// SA parameters
-	double startTemperature = 1.0;
-	double endTemperature = 0.001;
-	double coolingFactor = 0.95;
-	double startPerturbance = 0.05;
-	double endPerturbance = 0.001;
-	int iterationsPerTemperature = 10;
+	// Algorithm selection + settings
+	QString algorithmName = QStringLiteral("Simulated Annealing");
+	QVariantMap algorithmSettings;
 
 	// Which coefficient indices to optimize (indices into the coefficient vector)
 	QVector<int> selectedCoefficientIndices;
@@ -73,7 +71,7 @@ struct OptimizationProgress {
 	int outerIteration = 0;
 	double currentMetric = 0.0;
 	double bestMetric = 0.0;
-	double temperature = 0.0;
+	QString algorithmStatus;
 	int currentFrameNr = 0;
 	int currentPatchX = 0;
 	int currentPatchY = 0;
@@ -110,10 +108,8 @@ public:
 	// Thread-safe cancellation (called from main thread)
 	void requestCancel();
 
-	// Thread-safe live SA parameter update (called from main thread)
-	void updateLiveSAParameters(double endTemp, double coolingFactor,
-								double startPerturb, double endPerturb,
-								int itersPerTemp);
+	// Thread-safe live algorithm parameter update (called from main thread)
+	void updateLiveAlgorithmParameters(const QVariantMap& params);
 
 public slots:
 	void runOptimization(const OptimizationConfig& config);
@@ -125,22 +121,8 @@ signals:
 
 private:
 	QAtomicInt cancelRequested;
-
-	// Live-updatable SA parameters (protected by mutex)
-	QMutex liveParamsMutex;
-	double liveEndTemperature;
-	double liveCoolingFactor;
-	double liveStartPerturbance;
-	double liveEndPerturbance;
-	int liveIterationsPerTemperature;
-
-	void perturbCoefficients(QVector<double>& coefficients,
-							 const QVector<int>& selectedIndices,
-							 double perturbance,
-							 const QVector<double>& minBounds,
-							 const QVector<double>& maxBounds);
-
-	double randomDouble(double low, double high);
+	IOptimizer* currentOptimizer;
+	QMutex optimizerMutex;
 };
 
 #endif // OPTIMIZATIONWORKER_H

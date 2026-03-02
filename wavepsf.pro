@@ -54,6 +54,9 @@ SOURCES += \
 	$$SOURCEDIR/data/wavefrontparametertable.cpp \
 	$$SOURCEDIR/core/optimization/imagemetriccalculator.cpp \
 	$$SOURCEDIR/core/optimization/optimizationworker.cpp \
+	$$SOURCEDIR/core/optimization/simulatedannealingoptimizer.cpp \
+	$$SOURCEDIR/core/optimization/cmaesoptimizer.cpp \
+	$$SOURCEDIR/core/optimization/optimizerfactory.cpp \
 	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.cpp \
 	$$SOURCEDIR/core/interpolation/tableinterpolator.cpp \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.cpp \
@@ -98,8 +101,12 @@ HEADERS += \
 	$$SOURCEDIR/gui/psfcontrol/psfsettingsdialog.h \
 	$$SOURCEDIR/core/psf/psfsettings.h \
 	$$SOURCEDIR/data/wavefrontparametertable.h \
+	$$SOURCEDIR/core/optimization/ioptimizer.h \
 	$$SOURCEDIR/core/optimization/imagemetriccalculator.h \
 	$$SOURCEDIR/core/optimization/optimizationworker.h \
+	$$SOURCEDIR/core/optimization/simulatedannealingoptimizer.h \
+	$$SOURCEDIR/core/optimization/cmaesoptimizer.h \
+	$$SOURCEDIR/core/optimization/optimizerfactory.h \
 	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.h \
 	$$SOURCEDIR/core/interpolation/tableinterpolator.h \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.h \
