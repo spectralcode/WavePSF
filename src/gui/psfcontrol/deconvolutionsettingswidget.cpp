@@ -94,7 +94,6 @@ void DeconvolutionSettingsWidget::setupUI()
 
 	// Live mode checkbox
 	this->liveModeCheckBox = new QCheckBox(tr("Live Deconvolution"), controlsWidget);
-	this->liveModeCheckBox->setChecked(false);
 	controlsLayout->addWidget(this->liveModeCheckBox);
 
 	// Deconvolve button
@@ -196,24 +195,12 @@ QVariantMap DeconvolutionSettingsWidget::getSettings() const
 
 void DeconvolutionSettingsWidget::setSettings(const QVariantMap& settings)
 {
-	if (settings.contains("algorithm")) {
-		this->algorithmComboBox->setCurrentIndex(settings.value("algorithm").toInt());
-	}
-	if (settings.contains("iterations")) {
-		this->iterationsSpinBox->setValue(settings.value("iterations").toInt());
-	}
-	if (settings.contains("relaxationFactor")) {
-		this->relaxationFactorSpinBox->setValue(settings.value("relaxationFactor").toDouble());
-	}
-	if (settings.contains("regularizationFactor")) {
-		this->regularizationFactorSpinBox->setValue(settings.value("regularizationFactor").toDouble());
-	}
-	if (settings.contains("noiseToSignalFactor")) {
-		this->noiseToSignalFactorSpinBox->setValue(settings.value("noiseToSignalFactor").toDouble());
-	}
-	if (settings.contains("liveMode")) {
-		this->liveModeCheckBox->setChecked(settings.value("liveMode").toBool());
-	}
+	this->algorithmComboBox->setCurrentIndex(settings.value("algorithm", 0).toInt());
+	this->iterationsSpinBox->setValue(settings.value("iterations", 128).toInt());
+	this->relaxationFactorSpinBox->setValue(settings.value("relaxationFactor", 0.65).toDouble());
+	this->regularizationFactorSpinBox->setValue(settings.value("regularizationFactor", 0.005).toDouble());
+	this->noiseToSignalFactorSpinBox->setValue(settings.value("noiseToSignalFactor", 0.01).toDouble());
+	this->liveModeCheckBox->setChecked(settings.value("liveMode", true).toBool());
 }
 
 void DeconvolutionSettingsWidget::installScrollGuard(QWidget* widget)

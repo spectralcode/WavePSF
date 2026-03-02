@@ -243,10 +243,10 @@ void OptimizationWidget::setupCoefficientSection(QVBoxLayout* layout)
 	QFormLayout* coeffForm = new QFormLayout(coeffGroup);
 
 	this->coefficientSpecLineEdit = new QLineEdit(coeffGroup);
-	this->coefficientSpecLineEdit->setPlaceholderText(tr("e.g. 0-3, 5, 7-10"));
+	this->coefficientSpecLineEdit->setPlaceholderText(tr("e.g. 2-8, 11"));
 	this->coefficientSpecLineEdit->setToolTip(
-		tr("Coefficient indices to optimize (0-based, comma-separated, ranges with dash)"));
-	coeffForm->addRow(tr("Indices:"), this->coefficientSpecLineEdit);
+		tr("Parameter IDs to optimize (e.g. Noll indices for Zernike, comma-separated, ranges with dash)"));
+	coeffForm->addRow(tr("IDs:"), this->coefficientSpecLineEdit);
 
 	layout->addWidget(coeffGroup);
 }
@@ -420,16 +420,16 @@ void OptimizationWidget::setParameterDescriptors(const QVector<WavefrontParamete
 {
 	this->parameterDescriptors = descriptors;
 
-	// Update placeholder with valid range
+	// Update placeholder with valid ID range
 	if (!descriptors.isEmpty()) {
 		this->coefficientSpecLineEdit->setPlaceholderText(
-			QString("e.g. 0-%1").arg(descriptors.size() - 1));
+			QString("e.g. %1-%2").arg(descriptors.first().id).arg(descriptors.last().id));
 	}
 
-	// If the line edit is empty, default to all coefficients
+	// If the line edit is empty, default to all coefficients (by ID)
 	if (this->coefficientSpecLineEdit->text().isEmpty()) {
 		this->coefficientSpecLineEdit->setText(
-			QString("0-%1").arg(descriptors.size() - 1));
+			QString("%1-%2").arg(descriptors.first().id).arg(descriptors.last().id));
 	}
 }
 
@@ -516,8 +516,16 @@ OptimizationConfig OptimizationWidget::buildConfig() const
 	config.endPerturbance = this->endPerturbanceSpinBox->value();
 	config.iterationsPerTemperature = this->itersPerTempSpinBox->value();
 
-	// Selected coefficient indices (parse from text, 0-based)
-	config.selectedCoefficientIndices = parseIndexSpec(this->coefficientSpecLineEdit->text());
+	// Convert user-entered parameter IDs to 0-based array indices
+	QVector<int> requestedIds = parseIndexSpec(this->coefficientSpecLineEdit->text());
+	for (int id : requestedIds) {
+		for (int i = 0; i < this->parameterDescriptors.size(); ++i) {
+			if (this->parameterDescriptors[i].id == id) {
+				config.selectedCoefficientIndices.append(i);
+				break;
+			}
+		}
+	}
 
 	// Metric
 	config.useReferenceMetric = (this->metricModeComboBox->currentIndex() == 1);
@@ -605,59 +613,31 @@ QVariantMap OptimizationWidget::getSettings() const
 
 void OptimizationWidget::setSettings(const QVariantMap& settings)
 {
-	if (settings.contains("mode")) {
-		this->modeComboBox->setCurrentIndex(settings.value("mode").toInt());
-	}
-	if (settings.contains("startTemperature")) {
-		this->startTempSpinBox->setValue(settings.value("startTemperature").toDouble());
-	}
-	if (settings.contains("endTemperature")) {
-		this->endTempSpinBox->setValue(settings.value("endTemperature").toDouble());
-	}
-	if (settings.contains("coolingFactor")) {
-		this->coolingFactorSpinBox->setValue(settings.value("coolingFactor").toDouble());
-	}
+	this->modeComboBox->setCurrentIndex(settings.value("mode", 0).toInt());
+	this->startTempSpinBox->setValue(settings.value("startTemperature", 0.1).toDouble());
+	this->endTempSpinBox->setValue(settings.value("endTemperature", 0.001).toDouble());
+	this->coolingFactorSpinBox->setValue(settings.value("coolingFactor", 0.95).toDouble());
 	if (settings.contains("startPerturbance")) {
 		this->startPerturbanceSpinBox->setValue(settings.value("startPerturbance").toDouble());
-	} else if (settings.contains("perturbance")) {
-		this->startPerturbanceSpinBox->setValue(settings.value("perturbance").toDouble());
+	} else {
+		this->startPerturbanceSpinBox->setValue(settings.value("perturbance", 0.05).toDouble());
 	}
-	if (settings.contains("endPerturbance")) {
-		this->endPerturbanceSpinBox->setValue(settings.value("endPerturbance").toDouble());
-	}
-	if (settings.contains("itersPerTemp")) {
-		this->itersPerTempSpinBox->setValue(settings.value("itersPerTemp").toInt());
-	}
-	if (settings.contains("metricMode")) {
-		this->metricModeComboBox->setCurrentIndex(settings.value("metricMode").toInt());
-	}
-	if (settings.contains("metricType")) {
-		this->metricTypeComboBox->setCurrentIndex(settings.value("metricType").toInt());
-	}
-	if (settings.contains("metricMultiplier")) {
-		this->metricMultiplierSpinBox->setValue(settings.value("metricMultiplier").toDouble());
-	}
+	this->endPerturbanceSpinBox->setValue(settings.value("endPerturbance", 0.001).toDouble());
+	this->itersPerTempSpinBox->setValue(settings.value("itersPerTemp", 1).toInt());
+	this->metricModeComboBox->setCurrentIndex(settings.value("metricMode", 1).toInt());
+	this->metricTypeComboBox->setCurrentIndex(settings.value("metricType", 1).toInt());
+	this->metricMultiplierSpinBox->setValue(settings.value("metricMultiplier", -100.0).toDouble());
 	if (settings.contains("patches")) {
 		this->patchesLineEdit->setText(settings.value("patches").toString());
 	}
 	if (settings.contains("frames")) {
 		this->framesLineEdit->setText(settings.value("frames").toString());
 	}
-	if (settings.contains("startCoeffSource")) {
-		this->startCoeffSourceComboBox->setCurrentIndex(settings.value("startCoeffSource").toInt());
-	}
-	if (settings.contains("sourceParam")) {
-		this->sourceParamSpinBox->setValue(settings.value("sourceParam").toInt());
-	}
-	if (settings.contains("coefficientSpec")) {
-		this->coefficientSpecLineEdit->setText(settings.value("coefficientSpec").toString());
-	}
-	if (settings.contains("livePreview")) {
-		this->livePreviewCheckBox->setChecked(settings.value("livePreview").toBool());
-	}
-	if (settings.contains("livePreviewInterval")) {
-		this->livePreviewIntervalSpinBox->setValue(settings.value("livePreviewInterval").toInt());
-	}
+	this->startCoeffSourceComboBox->setCurrentIndex(settings.value("startCoeffSource", 0).toInt());
+	this->sourceParamSpinBox->setValue(settings.value("sourceParam", 0).toInt());
+	this->coefficientSpecLineEdit->setText(settings.value("coefficientSpec", "2-8").toString());
+	this->livePreviewCheckBox->setChecked(settings.value("livePreview", true).toBool());
+	this->livePreviewIntervalSpinBox->setValue(settings.value("livePreviewInterval", 10).toInt());
 }
 
 void OptimizationWidget::installScrollGuard(QWidget* widget)

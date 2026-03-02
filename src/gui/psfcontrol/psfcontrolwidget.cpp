@@ -141,15 +141,9 @@ QVariantMap PSFControlWidget::getSettings() const
 
 void PSFControlWidget::setSettings(const QVariantMap& settings)
 {
-	if (settings.contains("coefficients")) {
-		this->coeffEditor->setSettings(settings.value("coefficients").toMap());
-	}
-	if (settings.contains("deconvolution")) {
-		this->deconvSettings->setSettings(settings.value("deconvolution").toMap());
-	}
-	if (settings.contains("optimization")) {
-		this->optimizationWidget->setSettings(settings.value("optimization").toMap());
-	}
+	this->coeffEditor->setSettings(settings.value("coefficients").toMap());
+	this->deconvSettings->setSettings(settings.value("deconvolution").toMap());
+	this->optimizationWidget->setSettings(settings.value("optimization").toMap());
 	if (settings.contains("psf_settings")) {
 		this->currentSettings = deserializePSFSettings(settings.value("psf_settings").toMap());
 	}

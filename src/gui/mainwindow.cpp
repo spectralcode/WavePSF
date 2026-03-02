@@ -634,7 +634,7 @@ void MainWindow::updateStyleMenuChecks(StyleManager::StyleMode newStyle) {
 void MainWindow::loadSettings() {
 	QVariantMap settings = this->guiSettings->getStoredSettings(SETTINGS_GROUP);
 
-	this->windowSize = settings.value(WINDOW_SIZE_KEY, QSize(800, 600)).toSize();
+	this->windowSize = settings.value(WINDOW_SIZE_KEY, QSize(1200, 800)).toSize();
 	this->windowPosition = settings.value(WINDOW_POSITION_KEY, QPoint(100, 100)).toPoint();
 	this->lastOpenDirInput = settings.value(LAST_OPEN_DIR_INPUT_KEY, QString()).toString();
 	this->lastOpenDirGroundTruth = settings.value(LAST_OPEN_DIR_GROUND_TRUTH_KEY, QString()).toString();
@@ -651,6 +651,8 @@ void MainWindow::loadSettings() {
 
 	if (settings.contains(SPLITTER_STATE_KEY) && this->centralSplitter) {
 		this->centralSplitter->restoreState(settings.value(SPLITTER_STATE_KEY).toByteArray());
+	} else if (this->centralSplitter) {
+		this->centralSplitter->setSizes({480, 320});
 	}
 
 	this->resize(this->windowSize);
