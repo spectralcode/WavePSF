@@ -62,6 +62,7 @@ void MessageRouter::staticHandler(QtMsgType type, const QMessageLogContext& ctx,
 
 void MessageRouter::handle(QtMsgType type, const QMessageLogContext& ctx, const QString& msg)
 {
+	Q_UNUSED(ctx);
 	const QDateTime now = QDateTime::currentDateTime();
 
 	// Build plain text for UI (no [LEVEL][CATEGORY] noise)
