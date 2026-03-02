@@ -22,6 +22,7 @@ class ApplicationController;
 class ImageSessionViewer;
 class PSFGenerationWidget;
 class ProcessingControlWidget;
+class PSFSettingsDialog;
 
 class MainWindow : public QMainWindow {
 	Q_OBJECT
@@ -132,6 +133,7 @@ private:
 	ImageSessionViewer* sessionViewer;
 	PSFGenerationWidget* psfGenerationWidget;
 	ProcessingControlWidget* processingControlWidget;
+	PSFSettingsDialog* settingsDialog;
 
 signals:
 

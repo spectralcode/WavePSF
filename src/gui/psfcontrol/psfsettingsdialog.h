@@ -11,7 +11,7 @@ class QComboBox;
 class QTableWidget;
 class QCheckBox;
 class QPushButton;
-class QStackedWidget;
+class QGroupBox;
 
 class PSFSettingsDialog : public QDialog
 {
@@ -41,16 +41,17 @@ private:
 	bool validateSettings() const;
 	void updateValidationState();
 
-	// Generator-specific stacked widget
-	QStackedWidget* generatorStack;
+	// Generator GroupBoxes
+	QGroupBox* zernikeGroupBox;
+	QGroupBox* dmGroupBox;
 
-	// Zernike generator controls (page 0)
+	// Zernike generator controls
 	QLineEdit* nollIndicesEdit;
 	QDoubleSpinBox* globalMinSpin;
 	QDoubleSpinBox* globalMaxSpin;
 	QTableWidget* overrideTable;
 
-	// DM generator controls (page 1)
+	// DM generator controls
 	QSpinBox* dmRowsSpin;
 	QSpinBox* dmColsSpin;
 	QDoubleSpinBox* dmCouplingSpin;

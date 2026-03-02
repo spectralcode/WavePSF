@@ -53,7 +53,8 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	  saveParametersAction(nullptr), loadParametersAction(nullptr), saveOutputAction(nullptr),
 	  deconvolveAllAction(nullptr),
 	  sessionViewer(nullptr),
-	  psfGenerationWidget(nullptr), processingControlWidget(nullptr) {
+	  psfGenerationWidget(nullptr), processingControlWidget(nullptr),
+	  settingsDialog(nullptr) {
 	MessageRouter::instance()->install();
 	this->ui->setupUi(this);
 	this->setupMenuBar();
@@ -326,20 +327,36 @@ void MainWindow::setupExtrasMenu() {
 }
 
 void MainWindow::openSettings() {
-	PSFSettingsDialog dialog(this->currentPSFSettings,
+	if (this->settingsDialog) {
+		this->settingsDialog->raise();
+		this->settingsDialog->activateWindow();
+		return;
+	}
+
+	this->settingsDialog = new PSFSettingsDialog(
+		this->currentPSFSettings,
 		this->sessionViewer->getAutoRangeEnabled(),
 		this->sessionViewer->getDisplayRangeMin(),
 		this->sessionViewer->getDisplayRangeMax(),
 		this);
-	connect(&dialog, &PSFSettingsDialog::settingsApplied,
+	this->settingsDialog->setAttribute(Qt::WA_DeleteOnClose);
+
+	connect(this->settingsDialog, &PSFSettingsDialog::settingsApplied,
 			this->applicationController, &ApplicationController::applyPSFSettings);
-	connect(&dialog, &PSFSettingsDialog::displaySettingsApplied,
+	connect(this->settingsDialog, &PSFSettingsDialog::displaySettingsApplied,
 			this->sessionViewer, &ImageSessionViewer::setDisplaySettings);
-	if (dialog.exec() == QDialog::Accepted) {
-		this->applicationController->applyPSFSettings(dialog.getSettings());
+	connect(this->settingsDialog, &QDialog::accepted, this, [this]() {
+		this->applicationController->applyPSFSettings(this->settingsDialog->getSettings());
 		this->sessionViewer->setDisplaySettings(
-			dialog.getAutoRange(), dialog.getDisplayMin(), dialog.getDisplayMax());
-	}
+			this->settingsDialog->getAutoRange(),
+			this->settingsDialog->getDisplayMin(),
+			this->settingsDialog->getDisplayMax());
+	});
+	connect(this->settingsDialog, &QDialog::destroyed, this, [this]() {
+		this->settingsDialog = nullptr;
+	});
+
+	this->settingsDialog->show();
 }
 
 void MainWindow::setupCentralWidget()
