@@ -112,6 +112,9 @@ void ApplicationController::resetPSFCoefficients()
 		this->psfModule->resetCoefficients();
 	}
 	this->storeCurrentCoefficients();
+	if (this->psfModule != nullptr) {
+		emit coefficientsLoaded(this->psfModule->getAllCoefficients());
+	}
 }
 
 void ApplicationController::copyCoefficients()
