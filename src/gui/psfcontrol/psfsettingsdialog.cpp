@@ -206,27 +206,27 @@ void PSFSettingsDialog::setupUI()
 	dmLayout->addRow(tr("Actuator Columns:"), this->dmColsSpin);
 
 	this->dmCouplingSpin = new QDoubleSpinBox(this->dmGroupBox);
-	this->dmCouplingSpin->setRange(0.01, 0.50);
+	this->dmCouplingSpin->setRange(0.01, 1.00);
 	this->dmCouplingSpin->setDecimals(3);
 	this->dmCouplingSpin->setSingleStep(0.01);
 	this->dmCouplingSpin->setValue(0.15);
 	this->dmCouplingSpin->setToolTip(tr(
-		"Inter-actuator coupling (typical 0.05-0.15).\n"
+		"Inter-actuator coupling (typical 0.05-0.30).\n"
 		"Fraction of peak influence reaching the adjacent actuator.\n"
 		"Higher = smoother wavefront, more overlap between actuators.\n"
 		"Lower = sharper, more localized actuator influence."));
 	dmLayout->addRow(tr("Coupling Coefficient:"), this->dmCouplingSpin);
 
 	this->dmGaussianIndexSpin = new QDoubleSpinBox(this->dmGroupBox);
-	this->dmGaussianIndexSpin->setRange(1.0, 4.0);
+	this->dmGaussianIndexSpin->setRange(0.01, 10.0);
 	this->dmGaussianIndexSpin->setDecimals(2);
 	this->dmGaussianIndexSpin->setSingleStep(0.1);
 	this->dmGaussianIndexSpin->setValue(2.0);
 	this->dmGaussianIndexSpin->setToolTip(tr(
 		"Shape exponent of the influence function (typical 1.5-2.5).\n"
 		"2.0 = standard Gaussian shape.\n"
-		"Lower = broader, flatter influence shoulders.\n"
-		"Higher = sharper, more peaked influence."));
+		"< 1.0 = very broad.\n"
+		"Higher = sharper."));
 	dmLayout->addRow(tr("Gaussian Index:"), this->dmGaussianIndexSpin);
 
 	this->dmCommandMinSpin = new QDoubleSpinBox(this->dmGroupBox);
