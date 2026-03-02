@@ -111,4 +111,6 @@ FORMS += \
 RESOURCES += \
 	resources.qrc
 
+RC_ICONS = icon/wavepsf.ico
+
 

@@ -3,4 +3,7 @@
         <file alias="dark.qss">src/gui/styles/dark.qss</file>
         <file alias="light.qss">src/gui/styles/light.qss</file>
     </qresource>
+    <qresource prefix="/icons">
+        <file alias="wavepsf.png">icon/wavepsf_64.png</file>
+    </qresource>
 </RCC>

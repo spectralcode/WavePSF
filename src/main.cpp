@@ -7,6 +7,7 @@
 #include <QApplication>
 #include <QStandardPaths>
 #include <QDir>
+#include <QIcon>
 
 
 int main(int argc, char *argv[])
@@ -17,6 +18,7 @@ int main(int argc, char *argv[])
 	//application properties
 	a.setApplicationName("WavePSF");
 	a.setApplicationVersion("0.1");
+	a.setWindowIcon(QIcon(QStringLiteral(":/icons/wavepsf.png")));
 	
 	//create settings managers
 	QString settingsDir = QCoreApplication::applicationDirPath(); //file paths next to executable
