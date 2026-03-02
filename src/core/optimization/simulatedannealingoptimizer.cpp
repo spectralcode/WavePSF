@@ -131,9 +131,11 @@ OptimizerResult SimulatedAnnealingOptimizer::run(
 
 			if (metricNew < metricOld) {
 				metricOld = metricNew;
-				bestCoeffs = currentCoeffs;
-				bestMetric = metricNew;
 				oldCoeffs = currentCoeffs;
+				if (metricNew < bestMetric) {
+					bestCoeffs = currentCoeffs;
+					bestMetric = metricNew;
+				}
 			} else {
 				double deltaMetric = metricNew - metricOld;
 				double acceptProb = qExp(-deltaMetric / temperature);
