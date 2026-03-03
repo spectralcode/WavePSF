@@ -40,7 +40,7 @@ PSFGenerationWidget::PSFGenerationWidget(QWidget* parent)
 	this->psfPreview = new PSFPreviewWidget(this);
 	rightColumn->addWidget(this->wavefrontPlot, 1);
 	rightColumn->addWidget(this->psfPreview, 1);
-	contentLayout->addLayout(rightColumn, 1);
+	contentLayout->addLayout(rightColumn, 4);
 
 	mainLayout->addLayout(contentLayout, 1);
 
