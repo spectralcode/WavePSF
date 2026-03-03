@@ -50,7 +50,7 @@ void ZernikeGenerator::deserializeSettings(const QVariantMap& settings)
 {
 	if (settings.contains("noll_index_spec")) {
 		QVector<int> indices = parseNollIndexSpec(settings["noll_index_spec"].toString());
-		if (!indices.isEmpty()) {
+		if (!indices.isEmpty() && indices != this->nollIndices) {
 			this->setNollIndices(indices);
 		}
 	}

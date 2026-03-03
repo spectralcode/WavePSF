@@ -669,7 +669,14 @@ void ApplicationController::resizeParameterTable()
 	int cols = this->imageSession->getPatchGridCols();
 	int rows = this->imageSession->getPatchGridRows();
 	int coeffs = this->psfModule->getAllCoefficients().size();
-	this->parameterTable->resize(frames, cols, rows, coeffs);
+
+	// Only resize (and zero-fill) when dimensions actually changed
+	if (frames != this->parameterTable->getNumberOfFrames()
+		|| cols != this->parameterTable->getNumberOfPatchesInX()
+		|| rows != this->parameterTable->getNumberOfPatchesInY()
+		|| coeffs != this->parameterTable->getCoefficientsPerPatch()) {
+		this->parameterTable->resize(frames, cols, rows, coeffs);
+	}
 }
 
 bool ApplicationController::loadFileToSession(const QString& filePath, bool isGroundTruth)

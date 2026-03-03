@@ -35,6 +35,15 @@ PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
 	this->displayMaxSpin->setEnabled(!autoRange);
 
 	this->updateValidationState();
+
+	// Live PSF update when changing aperture radius
+	connect(this->apertureRadiusSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, [this]() { emit settingsApplied(this->getSettings()); });
+
+	// Restore original settings on Cancel/close
+	connect(this, &QDialog::rejected, this, [this]() {
+		emit settingsApplied(this->initialSettings);
+	});
 }
 
 PSFSettings PSFSettingsDialog::getSettings() const
@@ -133,6 +142,7 @@ void PSFSettingsDialog::onApplyClicked()
 	if (this->validateSettings()) {
 		emit settingsApplied(this->getSettings());
 		emit displaySettingsApplied(this->getAutoRange(), this->getDisplayMin(), this->getDisplayMax());
+		this->initialSettings = this->getSettings();
 	}
 }
 
