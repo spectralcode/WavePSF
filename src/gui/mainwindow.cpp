@@ -10,6 +10,7 @@
 #include "utils/supportedfilechecker.h"
 #include "gui/messageconsole/messagerouter.h"
 #include "gui/messageconsole/messageconsoledock.h"
+#include "gui/aboutdialog.h"
 
 
 #include <QFileDialog>
@@ -54,7 +55,7 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	  deconvolveAllAction(nullptr),
 	  sessionViewer(nullptr),
 	  psfGenerationWidget(nullptr), processingControlWidget(nullptr),
-	  settingsDialog(nullptr) {
+	  settingsDialog(nullptr), aboutDialog(nullptr) {
 	MessageRouter::instance()->install();
 	this->ui->setupUi(this);
 	this->setupMenuBar();
@@ -128,6 +129,7 @@ void MainWindow::setupMenuBar() {
 	this->setupProcessingMenu();
 	this->setupViewMenu();
 	this->setupExtrasMenu();
+	this->setupHelpMenu();
 }
 
 void MainWindow::setupFileMenu() {
@@ -324,6 +326,21 @@ void MainWindow::setupExtrasMenu() {
 	settingsAction->setStatusTip("Configure application settings");
 	connect(settingsAction, &QAction::triggered, this, &MainWindow::openSettings);
 	this->extrasMenu->addAction(settingsAction);
+}
+
+void MainWindow::setupHelpMenu() {
+	this->helpMenu = this->menuBar()->addMenu("&Help");
+
+	this->aboutAction = this->helpMenu->addAction("&About WavePSF");
+	this->aboutAction->setStatusTip("About this application");
+	connect(this->aboutAction, &QAction::triggered, this, [this]() {
+		if (!this->aboutDialog) {
+			this->aboutDialog = new AboutDialog(this);
+		}
+		this->aboutDialog->show();
+		this->aboutDialog->raise();
+		this->aboutDialog->activateWindow();
+	});
 }
 
 void MainWindow::openSettings() {
