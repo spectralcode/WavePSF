@@ -8,7 +8,7 @@
 CMAESOptimizer::CMAESOptimizer()
 	: initialSigma(0.3)
 	, populationSize(0)
-	, maxGenerations(100)
+	, maxGenerations(300)
 {
 }
 
@@ -21,14 +21,14 @@ QVector<OptimizerParameter> CMAESOptimizer::getParameterDescriptors() const
 {
 	return {
 		{ "initialSigma",   "Initial Sigma",
-		  "Initial step size (standard deviation) of the search distribution.\nTypical: 0.1-0.5.",
+		  "Initial step size as fraction of parameter range.\n0.3 = 30% of each parameter's bounds.\nTypical: 0.1-0.5.",
 		  0.001, 10.0,   0.01, 0.3, 3 },
 		{ "populationSize", "Population Size (0=auto)",
 		  "Number of candidate solutions per generation.\n0 = automatic (4 + 3*ln(N)).",
 		  0,     500,    1,    0,   0 },
 		{ "maxGenerations", "Max Generations",
 		  "Maximum number of evolutionary generations before stopping.",
-		  1,     100000, 10,   100, 0 }
+		  1,     100000, 10,   300, 0 }
 	};
 }
 
@@ -99,14 +99,24 @@ OptimizerResult CMAESOptimizer::run(
 	double chiN = qSqrt(static_cast<double>(N))
 				  * (1.0 - 1.0 / (4.0 * N) + 1.0 / (21.0 * N * N));
 
-	// Extract initial mean from selected indices
-	QVector<double> mean(N);
-	QVector<double> lo(N), hi(N);
+	// Extract bounds and compute ranges for internal normalization.
+	// All CMA-ES state (mean, C, ps, pc, sigma) operates in normalized [0,1]
+	// space so that sigma is scale-independent across different parameter ranges.
+	QVector<double> lo(N), hi(N), range(N);
 	for (int i = 0; i < N; ++i) {
 		int idx = selectedIndices[i];
-		mean[i] = initialCoefficients[idx];
 		lo[i] = (idx < lowerBounds.size()) ? lowerBounds[idx] : -0.3;
 		hi[i] = (idx < upperBounds.size()) ? upperBounds[idx] : 0.3;
+		range[i] = hi[i] - lo[i];
+		if (range[i] < 1e-15) range[i] = 1e-15;
+	}
+
+	// Initial mean in normalized [0, 1] space
+	QVector<double> mean(N);
+	for (int i = 0; i < N; ++i) {
+		int idx = selectedIndices[i];
+		double val = qBound(lo[i], initialCoefficients[idx], hi[i]);
+		mean[i] = (val - lo[i]) / range[i];
 	}
 
 	double sigma = this->initialSigma;
@@ -137,21 +147,23 @@ OptimizerResult CMAESOptimizer::run(
 
 	int eigenUpdateInterval = qMax(1, N / 10);
 
-	// Global best tracking
+	// Global best tracking (stored in actual coefficient space)
 	QVector<double> globalBestCoeffs = initialCoefficients;
 	double globalBestMetric = (std::numeric_limits<double>::max)();
 
-	// Population storage
+	// Population storage (x and y in normalized [0,1] space)
 	struct Individual {
-		QVector<double> x;   // N-dimensional search space
+		QVector<double> x;   // N-dimensional normalized space
 		QVector<double> y;   // x = mean + sigma * y
 		double fitness;
 	};
 	QVector<Individual> population(lambda);
 
 	QVector<double> fullCoeffs = initialCoefficients;
+	const int maxResampleAttempts = 10;
 
-	for (int gen = 0; gen < this->maxGenerations; ++gen) {
+	int gen = 0;
+	for (gen = 0; gen < this->maxGenerations; ++gen) {
 		if (cancelFlag.loadAcquire()) break;
 
 		// Sample lambda offspring
@@ -161,30 +173,47 @@ OptimizerResult CMAESOptimizer::run(
 			population[k].x.resize(N);
 			population[k].y.resize(N);
 
-			// z ~ N(0, I)
-			QVector<double> z(N);
-			for (int i = 0; i < N; ++i) {
-				z[i] = randomGaussian();
-			}
-
-			// y = B * D * z
-			for (int i = 0; i < N; ++i) {
-				double sum = 0.0;
-				for (int j = 0; j < N; ++j) {
-					sum += B[i * N + j] * D[j] * z[j];
+			// Resample until feasible (within [0,1]^N) to avoid
+			// covariance distortion from boundary clamping.
+			bool feasible = false;
+			for (int attempt = 0; attempt <= maxResampleAttempts; ++attempt) {
+				QVector<double> z(N);
+				for (int i = 0; i < N; ++i) {
+					z[i] = randomGaussian();
 				}
-				population[k].y[i] = sum;
-				population[k].x[i] = mean[i] + sigma * sum;
+
+				// y = B * D * z,  x = mean + sigma * y
+				bool inBounds = true;
+				for (int i = 0; i < N; ++i) {
+					double sum = 0.0;
+					for (int j = 0; j < N; ++j) {
+						sum += B[i * N + j] * D[j] * z[j];
+					}
+					population[k].y[i] = sum;
+					population[k].x[i] = mean[i] + sigma * sum;
+					if (population[k].x[i] < 0.0 || population[k].x[i] > 1.0) {
+						inBounds = false;
+					}
+				}
+
+				if (inBounds || attempt == maxResampleAttempts) {
+					feasible = inBounds;
+					break;
+				}
 			}
 
-			// Clamp to bounds
-			for (int i = 0; i < N; ++i) {
-				population[k].x[i] = qBound(lo[i], population[k].x[i], hi[i]);
+			// Fallback: clamp and recompute y
+			if (!feasible) {
+				for (int i = 0; i < N; ++i) {
+					population[k].x[i] = qBound(0.0, population[k].x[i], 1.0);
+					population[k].y[i] = (sigma > 1e-20)
+						? (population[k].x[i] - mean[i]) / sigma : 0.0;
+				}
 			}
 
-			// Evaluate
+			// Convert normalized x to actual space for objective evaluation
 			for (int i = 0; i < N; ++i) {
-				fullCoeffs[selectedIndices[i]] = population[k].x[i];
+				fullCoeffs[selectedIndices[i]] = lo[i] + population[k].x[i] * range[i];
 			}
 			population[k].fitness = objective(fullCoeffs);
 		}
@@ -197,15 +226,16 @@ OptimizerResult CMAESOptimizer::run(
 			return a.fitness < b.fitness;
 		});
 
-		// Track global best
+		// Track global best (convert to actual space)
 		if (population[0].fitness < globalBestMetric) {
 			globalBestMetric = population[0].fitness;
 			for (int i = 0; i < N; ++i) {
-				globalBestCoeffs[selectedIndices[i]] = population[0].x[i];
+				globalBestCoeffs[selectedIndices[i]] =
+					lo[i] + population[0].x[i] * range[i];
 			}
 		}
 
-		// Compute new mean
+		// Compute new mean (in normalized space)
 		QVector<double> meanOld = mean;
 		for (int i = 0; i < N; ++i) {
 			mean[i] = 0.0;
@@ -217,7 +247,8 @@ OptimizerResult CMAESOptimizer::run(
 		// Mean displacement (used for path updates)
 		QVector<double> meanDiff(N);
 		for (int i = 0; i < N; ++i) {
-			meanDiff[i] = (mean[i] - meanOld[i]) / sigma;
+			meanDiff[i] = (sigma > 1e-20)
+				? (mean[i] - meanOld[i]) / sigma : 0.0;
 		}
 
 		// Update ps (sigma evolution path)
@@ -293,14 +324,15 @@ OptimizerResult CMAESOptimizer::run(
 			}
 		}
 
-		// Report progress
+		// Report progress (convert to actual space)
 		OptimizerProgress progress;
 		progress.iteration = gen + 1;
 		progress.currentMetric = population[0].fitness;
 		progress.bestMetric = globalBestMetric;
 		progress.bestCoefficients = globalBestCoeffs;
 		for (int i = 0; i < N; ++i) {
-			fullCoeffs[selectedIndices[i]] = population[0].x[i];
+			fullCoeffs[selectedIndices[i]] =
+				lo[i] + population[0].x[i] * range[i];
 		}
 		progress.currentCoefficients = fullCoeffs;
 		progress.algorithmStatus = QString("sigma: %1").arg(sigma, 0, 'g', 4);
@@ -310,9 +342,7 @@ OptimizerResult CMAESOptimizer::run(
 	OptimizerResult result;
 	result.bestCoefficients = globalBestCoeffs;
 	result.bestMetric = globalBestMetric;
-	result.totalIterations = qMin(this->maxGenerations,
-								  static_cast<int>(globalBestMetric < (std::numeric_limits<double>::max)()
-												   ? this->maxGenerations : 0));
+	result.totalIterations = gen;
 	return result;
 }
 
