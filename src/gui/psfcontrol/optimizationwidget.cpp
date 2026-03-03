@@ -191,10 +191,19 @@ void OptimizationWidget::setupMetricSection(QVBoxLayout* layout)
 	this->installScrollGuard(this->metricMultiplierSpinBox);
 	metricForm->addRow(tr("Multiplier:"), this->metricMultiplierSpinBox);
 
+	this->metricDescriptionLabel = new QLabel(metricGroup);
+	this->metricDescriptionLabel->setWordWrap(true);
+	this->metricDescriptionLabel->setStyleSheet("color: gray; font-size: 11px;");
+	metricForm->addRow(this->metricDescriptionLabel);
+
 	layout->addWidget(metricGroup);
 
 	connect(this->metricModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
 			this, &OptimizationWidget::onMetricModeChanged);
+	connect(this->metricTypeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, &OptimizationWidget::updateMetricDescription);
+
+	this->updateMetricDescription();
 }
 
 void OptimizationWidget::setupCoefficientSection(QVBoxLayout* layout)
@@ -317,6 +326,25 @@ void OptimizationWidget::onMetricModeChanged(int index)
 		this->metricTypeComboBox->addItems(ImageMetricCalculator::imageMetricNames());
 	} else {
 		this->metricTypeComboBox->addItems(ImageMetricCalculator::referenceMetricNames());
+	}
+	this->updateMetricDescription();
+}
+
+void OptimizationWidget::updateMetricDescription()
+{
+	int mode = this->metricModeComboBox->currentIndex();
+	int type = this->metricTypeComboBox->currentIndex();
+	if (type < 0) {
+		this->metricDescriptionLabel->clear();
+		return;
+	}
+	QStringList descriptions = (mode == 0)
+		? ImageMetricCalculator::imageMetricDescriptions()
+		: ImageMetricCalculator::referenceMetricDescriptions();
+	if (type < descriptions.size()) {
+		this->metricDescriptionLabel->setText(descriptions.at(type));
+	} else {
+		this->metricDescriptionLabel->clear();
 	}
 }
 

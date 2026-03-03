@@ -19,6 +19,55 @@ double ImageMetricCalculator::calculate(const af::array& image, ImageMetric metr
 		case SQUARED_SUM:
 			return af::sum<float>(af::pow(image, 2));
 
+		case LAPLACIAN_VARIANCE: {
+			float kernel[] = {0,1,0, 1,-4,1, 0,1,0};
+			af::array lap = af::convolve2(image.as(f32), af::array(3, 3, kernel));
+			return -af::var<double>(lap, AF_VARIANCE_POPULATION);
+		}
+
+		case TENENGRAD: {
+			float kx[] = {-1,0,1, -2,0,2, -1,0,1};
+			float ky[] = {-1,-2,-1, 0,0,0, 1,2,1};
+			af::array gx = af::convolve2(image.as(f32), af::array(3, 3, kx));
+			af::array gy = af::convolve2(image.as(f32), af::array(3, 3, ky));
+			return -af::sum<double>(gx * gx + gy * gy);
+		}
+
+		case BRENNER_GRADIENT: {
+			af::array img = image.as(f32);
+			int cols = img.dims(1);
+			af::array shifted = img(af::span, af::seq(2, cols - 1));
+			af::array original = img(af::span, af::seq(0, cols - 3));
+			af::array diff = shifted - original;
+			return -af::sum<double>(diff * diff);
+		}
+
+		case SHANNON_ENTROPY: {
+			af::array img = image.as(f32);
+			af::array hist = af::histogram(img, 256);
+			af::array p = hist.as(f32) / af::sum<float>(hist);
+			af::array mask = p > 1e-10f;
+			af::array logp = af::log(p + 1e-10f);
+			return af::sum<double>(-p * logp * mask);
+		}
+
+		case TOTAL_VARIATION: {
+			af::array img = image.as(f32);
+			af::array dx = af::diff1(img, 1);
+			af::array dy = af::diff1(img, 0);
+			return af::sum<double>(af::abs(dx)) + af::sum<double>(af::abs(dy));
+		}
+
+		case KURTOSIS: {
+			af::array img = image.as(f32);
+			double mean = af::mean<double>(img);
+			af::array centered = img - static_cast<float>(mean);
+			double var = af::mean<double>(centered * centered);
+			if (var < 1e-12) return (std::numeric_limits<double>::max)();
+			double m4 = af::mean<double>(af::pow(centered, 4));
+			return -(m4 / (var * var));
+		}
+
 		default:
 			return af::sum<float>(image);
 		}
@@ -83,7 +132,37 @@ QStringList ImageMetricCalculator::imageMetricNames()
 		<< QStringLiteral("Total Intensity")
 		<< QStringLiteral("Variance")
 		<< QStringLiteral("Standard Deviation")
-		<< QStringLiteral("Squared Sum");
+		<< QStringLiteral("Squared Sum")
+		<< QStringLiteral("Laplacian Variance")
+		<< QStringLiteral("Tenengrad")
+		<< QStringLiteral("Brenner Gradient")
+		<< QStringLiteral("Shannon Entropy")
+		<< QStringLiteral("Total Variation")
+		<< QStringLiteral("Kurtosis");
+}
+
+QStringList ImageMetricCalculator::imageMetricDescriptions()
+{
+	return QStringList()
+		<< QStringLiteral("Total pixel intensity. sum(I)")
+		<< QStringLiteral("Population variance of pixel values. var(I).")
+		<< QStringLiteral("Population standard deviation of pixel values. std(I).")
+		<< QStringLiteral("Sum of squared pixel values. sum(I^2)")
+		<< QStringLiteral("Negative variance of Laplacian-filtered image. -var(L * I)")
+		<< QStringLiteral("Negative sum of squared Sobel gradients. -sum(Gx^2 + Gy^2)")
+		<< QStringLiteral("Negative sum of squared horizontal pixel differences. -sum((I(x+2) - I(x))^2)")
+		<< QStringLiteral("Shannon entropy over 256-bin histogram. -sum(p * log(p))")
+		<< QStringLiteral("L1 norm of image gradients. sum(|dI/dx|) + sum(|dI/dy|)")
+		<< QStringLiteral("Negative kurtosis of pixel distribution. -m4 / var^2");
+}
+
+QStringList ImageMetricCalculator::referenceMetricDescriptions()
+{
+	return QStringList()
+		<< QStringLiteral("Normalized squared difference. sum((I-R)^2) / sqrt(sum(I^2) * sum(R^2))")
+		<< QStringLiteral("Normalized cross-correlation [-1, 1]. sum((I-mean(I))*(R-mean(R))) / (norm(I-mean(I)) * norm(R-mean(R))). Recommended multiplier: -100")
+		<< QStringLiteral("Hamming distance of Otsu-binarized images. sum(|otsu(I) - otsu(R)|)")
+		<< QStringLiteral("Difference of total pixel intensities. sum(I) - sum(R)");
 }
 
 QStringList ImageMetricCalculator::referenceMetricNames()

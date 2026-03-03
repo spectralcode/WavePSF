@@ -12,7 +12,13 @@ public:
 		TOTAL_INTENSITY = 0,
 		VARIANCE = 1,
 		STDEV = 2,
-		SQUARED_SUM = 3
+		SQUARED_SUM = 3,
+		LAPLACIAN_VARIANCE = 4,
+		TENENGRAD = 5,
+		BRENNER_GRADIENT = 6,
+		SHANNON_ENTROPY = 7,
+		TOTAL_VARIATION = 8,
+		KURTOSIS = 9
 	};
 
 	// Reference-comparison metrics (minimize these; NCC is negated)
@@ -33,6 +39,10 @@ public:
 	// Human-readable names for UI combo boxes
 	static QStringList imageMetricNames();
 	static QStringList referenceMetricNames();
+
+	// Descriptions for UI
+	static QStringList imageMetricDescriptions();
+	static QStringList referenceMetricDescriptions();
 
 private:
 	static af::array otsuThreshold(const af::array& image);

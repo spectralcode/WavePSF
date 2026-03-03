@@ -57,6 +57,7 @@ private slots:
 	void resetPlotView();
 	void showPlotContextMenu(const QPoint& pos);
 	void onAlgorithmChanged(int index);
+	void updateMetricDescription();
 	void emitAlgorithmParametersChanged();
 	void emitLivePreviewSettingsChanged();
 
@@ -112,6 +113,7 @@ private:
 	QComboBox* metricModeComboBox;
 	QComboBox* metricTypeComboBox;
 	QDoubleSpinBox* metricMultiplierSpinBox;
+	QLabel* metricDescriptionLabel;
 
 	// Coefficient specification
 	QLineEdit* coefficientSpecLineEdit;
