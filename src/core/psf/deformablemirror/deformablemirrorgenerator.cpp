@@ -194,7 +194,6 @@ void DeformableMirrorGenerator::rebuildActuatorLayout()
 	this->cachedInfluenceFunctions.clear();
 
 	// Actuators are placed on a regular rectangular grid spanning [-1, 1]
-	// Only actuators whose center falls inside the unit circle are included
 	double spacingX = (this->actuatorCols > 1) ? 2.0 / (this->actuatorCols - 1) : 0.0;
 	double spacingY = (this->actuatorRows > 1) ? 2.0 / (this->actuatorRows - 1) : 0.0;
 
@@ -203,18 +202,16 @@ void DeformableMirrorGenerator::rebuildActuatorLayout()
 		for (int c = 0; c < this->actuatorCols; ++c) {
 			double x = -1.0 + c * spacingX;
 			double y = -1.0 + r * spacingY;
-			double radius = qSqrt(x * x + y * y);
 
-			if (radius <= 1.0 + 1e-9) { // small tolerance for edge actuators
-				ActuatorInfo info;
-				info.linearIndex = linearIndex;
-				info.row = r;
-				info.col = c;
-				info.x = x;
-				info.y = y;
-				this->activeActuators.append(info);
-				this->commands[linearIndex] = 0.0;
-			}
+			ActuatorInfo info;
+			info.linearIndex = linearIndex;
+			info.row = r;
+			info.col = c;
+			info.x = x;
+			info.y = y;
+			this->activeActuators.append(info);
+			this->commands[linearIndex] = 0.0;
+
 			++linearIndex;
 		}
 	}
