@@ -51,7 +51,8 @@ CoefficientEditorWidget::CoefficientEditorWidget(QWidget* parent)
 
 	QWidget* scrollContent = new QWidget(scrollArea);
 	this->scrollLayout = new QVBoxLayout(scrollContent);
-	this->scrollLayout->setContentsMargins(0, 0, 0, 0);
+	this->scrollLayout->setContentsMargins(4, 0, 4, 0);
+	this->scrollLayout->setSpacing(10);
 	this->scrollLayout->addStretch();
 
 	scrollArea->setWidget(scrollContent);
@@ -120,7 +121,12 @@ bool CoefficientEditorWidget::eventFilter(QObject* obj, QEvent* event)
 		QSlider* slider = qobject_cast<QSlider*>(obj);
 		if (slider) {
 			event->ignore();
-			return true; // block wheel events on sliders
+			return true;
+		}
+		QDoubleSpinBox* spinBox = qobject_cast<QDoubleSpinBox*>(obj);
+		if (spinBox && !spinBox->hasFocus()) {
+			event->ignore();
+			return true;
 		}
 	}
 	return QWidget::eventFilter(obj, event);
@@ -207,13 +213,15 @@ void CoefficientEditorWidget::buildRows()
 
 	for (const WavefrontParameter& desc : qAsConst(this->descriptors)) {
 		QWidget* rowWidget = new QWidget(this);
-		QHBoxLayout* rowLayout = new QHBoxLayout(rowWidget);
-		rowLayout->setContentsMargins(0, 0, 0, 0);
+		QVBoxLayout* rowLayout = new QVBoxLayout(rowWidget);
+		rowLayout->setContentsMargins(0, 2, 0, 2);
+		rowLayout->setSpacing(2);
 
-		QLabel* label = new QLabel(desc.name, rowWidget);
-		label->setMinimumWidth(80);
-		label->setToolTip(QString("Noll index %1").arg(desc.id));
+		// Line 1: Noll index and name
+		QLabel* label = new QLabel(QString("%1. %2").arg(desc.id).arg(desc.name), rowWidget);
+		label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
 
+		// Line 2: Slider + SpinBox
 		QSlider* slider = new QSlider(Qt::Horizontal, rowWidget);
 		slider->setRange(
 			static_cast<int>(desc.minValue * SLIDER_SCALE_FACTOR),
@@ -221,18 +229,23 @@ void CoefficientEditorWidget::buildRows()
 		);
 		slider->setValue(static_cast<int>(desc.defaultValue * SLIDER_SCALE_FACTOR));
 		slider->setSingleStep(qMax(1, static_cast<int>(currentStep * SLIDER_SCALE_FACTOR)));
-		slider->setFocusPolicy(Qt::StrongFocus); // needed for event filter to work
-		slider->installEventFilter(this); // block wheel events
+		slider->setFocusPolicy(Qt::StrongFocus);
+		slider->installEventFilter(this);
 
 		QDoubleSpinBox* spinBox = new QDoubleSpinBox(rowWidget);
 		spinBox->setRange(desc.minValue, desc.maxValue);
 		spinBox->setSingleStep(currentStep);
 		spinBox->setDecimals(4);
 		spinBox->setValue(desc.defaultValue);
+		spinBox->setFocusPolicy(Qt::StrongFocus);
+		spinBox->installEventFilter(this);
 
 		rowLayout->addWidget(label);
-		rowLayout->addWidget(slider, 1);
-		rowLayout->addWidget(spinBox);
+		QHBoxLayout* controlsRow = new QHBoxLayout();
+		controlsRow->setContentsMargins(0, 0, 0, 0);
+		controlsRow->addWidget(slider, 1);
+		controlsRow->addWidget(spinBox);
+		rowLayout->addLayout(controlsRow);
 
 		CoefficientRow row;
 		row.id = desc.id;

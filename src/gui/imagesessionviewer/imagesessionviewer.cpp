@@ -21,6 +21,7 @@ namespace {
 	const char* PATCH_GRID_ROWS_KEY = "patchGridRows";
 	const char* PATCH_BORDER_EXTENSION_KEY = "patchBorderExtension";
 	const char* RIGHT_SPLITTER_STATE_KEY = "right_splitter_state";
+	const char* MAIN_SPLITTER_STATE_KEY = "main_splitter_state";
 
 	const bool	DEFAULT_AUTO_RANGE = true;
 	const double DEFAULT_MIN = 0.0;
@@ -77,6 +78,9 @@ QVariantMap ImageSessionViewer::getSettings() const
 	if (this->rightSplitter) {
 		settingsMap.insert(RIGHT_SPLITTER_STATE_KEY, this->rightSplitter->saveState());
 	}
+	if (this->mainSplitter) {
+		settingsMap.insert(MAIN_SPLITTER_STATE_KEY, this->mainSplitter->saveState());
+	}
 
 	return settingsMap;
 }
@@ -99,6 +103,9 @@ void ImageSessionViewer::setSettings(const QVariantMap& settingsMap)
 
 	if (settingsMap.contains(RIGHT_SPLITTER_STATE_KEY) && this->rightSplitter) {
 		this->rightSplitter->restoreState(settingsMap.value(RIGHT_SPLITTER_STATE_KEY).toByteArray());
+	}
+	if (settingsMap.contains(MAIN_SPLITTER_STATE_KEY) && this->mainSplitter) {
+		this->mainSplitter->restoreState(settingsMap.value(MAIN_SPLITTER_STATE_KEY).toByteArray());
 	}
 }
 
