@@ -38,7 +38,9 @@ PSFGenerationWidget::PSFGenerationWidget(QWidget* parent)
 	QVBoxLayout* rightColumn = new QVBoxLayout();
 	this->wavefrontPlot = new WavefrontPlotWidget(this);
 	this->psfPreview = new PSFPreviewWidget(this);
+	rightColumn->addWidget(new QLabel(tr("Wavefront"), this));
 	rightColumn->addWidget(this->wavefrontPlot, 1);
+	rightColumn->addWidget(new QLabel(tr("PSF"), this));
 	rightColumn->addWidget(this->psfPreview, 1);
 	contentLayout->addLayout(rightColumn, 4);
 

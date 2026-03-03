@@ -184,6 +184,12 @@ void WavefrontPlotWidget::showEvent(QShowEvent* event)
 	this->resetView();
 }
 
+void WavefrontPlotWidget::resizeEvent(QResizeEvent* event)
+{
+	QWidget::resizeEvent(event);
+	this->resetView();
+}
+
 void WavefrontPlotWidget::resetView()
 {
 	this->plot->rescaleAxes();
