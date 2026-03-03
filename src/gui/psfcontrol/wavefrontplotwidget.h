@@ -2,13 +2,14 @@
 #define WAVEFRONTPLOTWIDGET_H
 
 #include <QWidget>
+#include <QVariantMap>
 #include <arrayfire.h>
 
 class QCustomPlot;
 class QCPColorMap;
 class QCPColorScale;
-class QComboBox;
 class QAction;
+class QActionGroup;
 class QMenu;
 
 class WavefrontPlotWidget : public QWidget
@@ -17,6 +18,9 @@ class WavefrontPlotWidget : public QWidget
 public:
 	explicit WavefrontPlotWidget(QWidget* parent = nullptr);
 	~WavefrontPlotWidget() override;
+
+	QVariantMap getSettings() const;
+	void setSettings(const QVariantMap& settings);
 
 public slots:
 	void updatePlot(af::array wavefront);
@@ -31,7 +35,6 @@ private slots:
 	void showContextMenu(const QPoint& pos);
 
 private:
-	void setupGradientCombo();
 	void setupContextMenu();
 	void applyBlueWhiteRedGradient();
 	void applyWavefrontGradient();
@@ -41,13 +44,14 @@ private:
 	QCustomPlot* plot;
 	QCPColorMap* colorMap;
 	QCPColorScale* colorScale;
-	QComboBox* gradientCombo;
 
 	QMenu* contextMenu;
+	QActionGroup* gradientGroup;
 	QAction* autoScaleAction;
 	QAction* symmetricZeroAction;
 	QAction* showGridAction;
 	QAction* showAxisAction;
+	QAction* showColorScaleAction;
 };
 
 #endif // WAVEFRONTPLOTWIDGET_H

@@ -72,6 +72,7 @@ QVariantMap PSFGenerationWidget::getSettings() const
 	QVariantMap settings;
 	settings.insert("coefficients", this->coeffEditor->getSettings());
 	settings.insert("psf_settings", serializePSFSettings(this->currentSettings));
+	settings.insert("wavefront_plot", this->wavefrontPlot->getSettings());
 	return settings;
 }
 
@@ -81,6 +82,7 @@ void PSFGenerationWidget::setSettings(const QVariantMap& settings)
 	if (settings.contains("psf_settings")) {
 		this->currentSettings = deserializePSFSettings(settings.value("psf_settings").toMap());
 	}
+	this->wavefrontPlot->setSettings(settings.value("wavefront_plot").toMap());
 }
 
 PSFSettings PSFGenerationWidget::getPSFSettings() const

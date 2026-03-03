@@ -2,9 +2,9 @@
 #include "qcustomplot.h"
 #include "gui/qcppaletteobserver.h"
 #include <QVBoxLayout>
-#include <QComboBox>
 #include <QMenu>
 #include <QAction>
+#include <QActionGroup>
 #include <QtMath>
 #include <QShowEvent>
 #include "gui/plotutils.h"
@@ -15,11 +15,6 @@ WavefrontPlotWidget::WavefrontPlotWidget(QWidget* parent)
 {
 	QVBoxLayout* layout = new QVBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
-
-	// Gradient selector combo box
-	this->gradientCombo = new QComboBox(this);
-	this->setupGradientCombo();
-	layout->addWidget(this->gradientCombo);
 
 	this->plot = new QCustomPlot(this);
 	layout->addWidget(this->plot);
@@ -59,10 +54,6 @@ WavefrontPlotWidget::WavefrontPlotWidget(QWidget* parent)
 	this->plot->axisRect()->setMarginGroup(QCP::msBottom | QCP::msTop, marginGroup);
 	this->colorScale->setMarginGroup(QCP::msBottom | QCP::msTop, marginGroup);
 
-	// Gradient selector signal
-	connect(this->gradientCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-			this, &WavefrontPlotWidget::applyGradient);
-
 	// Context menu
 	this->setupContextMenu();
 
@@ -72,6 +63,86 @@ WavefrontPlotWidget::WavefrontPlotWidget(QWidget* parent)
 
 WavefrontPlotWidget::~WavefrontPlotWidget()
 {
+}
+
+QVariantMap WavefrontPlotWidget::getSettings() const
+{
+	QVariantMap settings;
+	settings.insert("autoScale", this->autoScaleAction->isChecked());
+	settings.insert("symmetricZero", this->symmetricZeroAction->isChecked());
+	settings.insert("showGrid", this->showGridAction->isChecked());
+	settings.insert("showAxis", this->showAxisAction->isChecked());
+	settings.insert("showColorScale", this->showColorScaleAction->isChecked());
+
+	int colormapIndex = 13;
+	QList<QAction*> actions = this->gradientGroup->actions();
+	for (int i = 0; i < actions.size(); i++) {
+		if (actions[i]->isChecked()) {
+			colormapIndex = i;
+			break;
+		}
+	}
+	settings.insert("colormapIndex", colormapIndex);
+	return settings;
+}
+
+void WavefrontPlotWidget::setSettings(const QVariantMap& settings)
+{
+	if (settings.isEmpty()) return;
+
+	// Block signals to prevent cascading replots
+	this->autoScaleAction->blockSignals(true);
+	this->symmetricZeroAction->blockSignals(true);
+	this->showGridAction->blockSignals(true);
+	this->showAxisAction->blockSignals(true);
+	this->showColorScaleAction->blockSignals(true);
+
+	this->autoScaleAction->setChecked(settings.value("autoScale", true).toBool());
+	this->symmetricZeroAction->setChecked(settings.value("symmetricZero", true).toBool());
+	this->showGridAction->setChecked(settings.value("showGrid", true).toBool());
+	this->showAxisAction->setChecked(settings.value("showAxis", true).toBool());
+	this->showColorScaleAction->setChecked(settings.value("showColorScale", true).toBool());
+
+	int colormapIndex = settings.value("colormapIndex", 13).toInt();
+	QList<QAction*> actions = this->gradientGroup->actions();
+	if (colormapIndex >= 0 && colormapIndex < actions.size()) {
+		actions[colormapIndex]->setChecked(true);
+	}
+
+	this->autoScaleAction->blockSignals(false);
+	this->symmetricZeroAction->blockSignals(false);
+	this->showGridAction->blockSignals(false);
+	this->showAxisAction->blockSignals(false);
+	this->showColorScaleAction->blockSignals(false);
+
+	// Manually apply visual state since signals were blocked
+	bool showGrid = this->showGridAction->isChecked();
+	this->plot->xAxis->grid()->setVisible(showGrid);
+	this->plot->yAxis->grid()->setVisible(showGrid);
+
+	bool showAxis = this->showAxisAction->isChecked();
+	this->plot->xAxis->setVisible(showAxis);
+	this->plot->yAxis->setVisible(showAxis);
+	if (showAxis) {
+		this->plot->axisRect()->setAutoMargins(QCP::msAll);
+	} else {
+		this->plot->axisRect()->setAutoMargins(QCP::msNone);
+		this->plot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
+	}
+
+	bool showColorScale = this->showColorScaleAction->isChecked();
+	if (showColorScale) {
+		this->colorScale->setVisible(true);
+		this->plot->plotLayout()->addElement(0, 1, this->colorScale);
+	} else {
+		this->plot->plotLayout()->take(this->colorScale);
+		this->plot->plotLayout()->simplify();
+		this->colorScale->setVisible(false);
+	}
+
+	this->applyGradient(colormapIndex);
+	this->applyDataRange();
+	this->plot->replot();
 }
 
 void WavefrontPlotWidget::updatePlot(af::array wavefront)
@@ -130,26 +201,6 @@ void WavefrontPlotWidget::enforceAspectRatio()
 	} else {
 		this->plot->yAxis->setScaleRatio(this->plot->xAxis, 1.0);
 	}
-}
-
-void WavefrontPlotWidget::setupGradientCombo()
-{
-	this->gradientCombo->addItem(tr("Grayscale"));
-	this->gradientCombo->addItem(tr("Hot"));
-	this->gradientCombo->addItem(tr("Cold"));
-	this->gradientCombo->addItem(tr("Night"));
-	this->gradientCombo->addItem(tr("Candy"));
-	this->gradientCombo->addItem(tr("Geography"));
-	this->gradientCombo->addItem(tr("Ion"));
-	this->gradientCombo->addItem(tr("Thermal"));
-	this->gradientCombo->addItem(tr("Polar"));
-	this->gradientCombo->addItem(tr("Spectrum"));
-	this->gradientCombo->addItem(tr("Jet"));
-	this->gradientCombo->addItem(tr("Hues"));
-	this->gradientCombo->addItem(tr("Blue-White-Red"));
-	this->gradientCombo->addItem(tr("Wavefront"));
-	this->gradientCombo->addItem(tr("Seismic"));
-	this->gradientCombo->setCurrentIndex(13); // Wavefront is default
 }
 
 void WavefrontPlotWidget::applyGradient(int index)
@@ -255,9 +306,56 @@ void WavefrontPlotWidget::setupContextMenu()
 	connect(this->showAxisAction, &QAction::toggled, this, [this](bool checked) {
 		this->plot->xAxis->setVisible(checked);
 		this->plot->yAxis->setVisible(checked);
+		if (checked) {
+			this->plot->axisRect()->setAutoMargins(QCP::msAll);
+		} else {
+			this->plot->axisRect()->setAutoMargins(QCP::msNone);
+			this->plot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
+		}
 		this->plot->replot();
 	});
 	this->contextMenu->addAction(this->showAxisAction);
+
+	this->showColorScaleAction = new QAction(tr("Show Color Scale"), this);
+	this->showColorScaleAction->setCheckable(true);
+	this->showColorScaleAction->setChecked(true);
+	connect(this->showColorScaleAction, &QAction::toggled, this, [this](bool visible) {
+		if (visible) {
+			this->colorScale->setVisible(true);
+			this->plot->plotLayout()->addElement(0, 1, this->colorScale);
+		} else {
+			this->plot->plotLayout()->take(this->colorScale);
+			this->plot->plotLayout()->simplify();
+			this->colorScale->setVisible(false);
+		}
+		this->plot->replot();
+	});
+	this->contextMenu->addAction(this->showColorScaleAction);
+
+	this->contextMenu->addSeparator();
+
+	// Color map submenu
+	QMenu* colorMapMenu = new QMenu(tr("Color Map"), this->contextMenu);
+	this->gradientGroup = new QActionGroup(this);
+	this->gradientGroup->setExclusive(true);
+
+	QStringList names = {
+		tr("Grayscale"), tr("Hot"), tr("Cold"), tr("Night"), tr("Candy"),
+		tr("Geography"), tr("Ion"), tr("Thermal"), tr("Polar"), tr("Spectrum"),
+		tr("Jet"), tr("Hues"), tr("Blue-White-Red"), tr("Wavefront"), tr("Seismic")
+	};
+
+	for (int i = 0; i < names.size(); i++) {
+		QAction* action = colorMapMenu->addAction(names[i]);
+		action->setCheckable(true);
+		action->setChecked(i == 13); // Wavefront default
+		this->gradientGroup->addAction(action);
+		connect(action, &QAction::triggered, this, [this, i]() {
+			this->applyGradient(i);
+		});
+	}
+
+	this->contextMenu->addMenu(colorMapMenu);
 }
 
 void WavefrontPlotWidget::showContextMenu(const QPoint& pos)
