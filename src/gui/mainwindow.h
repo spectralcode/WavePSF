@@ -23,6 +23,7 @@ class ImageSessionViewer;
 class PSFGenerationWidget;
 class ProcessingControlWidget;
 class PSFSettingsDialog;
+class AboutDialog;
 
 class MainWindow : public QMainWindow {
 	Q_OBJECT
@@ -72,6 +73,7 @@ private:
 	void setupProcessingMenu();
 	void setupViewMenu();
 	void setupExtrasMenu();
+	void setupHelpMenu();
 	void setupCentralWidget();
 	void connectApplicationController();
 	void connectImageSessionViewer();
@@ -100,6 +102,7 @@ private:
 	QMenu* processingMenu;
 	QMenu* viewMenu;
 	QMenu* extrasMenu;
+	QMenu* helpMenu;
 	QMenu* styleMenu;
 
 	// File actions
@@ -126,6 +129,9 @@ private:
 	// View actions
 	QAction* toggleMessageConsoleAction;
 
+	// Help actions
+	QAction* aboutAction;
+
 	// Settings state
 	PSFSettings currentPSFSettings;
 
@@ -134,6 +140,7 @@ private:
 	PSFGenerationWidget* psfGenerationWidget;
 	ProcessingControlWidget* processingControlWidget;
 	PSFSettingsDialog* settingsDialog;
+	AboutDialog* aboutDialog;
 
 signals:
 

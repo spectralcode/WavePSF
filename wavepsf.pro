@@ -21,6 +21,7 @@ SOURCES += \
 	$$QCUSTOMPLOTDIR/qcustomplot.cpp \
 	$$SOURCEDIR/main.cpp \
 	$$SOURCEDIR/gui/mainwindow.cpp \
+	$$SOURCEDIR/gui/aboutdialog.cpp \
 	$$SOURCEDIR/utils/settingsfilemanager.cpp \
 	$$SOURCEDIR/gui/stylemanager.cpp \
 	$$SOURCEDIR/data/imagedata.cpp \
@@ -68,6 +69,7 @@ SOURCES += \
 HEADERS += \
 	$$QCUSTOMPLOTDIR/qcustomplot.h \
 	$$SOURCEDIR/gui/mainwindow.h \
+	$$SOURCEDIR/gui/aboutdialog.h \
 	$$SOURCEDIR/utils/settingsfilemanager.h \
 	$$SOURCEDIR/gui/stylemanager.h \
 	$$SOURCEDIR/data/imagedata.h \
