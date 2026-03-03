@@ -188,6 +188,10 @@ private:
 	QString customPSFFolder;
 	QMap<QPair<int,int>, af::array> externalPSFOverrides;  // (frame, patchIdx) → loaded PSF
 
+	// Generator state cache: preserves settings when switching between generator types
+	QMap<QString, QVariantMap> cachedGeneratorSettings;
+	QMap<QString, WavefrontParameterTable*> cachedParameterTables;
+
 signals:
 	// File loading results
 	void inputFileLoaded(const QString& filePath);

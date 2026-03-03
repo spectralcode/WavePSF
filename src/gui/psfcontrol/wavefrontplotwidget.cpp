@@ -1,6 +1,7 @@
 #include "wavefrontplotwidget.h"
 #include "qcustomplot.h"
 #include "gui/qcppaletteobserver.h"
+#include "core/psf/apertureutils.h"
 #include <QVBoxLayout>
 #include <QMenu>
 #include <QAction>
@@ -12,6 +13,8 @@
 
 WavefrontPlotWidget::WavefrontPlotWidget(QWidget* parent)
 	: QWidget(parent)
+	, apertureGeometry(0)
+	, apertureRadius(1.0)
 {
 	QVBoxLayout* layout = new QVBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
@@ -160,15 +163,16 @@ void WavefrontPlotWidget::updatePlot(af::array wavefront)
 	this->colorMap->data()->setSize(cols, rows);
 	this->colorMap->data()->setRange(QCPRange(-1, 1), QCPRange(-1, 1));
 
-	// Fill color map data; use per-cell alpha to hide area outside unit circle
+	// Fill color map data; use per-cell alpha to hide area outside aperture
+	ApertureUtils::Geometry geom = static_cast<ApertureUtils::Geometry>(this->apertureGeometry);
 	for (int y = 0; y < rows; ++y) {
 		double yNorm = 2.0 * y / (rows - 1) - 1.0;
 		for (int x = 0; x < cols; ++x) {
 			double xNorm = 2.0 * x / (cols - 1) - 1.0;
-			double r = qSqrt(xNorm * xNorm + yNorm * yNorm);
 			// Column-major: element(row=y, col=x) stored at y + x * rows
 			this->colorMap->data()->setCell(x, y, hostData[y + x * rows]);
-			this->colorMap->data()->setAlpha(x, y, (r > 1.0) ? 0 : 255);
+			bool inside = ApertureUtils::isInsideAperture(xNorm, yNorm, geom, this->apertureRadius);
+			this->colorMap->data()->setAlpha(x, y, inside ? 255 : 0);
 		}
 	}
 
@@ -176,6 +180,29 @@ void WavefrontPlotWidget::updatePlot(af::array wavefront)
 	this->plot->rescaleAxes();
 	this->enforceAspectRatio();
 	this->plot->replot();
+}
+
+void WavefrontPlotWidget::setAperture(int geometry, double radius)
+{
+	if (this->apertureGeometry == geometry && qFuzzyCompare(this->apertureRadius, radius)) return;
+	this->apertureGeometry = geometry;
+	this->apertureRadius = radius;
+
+	// Re-apply alpha masks on existing color map data
+	int cols = this->colorMap->data()->keySize();
+	int rows = this->colorMap->data()->valueSize();
+	if (cols > 0 && rows > 0) {
+		ApertureUtils::Geometry geom = static_cast<ApertureUtils::Geometry>(geometry);
+		for (int y = 0; y < rows; ++y) {
+			double yNorm = 2.0 * y / (rows - 1) - 1.0;
+			for (int x = 0; x < cols; ++x) {
+				double xNorm = 2.0 * x / (cols - 1) - 1.0;
+				this->colorMap->data()->setAlpha(x, y,
+					ApertureUtils::isInsideAperture(xNorm, yNorm, geom, radius) ? 255 : 0);
+			}
+		}
+		this->plot->replot();
+	}
 }
 
 void WavefrontPlotWidget::showEvent(QShowEvent* event)

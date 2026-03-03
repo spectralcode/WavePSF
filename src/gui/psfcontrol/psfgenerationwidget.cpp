@@ -2,6 +2,7 @@
 #include "coefficienteditorwidget.h"
 #include "wavefrontplotwidget.h"
 #include "psfpreviewwidget.h"
+#include "core/psf/psfsettings.h"
 #include "core/psf/wavefrontgeneratorfactory.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -122,6 +123,9 @@ void PSFGenerationWidget::setPSFSettings(const PSFSettings& settings)
 		this->generatorTypeCombo->setCurrentIndex(idx);
 	}
 	this->generatorTypeCombo->blockSignals(false);
+
+	// Forward aperture settings to wavefront plot
+	this->wavefrontPlot->setAperture(settings.apertureGeometry, settings.apertureRadius);
 }
 
 void PSFGenerationWidget::setGeneratorType(const QString& typeName)

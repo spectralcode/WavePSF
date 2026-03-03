@@ -24,6 +24,7 @@ public:
 
 public slots:
 	void updatePlot(af::array wavefront);
+	void setAperture(int geometry, double radius);
 
 protected:
 	void showEvent(QShowEvent* event) override;
@@ -53,6 +54,9 @@ private:
 	QAction* showGridAction;
 	QAction* showAxisAction;
 	QAction* showColorScaleAction;
+
+	int apertureGeometry;
+	double apertureRadius;
 };
 
 #endif // WAVEFRONTPLOTWIDGET_H

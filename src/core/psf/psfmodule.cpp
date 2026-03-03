@@ -69,6 +69,7 @@ PSFSettings PSFModule::getPSFSettings() const
 	s.apertureRadius = this->calculator->getApertureRadius();
 	s.normalizationMode = static_cast<int>(this->calculator->getNormalizationMode());
 	s.paddingFactor = this->calculator->getPaddingFactor();
+	s.apertureGeometry = this->calculator->getApertureGeometry();
 	return s;
 }
 
@@ -182,6 +183,7 @@ void PSFModule::applyPSFSettings(const PSFSettings& settings)
 	this->gridSize = settings.gridSize;
 	this->calculator->setLambda(settings.wavelengthNm / 1000.0);  // nm → µm
 	this->calculator->setApertureRadius(settings.apertureRadius);
+	this->calculator->setApertureGeometry(settings.apertureGeometry);
 	this->calculator->setNormalizationMode(
 		static_cast<PSFCalculator::NormalizationMode>(settings.normalizationMode));
 	this->calculator->setPaddingFactor(settings.paddingFactor);

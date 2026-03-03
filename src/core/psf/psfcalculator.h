@@ -23,12 +23,15 @@ public:
 	NormalizationMode getNormalizationMode() const;
 	void setPaddingFactor(int factor);
 	int getPaddingFactor() const;
+	void setApertureGeometry(int geometry);
+	int getApertureGeometry() const;
 
 private:
 	double lambda;
 	double apertureRadius;
 	NormalizationMode normMode;
 	int paddingFactor;
+	int apertureGeometry;
 
 	int cachedGridSize;
 	af::array cachedApertureMask;

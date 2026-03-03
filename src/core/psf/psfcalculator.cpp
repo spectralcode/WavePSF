@@ -1,4 +1,5 @@
 #include "psfcalculator.h"
+#include "apertureutils.h"
 
 
 PSFCalculator::PSFCalculator(double lambda, double apertureRadius, QObject* parent)
@@ -7,6 +8,7 @@ PSFCalculator::PSFCalculator(double lambda, double apertureRadius, QObject* pare
 	, apertureRadius(apertureRadius)
 	, normMode(SumNormalization)
 	, paddingFactor(1)
+	, apertureGeometry(0)
 	, cachedGridSize(0)
 {
 }
@@ -115,18 +117,23 @@ int PSFCalculator::getPaddingFactor() const
 	return this->paddingFactor;
 }
 
+void PSFCalculator::setApertureGeometry(int geometry)
+{
+	this->apertureGeometry = geometry;
+	this->cachedGridSize = 0; // Invalidate cache
+}
+
+int PSFCalculator::getApertureGeometry() const
+{
+	return this->apertureGeometry;
+}
+
 void PSFCalculator::buildApertureCache(int gridSize)
 {
 	this->cachedGridSize = gridSize;
-
-	// Build normalized 2D coordinate grids [-1, 1]
-	// Standard convention: x = columns (dim 1), y = rows (dim 0)
-	af::array x = (2.0f * af::range(af::dim4(gridSize, gridSize), 1).as(f32) / (gridSize - 1) - 1.0f);
-	af::array y = (2.0f * af::range(af::dim4(gridSize, gridSize), 0).as(f32) / (gridSize - 1) - 1.0f);
-	af::array r = af::sqrt(x * x + y * y);
-
-	// Circular aperture mask
-	this->cachedApertureMask = (r <= static_cast<float>(this->apertureRadius)).as(f32);
+	this->cachedApertureMask = ApertureUtils::buildMask(
+		gridSize, static_cast<ApertureUtils::Geometry>(this->apertureGeometry),
+		this->apertureRadius);
 }
 
 af::array PSFCalculator::fftshift2D(const af::array& input)

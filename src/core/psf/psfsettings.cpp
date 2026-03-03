@@ -107,6 +107,7 @@ QVariantMap serializePSFSettings(const PSFSettings& settings)
 	map["aperture_radius"] = settings.apertureRadius;
 	map["normalization_mode"] = settings.normalizationMode;
 	map["padding_factor"] = settings.paddingFactor;
+	map["aperture_geometry"] = settings.apertureGeometry;
 
 	// Serialize range overrides
 	QVariantMap overrides;
@@ -158,6 +159,9 @@ PSFSettings deserializePSFSettings(const QVariantMap& map)
 	}
 	if (map.contains("padding_factor")) {
 		settings.paddingFactor = map["padding_factor"].toInt();
+	}
+	if (map.contains("aperture_geometry")) {
+		settings.apertureGeometry = map["aperture_geometry"].toInt();
 	}
 
 	// Deserialize range overrides

@@ -63,6 +63,7 @@ private:
 	// PSF calculation controls
 	QComboBox* gridSizeCombo;
 	QDoubleSpinBox* apertureRadiusSpin;
+	QComboBox* apertureGeometryCombo;
 	QComboBox* normalizationCombo;
 	QComboBox* paddingFactorCombo;
 

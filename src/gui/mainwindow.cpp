@@ -373,6 +373,15 @@ void MainWindow::openSettings() {
 		this->settingsDialog = nullptr;
 	});
 
+	// Close dialog when generator type changes externally to avoid stale state
+	connect(this->applicationController, &ApplicationController::generatorTypeChanged,
+		this, [this](const QString&) {
+			if (this->settingsDialog) {
+				this->settingsDialog->blockSignals(true);
+				this->settingsDialog->close();
+			}
+		});
+
 	this->settingsDialog->show();
 }
 

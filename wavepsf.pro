@@ -42,6 +42,7 @@ SOURCES += \
 	$$SOURCEDIR/core/psf/deformablemirror/deformablemirrorgenerator.cpp \
 	$$SOURCEDIR/core/psf/wavefrontgeneratorfactory.cpp \
 	$$SOURCEDIR/core/psf/psfcalculator.cpp \
+	$$SOURCEDIR/core/psf/apertureutils.cpp \
 	$$SOURCEDIR/core/psf/deconvolver.cpp \
 	$$SOURCEDIR/core/psf/psfmodule.cpp \
 	$$SOURCEDIR/gui/psfcontrol/coefficienteditorwidget.cpp \
@@ -94,6 +95,7 @@ HEADERS += \
 	$$SOURCEDIR/core/psf/deformablemirror/deformablemirrorgenerator.h \
 	$$SOURCEDIR/core/psf/wavefrontgeneratorfactory.h \
 	$$SOURCEDIR/core/psf/psfcalculator.h \
+	$$SOURCEDIR/core/psf/apertureutils.h \
 	$$SOURCEDIR/core/psf/deconvolver.h \
 	$$SOURCEDIR/core/psf/psfmodule.h \
 	$$SOURCEDIR/gui/psfcontrol/coefficienteditorwidget.h \

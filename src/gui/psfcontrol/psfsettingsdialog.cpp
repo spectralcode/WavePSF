@@ -41,6 +41,8 @@ PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
 			this, [this]() { emit settingsApplied(this->getSettings()); });
 	connect(this->paddingFactorCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 			this, [this]() { emit settingsApplied(this->getSettings()); });
+	connect(this->apertureGeometryCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, [this]() { emit settingsApplied(this->getSettings()); });
 
 	// Restore original settings on Cancel/close
 	connect(this, &QDialog::rejected, this, [this]() {
@@ -109,6 +111,7 @@ PSFSettings PSFSettingsDialog::getSettings() const
 	s.gridSize = this->gridSizeCombo->currentText().toInt();
 	s.wavelengthNm = this->initialSettings.wavelengthNm;
 	s.apertureRadius = this->apertureRadiusSpin->value();
+	s.apertureGeometry = this->apertureGeometryCombo->currentIndex();
 	s.normalizationMode = this->normalizationCombo->currentIndex();
 	s.paddingFactor = this->paddingFactorCombo->currentText().split(" ").first().toInt();
 
@@ -300,6 +303,10 @@ void PSFSettingsDialog::setupUI()
 	this->apertureRadiusSpin->setSingleStep(0.01);
 	psfLayout->addRow(tr("Aperture Radius:"), this->apertureRadiusSpin);
 
+	this->apertureGeometryCombo = new QComboBox(psfTab);
+	this->apertureGeometryCombo->addItems({tr("Circle"), tr("Rectangle"), tr("Triangle")});
+	psfLayout->addRow(tr("Aperture Geometry:"), this->apertureGeometryCombo);
+
 	this->normalizationCombo = new QComboBox(psfTab);
 	this->normalizationCombo->addItems({tr("Sum"), tr("Peak"), tr("None")});
 	psfLayout->addRow(tr("Normalization:"), this->normalizationCombo);
@@ -404,6 +411,7 @@ void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 	}
 
 	this->apertureRadiusSpin->setValue(settings.apertureRadius);
+	this->apertureGeometryCombo->setCurrentIndex(settings.apertureGeometry);
 	this->normalizationCombo->setCurrentIndex(settings.normalizationMode);
 
 	// Padding factor combo: find matching item by numeric prefix

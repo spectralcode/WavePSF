@@ -28,6 +28,7 @@ struct PSFSettings {
 	double apertureRadius = 1.0;    // normalized [0, 1]
 	int normalizationMode = 0;      // 0=Sum, 1=Peak, 2=None
 	int paddingFactor = 1;          // FFT zero-padding factor (1=none, 2, 4, 8)
+	int apertureGeometry = 0;       // 0=Circle, 1=Rectangle, 2=Triangle
 };
 
 // Parse 0-based index spec string into sorted list of indices

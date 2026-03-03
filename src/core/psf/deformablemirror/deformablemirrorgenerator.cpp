@@ -227,10 +227,6 @@ void DeformableMirrorGenerator::buildInfluenceCache(int gridSize)
 	af::array X = (2.0f * af::range(af::dim4(gridSize, gridSize), 1).as(f32) / (gridSize - 1) - 1.0f);
 	af::array Y = (2.0f * af::range(af::dim4(gridSize, gridSize), 0).as(f32) / (gridSize - 1) - 1.0f);
 
-	// Circular pupil mask
-	af::array R = af::sqrt(X * X + Y * Y);
-	af::array mask = (R <= 1.0f).as(f32);
-
 	// Actuator spacing in normalized coordinates
 	double spacingX = (this->actuatorCols > 1) ? 2.0 / (this->actuatorCols - 1) : 2.0;
 	double spacingY = (this->actuatorRows > 1) ? 2.0 / (this->actuatorRows - 1) : 2.0;
@@ -247,7 +243,7 @@ void DeformableMirrorGenerator::buildInfluenceCache(int gridSize)
 		af::array dist = af::sqrt((X - ax) * (X - ax) + (Y - ay) * (Y - ay));
 		af::array normDist = dist / spacing;
 		af::array exponent = logW * af::pow(normDist, a);
-		af::array influence = af::exp(exponent) * mask;
+		af::array influence = af::exp(exponent);
 		af::eval(influence);
 		this->cachedInfluenceFunctions.append(influence);
 	}
