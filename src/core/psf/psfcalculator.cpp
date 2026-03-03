@@ -6,6 +6,7 @@ PSFCalculator::PSFCalculator(double lambda, double apertureRadius, QObject* pare
 	, lambda(lambda)
 	, apertureRadius(apertureRadius)
 	, normMode(SumNormalization)
+	, paddingFactor(1)
 	, cachedGridSize(0)
 {
 }
@@ -34,14 +35,27 @@ af::array PSFCalculator::computePSF(const af::array& wavefront)
 	af::array pupilImag = af::sin(phase) * this->cachedApertureMask;
 	af::array pupil = af::complex(pupilReal, pupilImag);
 
-	// FFT
-	af::array ft = af::fft2(pupil);
+	// FFT (with optional zero-padding for smoother PSF)
+	af::array ft;
+	if (this->paddingFactor > 1) {
+		int paddedSize = gridSize * this->paddingFactor;
+		ft = af::fft2(pupil, paddedSize, paddedSize);
+	} else {
+		ft = af::fft2(pupil);
+	}
 
 	// PSF = |FFT|^2 (intensity)
 	af::array psf = af::real(ft * af::conjg(ft));
 
 	// Shift DC component to center
 	psf = fftshift2D(psf);
+
+	// Crop center gridSize×gridSize from padded result
+	if (this->paddingFactor > 1) {
+		int paddedSize = psf.dims(0);
+		int offset = (paddedSize - gridSize) / 2;
+		psf = psf(af::seq(offset, offset + gridSize - 1), af::seq(offset, offset + gridSize - 1));
+	}
 
 	// Normalize PSF
 	if (this->normMode == SumNormalization) {
@@ -89,6 +103,16 @@ void PSFCalculator::setNormalizationMode(NormalizationMode mode)
 PSFCalculator::NormalizationMode PSFCalculator::getNormalizationMode() const
 {
 	return this->normMode;
+}
+
+void PSFCalculator::setPaddingFactor(int factor)
+{
+	this->paddingFactor = (factor > 0) ? factor : 1;
+}
+
+int PSFCalculator::getPaddingFactor() const
+{
+	return this->paddingFactor;
 }
 
 void PSFCalculator::buildApertureCache(int gridSize)

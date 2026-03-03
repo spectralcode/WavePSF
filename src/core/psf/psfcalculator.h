@@ -21,11 +21,14 @@ public:
 	double getApertureRadius() const;
 	void setNormalizationMode(NormalizationMode mode);
 	NormalizationMode getNormalizationMode() const;
+	void setPaddingFactor(int factor);
+	int getPaddingFactor() const;
 
 private:
 	double lambda;
 	double apertureRadius;
 	NormalizationMode normMode;
+	int paddingFactor;
 
 	int cachedGridSize;
 	af::array cachedApertureMask;

@@ -27,6 +27,7 @@ struct PSFSettings {
 	double wavelengthNm = 55.0;     // wavelength in nanometers
 	double apertureRadius = 1.0;    // normalized [0, 1]
 	int normalizationMode = 0;      // 0=Sum, 1=Peak, 2=None
+	int paddingFactor = 1;          // FFT zero-padding factor (1=none, 2, 4, 8)
 };
 
 // Parse 0-based index spec string into sorted list of indices

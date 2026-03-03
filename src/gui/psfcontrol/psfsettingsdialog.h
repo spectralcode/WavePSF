@@ -64,6 +64,7 @@ private:
 	QComboBox* gridSizeCombo;
 	QDoubleSpinBox* apertureRadiusSpin;
 	QComboBox* normalizationCombo;
+	QComboBox* paddingFactorCombo;
 
 	// Display controls
 	QCheckBox* displayAutoRangeCheck;

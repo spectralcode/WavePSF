@@ -68,6 +68,7 @@ PSFSettings PSFModule::getPSFSettings() const
 	s.wavelengthNm = this->calculator->getLambda() * 1000.0;  // µm → nm
 	s.apertureRadius = this->calculator->getApertureRadius();
 	s.normalizationMode = static_cast<int>(this->calculator->getNormalizationMode());
+	s.paddingFactor = this->calculator->getPaddingFactor();
 	return s;
 }
 
@@ -182,6 +183,7 @@ void PSFModule::applyPSFSettings(const PSFSettings& settings)
 	this->calculator->setApertureRadius(settings.apertureRadius);
 	this->calculator->setNormalizationMode(
 		static_cast<PSFCalculator::NormalizationMode>(settings.normalizationMode));
+	this->calculator->setPaddingFactor(settings.paddingFactor);
 
 	// Only re-broadcast descriptors if they actually changed
 	QVector<WavefrontParameter> newDescriptors = this->generator->getParameterDescriptors();

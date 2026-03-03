@@ -36,8 +36,10 @@ PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
 
 	this->updateValidationState();
 
-	// Live PSF update when changing aperture radius
+	// Live PSF update when changing aperture radius or padding factor
 	connect(this->apertureRadiusSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, [this]() { emit settingsApplied(this->getSettings()); });
+	connect(this->paddingFactorCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 			this, [this]() { emit settingsApplied(this->getSettings()); });
 
 	// Restore original settings on Cancel/close
@@ -108,6 +110,7 @@ PSFSettings PSFSettingsDialog::getSettings() const
 	s.wavelengthNm = this->initialSettings.wavelengthNm;
 	s.apertureRadius = this->apertureRadiusSpin->value();
 	s.normalizationMode = this->normalizationCombo->currentIndex();
+	s.paddingFactor = this->paddingFactorCombo->currentText().split(" ").first().toInt();
 
 	return s;
 }
@@ -301,6 +304,15 @@ void PSFSettingsDialog::setupUI()
 	this->normalizationCombo->addItems({tr("Sum"), tr("Peak"), tr("None")});
 	psfLayout->addRow(tr("Normalization:"), this->normalizationCombo);
 
+	this->paddingFactorCombo = new QComboBox(psfTab);
+	this->paddingFactorCombo->addItems({QStringLiteral("1 (None)"), QStringLiteral("2"), QStringLiteral("4"), QStringLiteral("8")});
+	this->paddingFactorCombo->setToolTip(tr(
+		"Zero-padding factor for the FFT.\n"
+		"Higher values produce smoother PSFs by oversampling\n"
+		"the diffraction pattern before cropping back to grid size.\n"
+		"Increases computation time."));
+	psfLayout->addRow(tr("Padding Factor:"), this->paddingFactorCombo);
+
 	tabWidget->addTab(psfTab, tr("PSF Calculation"));
 
 	// --- Display tab ---
@@ -393,6 +405,15 @@ void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 
 	this->apertureRadiusSpin->setValue(settings.apertureRadius);
 	this->normalizationCombo->setCurrentIndex(settings.normalizationMode);
+
+	// Padding factor combo: find matching item by numeric prefix
+	QString paddingStr = QString::number(settings.paddingFactor);
+	for (int i = 0; i < this->paddingFactorCombo->count(); ++i) {
+		if (this->paddingFactorCombo->itemText(i).startsWith(paddingStr)) {
+			this->paddingFactorCombo->setCurrentIndex(i);
+			break;
+		}
+	}
 }
 
 void PSFSettingsDialog::rebuildOverrideTable(const QVector<int>& indices)
