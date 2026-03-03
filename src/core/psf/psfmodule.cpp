@@ -126,19 +126,20 @@ af::array PSFModule::deconvolve(const af::array& input)
 	return this->deconvolver->deconvolve(input, psf);
 }
 
-void PSFModule::setGeneratorType(const QString& typeName)
+void PSFModule::setGeneratorType(const QString& typeName, const QVariantMap& cachedSettings)
 {
 	if (this->generator->typeName() == typeName) {
 		return;
 	}
 
-	// Save current generator settings before switching
-	QVariantMap oldSettings = this->generator->serializeSettings();
-
-	// Delete old generator and create new one
 	delete this->generator;
 	this->generator = dynamic_cast<IWavefrontGenerator*>(
 		WavefrontGeneratorFactory::create(typeName, this));
+
+	// Restore structural settings (noll indices, ranges, grid config) if previously cached
+	if (!cachedSettings.isEmpty()) {
+		this->generator->deserializeSettings(cachedSettings);
+	}
 
 	emit generatorTypeChanged(typeName);
 	emit parameterDescriptorsChanged(this->generator->getParameterDescriptors());

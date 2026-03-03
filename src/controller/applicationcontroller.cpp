@@ -80,6 +80,11 @@ void ApplicationController::configurePatchGrid(int cols, int rows, int borderExt
 {
 	if (this->imageSession != nullptr) {
 		this->imageSession->configurePatchGrid(cols, rows, borderExtension);
+
+		// Invalidate cached parameter tables (patch dimensions changed)
+		qDeleteAll(this->cachedParameterTables);
+		this->cachedParameterTables.clear();
+
 		this->resizeParameterTable();
 	}
 }
@@ -177,16 +182,34 @@ void ApplicationController::setGeneratorType(const QString& typeName)
 	if (this->psfModule == nullptr) {
 		return;
 	}
-	if (this->psfModule->getGeneratorTypeName() == typeName) {
+	QString oldTypeName = this->psfModule->getGeneratorTypeName();
+	if (oldTypeName == typeName) {
 		return;
 	}
-	this->psfModule->setGeneratorType(typeName);
 
-	// Clear and resize parameter table for new coefficient count
+	// Save current state for the outgoing generator type
+	this->storeCurrentCoefficients();
+	this->cachedGeneratorSettings[oldTypeName] =
+		this->psfModule->getPSFSettings().generatorSettings;
 	if (this->parameterTable != nullptr) {
-		this->parameterTable->clear();
+		this->cachedParameterTables[oldTypeName] = this->parameterTable;
+		this->parameterTable = nullptr;
+	}
+
+	// Switch generator, passing cached structural settings if available
+	QVariantMap newSettings = this->cachedGeneratorSettings.value(typeName);
+	this->psfModule->setGeneratorType(typeName, newSettings);
+
+	// Restore or create parameter table for the new type
+	if (this->cachedParameterTables.contains(typeName)) {
+		this->parameterTable = this->cachedParameterTables.take(typeName);
+	} else {
+		this->parameterTable = new WavefrontParameterTable(this);
 		this->resizeParameterTable();
 	}
+
+	// Load coefficients for current patch from the restored/fresh table
+	this->loadCoefficientsForCurrentPatch();
 
 	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
 }
@@ -501,6 +524,10 @@ void ApplicationController::handleInputDataChanged()
 {
 	// Clear per-patch PSF overrides (new file loaded)
 	this->externalPSFOverrides.clear();
+
+	// Invalidate cached parameter tables (dimensions no longer valid)
+	qDeleteAll(this->cachedParameterTables);
+	this->cachedParameterTables.clear();
 
 	// Emit ImageSession changed so viewers can update their data connections
 	emit imageSessionChanged(this->imageSession);
