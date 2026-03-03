@@ -56,7 +56,7 @@ QVBoxLayout* AboutDialog::createLogoLayout()
 	layout->addWidget(titleLabel, 0, Qt::AlignHCenter);
 
 	QLabel* logoLabel = new QLabel(this);
-	QPixmap pix(":/icons/wavepsf_256.png");
+	QPixmap pix(":/icons/wavepsf_psf_icon.png");
 	logoLabel->setPixmap(pix.scaled(96, 96, Qt::KeepAspectRatio, Qt::SmoothTransformation));
 	layout->addWidget(logoLabel, 0, Qt::AlignHCenter);
 

@@ -5,7 +5,7 @@
     </qresource>
     <qresource prefix="/icons">
         <file alias="wavepsf.ico">icon/wavepsf.ico</file>
-        <file alias="wavepsf_256.png">icon/wavepsf_256.png</file>
+        <file alias="wavepsf_psf_icon.png">icon/wavepsf_psf_icon.png</file>
     </qresource>
     <qresource prefix="/">
         <file alias="LICENSE">LICENSE</file>
