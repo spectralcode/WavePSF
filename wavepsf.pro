@@ -9,6 +9,10 @@ include($$PWD/pri/openmp.pri) #enable OpenMP
 
 include($$PWD/pri/arrayfire.pri)
 
+# TIFF backend: libtiff (default, supports multi-frame + full bit depth)
+# To use ArrayFire TIFF backend instead: CONFIG+=tiff_backend_arrayfire
+include($$PWD/pri/libtiff.pri)
+
 
 SOURCEDIR = $$shell_path($$PWD/src)
 QCUSTOMPLOTDIR = $$shell_path($$PWD/thirdparty/qcustomplot)

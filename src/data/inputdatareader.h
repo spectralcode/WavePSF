@@ -79,6 +79,9 @@ private:
 
 	// Standard image handling
 	ImageData* loadStandardImage(const QString& imagePath);
+#ifdef WAVEPSF_LIBTIFF_BACKEND
+	ImageData* loadTiffWithLibtiff(const QString& imagePath);
+#endif
 	ImageData* loadTiffWithArrayFire(const QString& imagePath);
 
 	// Utility methods

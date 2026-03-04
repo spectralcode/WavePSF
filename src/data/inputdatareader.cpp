@@ -1,5 +1,8 @@
 #include "inputdatareader.h"
 #include "utils/logging.h"
+#ifdef WAVEPSF_LIBTIFF_BACKEND
+#include "tiffio.h"
+#endif
 #include <QFile>
 #include <QTextStream>
 #include <QFileInfo>
@@ -262,9 +265,12 @@ ImageData* InputDataReader::loadStandardImage(const QString& imagePath)
 	QFileInfo fileInfo(imagePath);
 	QString suffix = fileInfo.suffix().toLower();
 
-	// Use ArrayFire for TIFF files (supports 8-bit, 16-bit, and multi-frame)
 	if (suffix == "tiff" || suffix == "tif") {
+#ifdef WAVEPSF_LIBTIFF_BACKEND
+		return this->loadTiffWithLibtiff(imagePath);
+#else
 		return this->loadTiffWithArrayFire(imagePath);
+#endif
 	}
 
 	// Use Qt for other standard formats
@@ -282,6 +288,95 @@ ImageData* InputDataReader::loadStandardImage(const QString& imagePath)
 
 	return new ImageData(image);
 }
+
+#ifdef WAVEPSF_LIBTIFF_BACKEND
+ImageData* InputDataReader::loadTiffWithLibtiff(const QString& imagePath)
+{
+	TIFF* tif = TIFFOpen(imagePath.toLocal8Bit().constData(), "r");
+	if (!tif) {
+		LOG_WARNING() << ": libtiff failed to open:" << imagePath;
+		return nullptr;
+	}
+
+	// Count frames (IFDs)
+	int frameCount = 0;
+	do { frameCount++; } while (TIFFReadDirectory(tif));
+	TIFFSetDirectory(tif, 0);
+
+	// Read metadata from first frame
+	uint32 width = 0, height = 0;
+	uint16 bitsPerSample = 8, samplesPerPixel = 1, sampleFormat = SAMPLEFORMAT_UINT;
+	TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
+	TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLESPERPIXEL, &samplesPerPixel);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLEFORMAT, &sampleFormat);
+
+	// Map to EnviDataType
+	EnviDataType enviType = UNSIGNED_CHAR_8BIT;
+	if (sampleFormat == SAMPLEFORMAT_IEEEFP) {
+		enviType = (bitsPerSample == 64) ? DOUBLE_64BIT : FLOAT_32BIT;
+	} else {
+		switch (bitsPerSample) {
+			case 8:  enviType = UNSIGNED_CHAR_8BIT;   break;
+			case 16: enviType = UNSIGNED_SHORT_16BIT; break;
+			case 32: enviType = SIGNED_INT_32BIT;     break;
+			default: enviType = UNSIGNED_CHAR_8BIT;   break;
+		}
+	}
+
+	size_t bytesPerSample = this->getBytesPerSample(enviType);
+	size_t rowBytes   = static_cast<size_t>(width) * bytesPerSample;
+	size_t frameBytes = rowBytes * static_cast<size_t>(height);
+
+	char* data = static_cast<char*>(malloc(frameBytes * static_cast<size_t>(frameCount)));
+	if (!data) {
+		LOG_ERROR() << ": Failed to allocate memory for TIFF data";
+		TIFFClose(tif);
+		return nullptr;
+	}
+
+	tsize_t scanlineSize = TIFFScanlineSize(tif);
+	char* rowBuf = static_cast<char*>(_TIFFmalloc(scanlineSize));
+	if (!rowBuf) {
+		free(data);
+		TIFFClose(tif);
+		return nullptr;
+	}
+
+	for (int f = 0; f < frameCount; ++f) {
+		TIFFSetDirectory(tif, static_cast<tdir_t>(f));
+		char* frameDest = data + static_cast<ptrdiff_t>(f) * static_cast<ptrdiff_t>(frameBytes);
+		for (uint32 y = 0; y < height; ++y) {
+			TIFFReadScanline(tif, rowBuf, y, 0);
+			if (samplesPerPixel == 1) {
+				memcpy(frameDest + y * rowBytes, rowBuf, rowBytes);
+			} else {
+				// Multi-channel per IFD: extract first channel only (HSI bands are single-channel)
+				for (uint32 x = 0; x < width; ++x) {
+					memcpy(frameDest + y * rowBytes + x * bytesPerSample,
+					       rowBuf + x * samplesPerPixel * bytesPerSample,
+					       bytesPerSample);
+				}
+			}
+		}
+	}
+
+	_TIFFfree(rowBuf);
+	TIFFClose(tif);
+
+	QVector<qreal> wavelengths;
+	for (int i = 0; i < frameCount; ++i) {
+		wavelengths.append(static_cast<qreal>(i));
+	}
+
+	LOG_INFO() << ": Loaded TIFF:" << width << "x" << height
+	           << "frames:" << frameCount << "bits:" << bitsPerSample;
+
+	return new ImageData(data, static_cast<int>(width), static_cast<int>(height),
+	                     frameCount, enviType, wavelengths, "Frame");
+}
+#endif // WAVEPSF_LIBTIFF_BACKEND
 
 ImageData* InputDataReader::loadTiffWithArrayFire(const QString& imagePath)
 {

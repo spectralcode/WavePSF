@@ -10,6 +10,7 @@
     <qresource prefix="/">
         <file alias="LICENSE">LICENSE</file>
         <file>aboutdata/thirdparty_licenses/arrayfire_license.txt</file>
+        <file>aboutdata/thirdparty_licenses/libtiff_license.txt</file>
         <file>aboutdata/thirdparty_licenses/qcustomplot_license.txt</file>
         <file>aboutdata/thirdparty_licenses/qt_license.txt</file>
     </qresource>

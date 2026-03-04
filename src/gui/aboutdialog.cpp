@@ -187,6 +187,12 @@ QList<ComponentInfo> AboutDialog::getThirdPartyComponents()
 	arrayfire.licensePath = ":/aboutdata/thirdparty_licenses/arrayfire_license.txt";
 	components.append(arrayfire);
 
+	ComponentInfo libtiff;
+	libtiff.name = "LibTIFF";
+	libtiff.url = "https://libtiff.gitlab.io/libtiff/";
+	libtiff.licensePath = ":/aboutdata/thirdparty_licenses/libtiff_license.txt";
+	components.append(libtiff);
+
 	ComponentInfo qcustomplot;
 	qcustomplot.name = "QCustomPlot";
 	qcustomplot.url = "https://www.qcustomplot.com";
