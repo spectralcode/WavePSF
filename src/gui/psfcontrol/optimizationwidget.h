@@ -116,6 +116,7 @@ private:
 	QLabel* metricDescriptionLabel;
 
 	// Coefficient specification
+	QCheckBox* optimizeAllCheck;
 	QLineEdit* coefficientSpecLineEdit;
 
 	// Controls

@@ -209,13 +209,24 @@ void OptimizationWidget::setupMetricSection(QVBoxLayout* layout)
 void OptimizationWidget::setupCoefficientSection(QVBoxLayout* layout)
 {
 	QGroupBox* coeffGroup = new QGroupBox(tr("Coefficients to Optimize"), this);
-	QFormLayout* coeffForm = new QFormLayout(coeffGroup);
+	QVBoxLayout* coeffLayout = new QVBoxLayout(coeffGroup);
 
+	this->optimizeAllCheck = new QCheckBox(tr("Optimize All"), coeffGroup);
+	this->optimizeAllCheck->setChecked(true);
+	this->optimizeAllCheck->setToolTip(tr("When checked, all visible coefficients are optimized"));
+	coeffLayout->addWidget(this->optimizeAllCheck);
+
+	QFormLayout* coeffForm = new QFormLayout();
 	this->coefficientSpecLineEdit = new QLineEdit(coeffGroup);
 	this->coefficientSpecLineEdit->setPlaceholderText(tr("e.g. 2-8, 11"));
 	this->coefficientSpecLineEdit->setToolTip(
 		tr("Parameter IDs to optimize (e.g. Noll indices for Zernike, comma-separated, ranges with dash)"));
+	this->coefficientSpecLineEdit->setEnabled(false);
 	coeffForm->addRow(tr("IDs:"), this->coefficientSpecLineEdit);
+	coeffLayout->addLayout(coeffForm);
+
+	connect(this->optimizeAllCheck, &QCheckBox::toggled,
+			this, [this](bool checked) { this->coefficientSpecLineEdit->setEnabled(!checked); });
 
 	layout->addWidget(coeffGroup);
 }
@@ -594,13 +605,19 @@ OptimizationConfig OptimizationWidget::buildConfig() const
 	config.algorithmName = this->algorithmComboBox->currentText();
 	config.algorithmSettings = this->readAlgorithmParameters();
 
-	// Convert user-entered parameter IDs to 0-based array indices
-	QVector<int> requestedIds = parseIndexSpec(this->coefficientSpecLineEdit->text());
-	for (int id : requestedIds) {
+	// Select coefficient indices to optimize
+	if (this->optimizeAllCheck->isChecked()) {
 		for (int i = 0; i < this->parameterDescriptors.size(); ++i) {
-			if (this->parameterDescriptors[i].id == id) {
-				config.selectedCoefficientIndices.append(i);
-				break;
+			config.selectedCoefficientIndices.append(i);
+		}
+	} else {
+		QVector<int> requestedIds = parseIndexSpec(this->coefficientSpecLineEdit->text());
+		for (int id : requestedIds) {
+			for (int i = 0; i < this->parameterDescriptors.size(); ++i) {
+				if (this->parameterDescriptors[i].id == id) {
+					config.selectedCoefficientIndices.append(i);
+					break;
+				}
 			}
 		}
 	}
@@ -688,6 +705,7 @@ QVariantMap OptimizationWidget::getSettings() const
 	settings.insert("frames", this->framesLineEdit->text());
 	settings.insert("startCoeffSource", this->startCoeffSourceComboBox->currentIndex());
 	settings.insert("sourceParam", this->sourceParamSpinBox->value());
+	settings.insert("optimizeAll", this->optimizeAllCheck->isChecked());
 	settings.insert("coefficientSpec", this->coefficientSpecLineEdit->text());
 	settings.insert("livePreview", this->livePreviewCheckBox->isChecked());
 	settings.insert("livePreviewInterval", this->livePreviewIntervalSpinBox->value());
@@ -750,6 +768,7 @@ void OptimizationWidget::setSettings(const QVariantMap& settings)
 	}
 	this->startCoeffSourceComboBox->setCurrentIndex(settings.value("startCoeffSource", 0).toInt());
 	this->sourceParamSpinBox->setValue(settings.value("sourceParam", 0).toInt());
+	this->optimizeAllCheck->setChecked(settings.value("optimizeAll", true).toBool());
 	this->coefficientSpecLineEdit->setText(settings.value("coefficientSpec", "2-8").toString());
 	this->livePreviewCheckBox->setChecked(settings.value("livePreview", true).toBool());
 	this->livePreviewIntervalSpinBox->setValue(settings.value("livePreviewInterval", 10).toInt());
