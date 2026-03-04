@@ -1,5 +1,6 @@
 #include "imagedataviewer.h"
 #include "data/imagedata.h"
+#include "data/patchlayout.h"
 #include "utils/logging.h"
 
 #include <QVBoxLayout>
@@ -148,9 +149,8 @@ void ImageDataViewer::configurePatchGrid(int cols, int rows)
 {
 	const ImageData* dataSource = this->getCurrentDataSource();
 	if (dataSource != nullptr) {
-		const int width = dataSource->getWidth();
-		const int height = dataSource->getHeight();
-		this->frameView->generateRects(width, height, cols, rows);
+		const PatchLayout layout{ dataSource->getWidth(), dataSource->getHeight(), cols, rows };
+		this->frameView->generateRects(layout);
 	}
 }
 

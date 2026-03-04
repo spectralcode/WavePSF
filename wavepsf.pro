@@ -78,6 +78,7 @@ HEADERS += \
 	$$SOURCEDIR/data/imagedata.h \
 	$$SOURCEDIR/data/inputdatareader.h \
 	$$SOURCEDIR/data/imagedataaccessor.h \
+	$$SOURCEDIR/data/patchlayout.h \
 	$$SOURCEDIR/utils/logging.h \
 	$$SOURCEDIR/controller/imagesession.h \
 	$$SOURCEDIR/controller/applicationcontroller.h \

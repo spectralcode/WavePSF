@@ -53,7 +53,7 @@ public slots:
 	void displayFullScene();
 	void displayFrame(uchar* frame, int width, int height);
 	void displayFrame(QImage frame);
-	void generateRects(int totalWidth, int totalHeight, int numberOfRectsInX, int numberOfRectsInY);
+	void generateRects(const PatchLayout& layout);
 	void setRectsVisible(bool visible);
 	void highlightSingleRect(int rectId);
 	void highlightMultipleRects(const QVector<int>& rectIds);

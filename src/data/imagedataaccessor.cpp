@@ -1,4 +1,5 @@
 #include "imagedataaccessor.h"
+#include "patchlayout.h"
 #include "utils/logging.h"
 #include <QDebug>
 #include <QRect>
@@ -470,33 +471,10 @@ void ImageDataAccessor::ensureTempBuffer(size_t requiredSize)
 
 QRect ImageDataAccessor::calculateCorePatchBounds(int patchX, int patchY) const
 {
-	if (!this->isValid()) {
-		return QRect();
-	}
-
-	int imageWidth = this->imageData->getWidth();
-	int imageHeight = this->imageData->getHeight();
-
-	// Calculate base patch size without borders
-	int basePatchWidth = imageWidth / this->patchGridCols;
-	int basePatchHeight = imageHeight / this->patchGridRows;
-
-	// Calculate base patch position
-	int baseX = patchX * basePatchWidth;
-	int baseY = patchY * basePatchHeight;
-
-	// Handle edge patches that might be larger due to remainder pixels
-	int actualWidth = basePatchWidth;
-	int actualHeight = basePatchHeight;
-
-	if (patchX == this->patchGridCols - 1) {
-		actualWidth = imageWidth - baseX;
-	}
-	if (patchY == this->patchGridRows - 1) {
-		actualHeight = imageHeight - baseY;
-	}
-
-	return QRect(baseX, baseY, actualWidth, actualHeight);
+	if (!this->isValid()) return QRect();
+	const PatchLayout layout{ this->imageData->getWidth(), this->imageData->getHeight(),
+	                          this->patchGridCols, this->patchGridRows };
+	return layout.patchBounds(patchX, patchY);
 }
 
 void ImageDataAccessor::writePatchAtPosition(const QRect& imagePos, const af::array& patchData)

@@ -9,6 +9,7 @@
 #include <QMouseEvent>
 #include <QPen>
 #include "rectitem.h"
+#include "data/patchlayout.h"
 
 
 class RectItemGroup : public QObject, public QGraphicsItemGroup
@@ -31,7 +32,7 @@ protected:
 	void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
 
 public slots:
-	void generateRects(int totalWidth, int totalHeight, int numberOfRectsInX, int numberOfRectsInY);
+	void generateRects(const PatchLayout& layout);
 	void highlightSingleRect(int rectId);
 	void highlightMultipleRects(const QVector<int>& rectIds);
 

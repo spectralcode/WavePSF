@@ -381,8 +381,8 @@ void GraphicsView::displayFrame(QImage frame) {
 	}
 }
 
-void GraphicsView::generateRects(int totalWidth, int totalHeight, int numberOfRectsInX, int numberOfRectsInY) {
-	this->grid->generateRects(totalWidth, totalHeight, numberOfRectsInX, numberOfRectsInY);
+void GraphicsView::generateRects(const PatchLayout& layout) {
+	this->grid->generateRects(layout);
 }
 
 void GraphicsView::setRectsVisible(bool visible) {

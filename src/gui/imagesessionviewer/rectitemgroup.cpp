@@ -45,20 +45,14 @@ void RectItemGroup::mousePressEvent(QGraphicsSceneMouseEvent* event) {
 
 
 
-void RectItemGroup::generateRects(int totalWidth, int totalHeight, int numberOfRectsInX, int numberOfRectsInY)
+void RectItemGroup::generateRects(const PatchLayout& layout)
 {
-	int width = totalWidth / numberOfRectsInX;
-	int height = totalHeight / numberOfRectsInY;
-	int xPos = 0;
-	int yPos = 0;
-
 	this->removeAndDeleteAllItems();
 
-	for(int y = 0; y < numberOfRectsInY; y++) {
-		for(int x = 0; x < numberOfRectsInX; x++) {
-			xPos = x*width;
-			yPos = y*height;
-			RectItem* newRectItem = new RectItem(xPos, yPos, width, height, this);
+	for (int row = 0; row < layout.rows; row++) {
+		for (int col = 0; col < layout.cols; col++) {
+			const QRect b = layout.patchBounds(col, row);
+			RectItem* newRectItem = new RectItem(b.x(), b.y(), b.width(), b.height(), this);
 			this->rectItems.append(newRectItem);
 			this->addToGroup(newRectItem);
 		}
