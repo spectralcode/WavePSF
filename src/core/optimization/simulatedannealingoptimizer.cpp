@@ -198,7 +198,11 @@ void SimulatedAnnealingOptimizer::perturbCoefficients(QVector<double>& coefficie
 		double newVal = this->randomDouble(current - perturbance, current + perturbance);
 		double lo = (idx < minBounds.size()) ? minBounds[idx] : -0.3;
 		double hi = (idx < maxBounds.size()) ? maxBounds[idx] : 0.3;
-		newVal = qBound(lo, newVal, hi);
+		// Reflect off boundaries so the perturbation distribution stays symmetric.
+		// Simple clamp would cause the optimizer to pile up at the boundary.
+		if (newVal > hi) newVal = 2.0 * hi - newVal;
+		if (newVal < lo) newVal = 2.0 * lo - newVal;
+		newVal = qBound(lo, newVal, hi); // safety clamp if perturbance > range
 		coefficients[idx] = newVal;
 	}
 }
