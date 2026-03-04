@@ -2,6 +2,7 @@
 #define PSFSETTINGSDIALOG_H
 
 #include <QDialog>
+#include <QMap>
 #include "core/psf/psfsettings.h"
 
 class QLineEdit;
@@ -18,6 +19,7 @@ class PSFSettingsDialog : public QDialog
 	Q_OBJECT
 public:
 	explicit PSFSettingsDialog(const PSFSettings& settings,
+							   const QMap<QString, QVariantMap>& allGeneratorSettings,
 							   bool autoRange, double displayMin, double displayMax,
 							   QWidget* parent = nullptr);
 
@@ -30,13 +32,17 @@ signals:
 	void settingsApplied(PSFSettings settings);
 	void displaySettingsApplied(bool autoRange, double min, double max);
 
+public slots:
+	void updateGeneratorType(const QString& typeName);
+
 private slots:
 	void onNollIndicesChanged();
 	void onApplyClicked();
 
 private:
 	void setupUI();
-	void populateFromSettings(const PSFSettings& settings);
+	void populateFromSettings(const PSFSettings& settings,
+							  const QMap<QString, QVariantMap>& allGeneratorSettings);
 	void rebuildOverrideTable(const QVector<int>& indices);
 	bool validateSettings() const;
 	void updateValidationState();
@@ -78,6 +84,7 @@ private:
 
 	// State
 	PSFSettings initialSettings;
+	QString currentGeneratorTypeName;
 };
 
 #endif // PSFSETTINGSDIALOG_H

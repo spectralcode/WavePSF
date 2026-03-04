@@ -34,6 +34,9 @@ public:
 	// Direct session access for modules
 	ImageSession* getImageSession() const;
 
+	// Returns generator settings for ALL known types (current + cached from previous switches)
+	QMap<QString, QVariantMap> getAllCachedGeneratorSettings() const;
+
 	// Session information access (for compatibility)
 	bool hasInputData() const;
 	bool hasOutputData() const;

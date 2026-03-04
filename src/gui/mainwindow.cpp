@@ -352,6 +352,7 @@ void MainWindow::openSettings() {
 
 	this->settingsDialog = new PSFSettingsDialog(
 		this->currentPSFSettings,
+		this->applicationController->getAllCachedGeneratorSettings(),
 		this->sessionViewer->getAutoRangeEnabled(),
 		this->sessionViewer->getDisplayRangeMin(),
 		this->sessionViewer->getDisplayRangeMax(),
@@ -373,14 +374,9 @@ void MainWindow::openSettings() {
 		this->settingsDialog = nullptr;
 	});
 
-	// Close dialog when generator type changes externally to avoid stale state
+	// Keep dialog in sync when generator type changes externally
 	connect(this->applicationController, &ApplicationController::generatorTypeChanged,
-		this, [this](const QString&) {
-			if (this->settingsDialog) {
-				this->settingsDialog->blockSignals(true);
-				this->settingsDialog->close();
-			}
-		});
+		this->settingsDialog, &PSFSettingsDialog::updateGeneratorType);
 
 	this->settingsDialog->show();
 }

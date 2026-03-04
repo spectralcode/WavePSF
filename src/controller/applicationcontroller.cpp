@@ -48,6 +48,16 @@ ImageSession* ApplicationController::getImageSession() const
 	return this->imageSession;
 }
 
+QMap<QString, QVariantMap> ApplicationController::getAllCachedGeneratorSettings() const
+{
+	QMap<QString, QVariantMap> result = this->cachedGeneratorSettings;
+	if (this->psfModule) {
+		PSFSettings current = this->psfModule->getPSFSettings();
+		result[current.generatorTypeName] = current.generatorSettings;
+	}
+	return result;
+}
+
 bool ApplicationController::openInputFile(const QString& filePath)
 {
 	return this->loadFileToSession(filePath, false);

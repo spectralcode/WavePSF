@@ -18,14 +18,16 @@
 
 
 PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
+								   const QMap<QString, QVariantMap>& allGeneratorSettings,
 								   bool autoRange, double displayMin, double displayMax,
 								   QWidget* parent)
 	: QDialog(parent)
 	, initialSettings(settings)
+	, currentGeneratorTypeName(settings.generatorTypeName)
 {
 	this->setWindowTitle(tr("Settings"));
 	this->setupUI();
-	this->populateFromSettings(settings);
+	this->populateFromSettings(settings, allGeneratorSettings);
 
 	// Populate display settings
 	this->displayAutoRangeCheck->setChecked(autoRange);
@@ -44,16 +46,18 @@ PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
 	connect(this->apertureGeometryCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 			this, [this]() { emit settingsApplied(this->getSettings()); });
 
-	// Restore original settings on Cancel/close
+	// Restore original settings on Cancel/close (but keep current generator type)
 	connect(this, &QDialog::rejected, this, [this]() {
-		emit settingsApplied(this->initialSettings);
+		PSFSettings revert = this->initialSettings;
+		revert.generatorTypeName = this->currentGeneratorTypeName;
+		emit settingsApplied(revert);
 	});
 }
 
 PSFSettings PSFSettingsDialog::getSettings() const
 {
 	PSFSettings s;
-	s.generatorTypeName = this->initialSettings.generatorTypeName;
+	s.generatorTypeName = this->currentGeneratorTypeName;
 
 	if (s.generatorTypeName == QLatin1String("Zernike")) {
 		// Zernike settings
@@ -141,6 +145,12 @@ double PSFSettingsDialog::getDisplayMin() const
 double PSFSettingsDialog::getDisplayMax() const
 {
 	return this->displayMaxSpin->value();
+}
+
+void PSFSettingsDialog::updateGeneratorType(const QString& typeName)
+{
+	this->currentGeneratorTypeName = typeName;
+	this->updateValidationState();
 }
 
 void PSFSettingsDialog::onApplyClicked()
@@ -363,21 +373,27 @@ void PSFSettingsDialog::setupUI()
 	this->resize(500, 600);
 }
 
-void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
+void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings,
+											  const QMap<QString, QVariantMap>& allGenSettings)
 {
-	// Populate Zernike fields
+	// Populate Zernike fields from the Zernike-specific settings map
+	QVariantMap zernikeGs = allGenSettings.value(QStringLiteral("Zernike"));
+	QString nollSpec = zernikeGs.value("noll_index_spec", "2-21").toString();
 	this->nollIndicesEdit->blockSignals(true);
-	this->nollIndicesEdit->setText(settings.nollIndexSpec);
+	this->nollIndicesEdit->setText(nollSpec);
 	this->nollIndicesEdit->blockSignals(false);
-	this->globalMinSpin->setValue(settings.globalMinCoefficient);
-	this->globalMaxSpin->setValue(settings.globalMaxCoefficient);
+	this->globalMinSpin->setValue(zernikeGs.value("global_min", -0.3).toDouble());
+	this->globalMaxSpin->setValue(zernikeGs.value("global_max", 0.3).toDouble());
 
-	QVector<int> indices = ZernikeGenerator::parseNollIndexSpec(settings.nollIndexSpec);
+	QVector<int> indices = ZernikeGenerator::parseNollIndexSpec(nollSpec);
 	this->rebuildOverrideTable(indices);
 
+	QVariantMap overrides = zernikeGs.value("range_overrides").toMap();
 	for (int row = 0; row < this->overrideTable->rowCount(); ++row) {
 		int nollIndex = this->overrideTable->item(row, 0)->text().toInt();
-		if (settings.coefficientRangeOverrides.contains(nollIndex)) {
+		QString key = QString::number(nollIndex);
+		if (overrides.contains(key)) {
+			QVariantMap range = overrides[key].toMap();
 			QCheckBox* checkBox = qobject_cast<QCheckBox*>(
 				this->overrideTable->cellWidget(row, 2));
 			QDoubleSpinBox* minSpin = qobject_cast<QDoubleSpinBox*>(
@@ -386,25 +402,25 @@ void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 				this->overrideTable->cellWidget(row, 4));
 			if (checkBox && minSpin && maxSpin) {
 				checkBox->setChecked(true);
-				minSpin->setValue(settings.coefficientRangeOverrides[nollIndex].first);
-				maxSpin->setValue(settings.coefficientRangeOverrides[nollIndex].second);
+				minSpin->setValue(range["min"].toDouble());
+				maxSpin->setValue(range["max"].toDouble());
 				minSpin->setEnabled(true);
 				maxSpin->setEnabled(true);
 			}
 		}
 	}
 
-	// Populate DM fields
-	QVariantMap gs = settings.generatorSettings;
-	this->dmRowsSpin->setValue(gs.value("actuator_rows", 8).toInt());
-	this->dmColsSpin->setValue(gs.value("actuator_cols", 8).toInt());
-	this->dmCouplingSpin->setValue(gs.value("coupling_coefficient", 0.15).toDouble());
-	this->dmGaussianIndexSpin->setValue(gs.value("gaussian_index", 2.0).toDouble());
-	this->dmCommandMinSpin->setValue(gs.value("command_min", -1.0).toDouble());
-	this->dmCommandMaxSpin->setValue(gs.value("command_max", 1.0).toDouble());
-	this->dmCommandStepSpin->setValue(gs.value("command_step", 0.01).toDouble());
+	// Populate DM fields from the DM-specific settings map
+	QVariantMap dmGs = allGenSettings.value(QStringLiteral("Deformable Mirror"));
+	this->dmRowsSpin->setValue(dmGs.value("actuator_rows", 8).toInt());
+	this->dmColsSpin->setValue(dmGs.value("actuator_cols", 8).toInt());
+	this->dmCouplingSpin->setValue(dmGs.value("coupling_coefficient", 0.15).toDouble());
+	this->dmGaussianIndexSpin->setValue(dmGs.value("gaussian_index", 2.0).toDouble());
+	this->dmCommandMinSpin->setValue(dmGs.value("command_min", -1.0).toDouble());
+	this->dmCommandMaxSpin->setValue(dmGs.value("command_max", 1.0).toDouble());
+	this->dmCommandStepSpin->setValue(dmGs.value("command_step", 0.01).toDouble());
 
-	// Grid size combo
+	// Common PSF calculation fields
 	int gridIdx = this->gridSizeCombo->findText(QString::number(settings.gridSize));
 	if (gridIdx >= 0) {
 		this->gridSizeCombo->setCurrentIndex(gridIdx);
@@ -497,7 +513,7 @@ void PSFSettingsDialog::rebuildOverrideTable(const QVector<int>& indices)
 
 bool PSFSettingsDialog::validateSettings() const
 {
-	if (this->initialSettings.generatorTypeName == QLatin1String("Zernike")) {
+	if (this->currentGeneratorTypeName == QLatin1String("Zernike")) {
 		QVector<int> indices = ZernikeGenerator::parseNollIndexSpec(this->nollIndicesEdit->text());
 		return !indices.isEmpty();
 	}
@@ -509,7 +525,7 @@ void PSFSettingsDialog::updateValidationState()
 	bool valid = this->validateSettings();
 
 	// Visual feedback for Zernike mode
-	if (this->initialSettings.generatorTypeName == QLatin1String("Zernike")) {
+	if (this->currentGeneratorTypeName == QLatin1String("Zernike")) {
 		if (valid) {
 			this->nollIndicesEdit->setStyleSheet(QString());
 		} else {
