@@ -18,7 +18,6 @@ class RectItemGroup : public QObject, public QGraphicsItemGroup
 public:
 	RectItemGroup(QGraphicsItem *parent = nullptr);
 	~RectItemGroup();
-	QVector<QPointF> getVertices();
 
 
 private:

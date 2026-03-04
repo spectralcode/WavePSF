@@ -1,20 +1,14 @@
 #include "rectitemgroup.h"
 
 
-RectItemGroup::RectItemGroup(QGraphicsItem *parent) : QObject(0), QGraphicsItemGroup(parent)
+RectItemGroup::RectItemGroup(QGraphicsItem *parent) : QObject(0), QGraphicsItemGroup(parent), selectedId(-1)
 {
 	this->setAcceptHoverEvents(true);
 	this->setFlag(QGraphicsItem::ItemIsMovable, false);
 	qRegisterMetaType<QVector<RectItem*>>("QVector<RectItem*>");
 }
 
-RectItemGroup::~RectItemGroup() {
-//	foreach(auto item,this->rectItems) {
-//		if(item != nullptr){
-//			delete item;
-//		}
-//	}
-}
+RectItemGroup::~RectItemGroup() = default;
 
 void RectItemGroup::removeAndDeleteAllItems()
 {
