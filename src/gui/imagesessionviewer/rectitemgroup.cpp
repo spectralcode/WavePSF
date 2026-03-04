@@ -61,6 +61,7 @@ void RectItemGroup::highlightSingleRect(int rectId)
 			item->setRectSelected(false);
 		}
 		this->rectItems.at(rectId)->setRectSelected(true);
+		this->selectedId = rectId;
 	}
 }
 
