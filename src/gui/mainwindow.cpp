@@ -371,6 +371,7 @@ void MainWindow::openSettings() {
 		this->sessionViewer->getAutoRangeEnabled(),
 		this->sessionViewer->getDisplayRangeMin(),
 		this->sessionViewer->getDisplayRangeMax(),
+		this->sessionViewer->isViewSyncEnabled(),
 		this);
 	this->settingsDialog->setAttribute(Qt::WA_DeleteOnClose);
 
@@ -378,6 +379,8 @@ void MainWindow::openSettings() {
 			this->applicationController, &ApplicationController::applyPSFSettings);
 	connect(this->settingsDialog, &PSFSettingsDialog::displaySettingsApplied,
 			this->sessionViewer, &ImageSessionViewer::setDisplaySettings);
+	connect(this->settingsDialog, &PSFSettingsDialog::viewSyncChanged,
+			this->sessionViewer, &ImageSessionViewer::setViewSyncEnabled);
 	connect(this->settingsDialog, &QDialog::accepted, this, [this]() {
 		this->applicationController->applyPSFSettings(this->settingsDialog->getSettings());
 		this->sessionViewer->setDisplaySettings(

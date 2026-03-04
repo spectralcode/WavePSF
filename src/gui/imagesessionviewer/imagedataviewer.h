@@ -53,6 +53,11 @@ public:
 
 	void enableInputDataDrops(bool enable = true);
 
+	// View sync
+	void applyViewTransform(QTransform transform, QPointF centerInScene);
+	void broadcastViewTransform();
+	void setViewSyncActive(bool active);
+
 protected:
 	void focusInEvent(QFocusEvent* event) override;
 	void focusOutEvent(QFocusEvent* event) override;
@@ -129,6 +134,8 @@ signals:
 	void renderRequested(const RenderRequest& req);
 
 	void inputFileDropRequested(const QString& filePath);
+
+	void viewTransformChanged(QTransform transform, QPointF centerInScene);
 };
 
 #endif // IMAGEDATAVIEWER_H

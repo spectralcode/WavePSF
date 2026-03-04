@@ -432,9 +432,22 @@ void ImageDataViewer::connectSignals()
 	connect(this->frameView, &GraphicsView::togglePressed, this, &ImageDataViewer::beginReferencePreview);
 	connect(this->frameView, &GraphicsView::toggleReleased, this, &ImageDataViewer::endReferencePreview);
 	connect(this->frameView, &GraphicsView::fileDropRequested, this, &ImageDataViewer::inputFileDropRequested);
+	connect(this->frameView, &GraphicsView::viewTransformChanged, this, &ImageDataViewer::viewTransformChanged);
 	connect(this->gtToggleButton, &QToolButton::clicked, this, [this](bool checked) {
 		this->showReference(checked);
 	});
+}
+
+void ImageDataViewer::applyViewTransform(QTransform t, QPointF center) {
+	this->frameView->applyViewTransform(t, center);
+}
+
+void ImageDataViewer::broadcastViewTransform() {
+	this->frameView->emitViewTransform();
+}
+
+void ImageDataViewer::setViewSyncActive(bool active) {
+	this->frameView->setSyncActive(active);
 }
 
 void ImageDataViewer::updateInfoDisplay()

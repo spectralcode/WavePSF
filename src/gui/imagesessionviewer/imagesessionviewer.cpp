@@ -22,10 +22,12 @@ namespace {
 	const char* PATCH_BORDER_EXTENSION_KEY = "patchBorderExtension";
 	const char* RIGHT_SPLITTER_STATE_KEY = "right_splitter_state";
 	const char* MAIN_SPLITTER_STATE_KEY = "main_splitter_state";
+	const char* SYNC_VIEWS_KEY = "sync_views";
 
 	const bool	DEFAULT_AUTO_RANGE = true;
 	const double DEFAULT_MIN = 0.0;
 	const double DEFAULT_MAX = 255.0;
+	const bool  DEFAULT_SYNC_VIEWS = false;
 	const int DEFAULT_PATCH_COLS = 4;
 	const int DEFAULT_PATCH_ROWS = 4;
 	const int DEFAULT_BORDER_EXTENSION = 10;
@@ -37,7 +39,8 @@ ImageSessionViewer::ImageSessionViewer(QWidget* parent)
 	  mainSplitter(nullptr), controlsWidget(nullptr), sidebarLayout(nullptr), rightSplitter(nullptr), viewersWidget(nullptr),
 	  frameControlsGroup(nullptr), frameSlider(nullptr), frameSpinBox(nullptr),
 	  patchSlider(nullptr), patchSpinBox(nullptr),
-	  inputViewer(nullptr), outputViewer(nullptr), updatingControls(false)
+	  inputViewer(nullptr), outputViewer(nullptr), updatingControls(false),
+	  viewSyncEnabled(false)
 {
 	this->setupUI();
 	this->connectSignals();
@@ -72,6 +75,7 @@ QVariantMap ImageSessionViewer::getSettings() const
 	settingsMap.insert(AUTO_RANGE_ENABLED_KEY, this->autoRangeEnabled);
 	settingsMap.insert(DISPLAY_RANGE_MIN_KEY, this->displayRangeMin);
 	settingsMap.insert(DISPLAY_RANGE_MAX_KEY, this->displayRangeMax);
+	settingsMap.insert(SYNC_VIEWS_KEY, this->viewSyncEnabled);
 	settingsMap.insert(PATCH_GRID_COLS_KEY, this->imageSession->getPatchGridCols());
 	settingsMap.insert(PATCH_GRID_ROWS_KEY, this->imageSession->getPatchGridRows());
 	settingsMap.insert(PATCH_BORDER_EXTENSION_KEY, this->imageSession->getPatchBorderExtension());
@@ -92,12 +96,14 @@ void ImageSessionViewer::setSettings(const QVariantMap& settingsMap)
 	const bool autoRange = settingsMap.value(AUTO_RANGE_ENABLED_KEY, DEFAULT_AUTO_RANGE).toBool();
 	const double minV = settingsMap.value(DISPLAY_RANGE_MIN_KEY, DEFAULT_MIN).toDouble();
 	const double maxV = settingsMap.value(DISPLAY_RANGE_MAX_KEY, DEFAULT_MAX).toDouble();
+	const bool syncViews = settingsMap.value(SYNC_VIEWS_KEY, DEFAULT_SYNC_VIEWS).toBool();
 	const int cols = settingsMap.value(PATCH_GRID_COLS_KEY, DEFAULT_PATCH_COLS).toInt();
 	const int rows = settingsMap.value(PATCH_GRID_ROWS_KEY, DEFAULT_PATCH_ROWS).toInt();
 	const int border = settingsMap.value(PATCH_BORDER_EXTENSION_KEY, DEFAULT_BORDER_EXTENSION).toInt();
 
 	//update internal state and apply settings
 	this->setDisplaySettings(autoRange, minV, maxV);
+	this->setViewSyncEnabled(syncViews);
 	this->configurePatchGrid(cols, rows, border);
 	emit patchGridConfigurationRequested(cols, rows, border);
 
@@ -262,6 +268,30 @@ void ImageSessionViewer::setDisplaySettings(bool autoRange, double min, double m
 			this->outputViewer->setDisplayRange(min, max);
 		}
 	}
+}
+
+void ImageSessionViewer::setViewSyncEnabled(bool enabled)
+{
+	this->viewSyncEnabled = enabled;
+	this->inputViewer->setViewSyncActive(enabled);
+	this->outputViewer->setViewSyncActive(enabled);
+	disconnect(this->viewSyncConn1);
+	disconnect(this->viewSyncConn2);
+	if (enabled) {
+		this->viewSyncConn1 = connect(
+			this->inputViewer,  &ImageDataViewer::viewTransformChanged,
+			this->outputViewer, &ImageDataViewer::applyViewTransform);
+		this->viewSyncConn2 = connect(
+			this->outputViewer, &ImageDataViewer::viewTransformChanged,
+			this->inputViewer,  &ImageDataViewer::applyViewTransform);
+		// Bring output view in line with input view immediately
+		this->inputViewer->broadcastViewTransform();
+	}
+}
+
+bool ImageSessionViewer::isViewSyncEnabled() const
+{
+	return this->viewSyncEnabled;
 }
 
 bool ImageSessionViewer::getAutoRangeEnabled() const

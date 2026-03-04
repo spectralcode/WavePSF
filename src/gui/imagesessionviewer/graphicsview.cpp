@@ -40,6 +40,8 @@ GraphicsView::GraphicsView(QWidget* parent) : QGraphicsView(parent)
 
 	this->acceptFileDrops = false;
 	this->isHighlightedForDrop = false;
+	this->syncInProgress = false;
+	this->syncActive = false;
 	this->setAcceptDrops(false);
 }
 
@@ -73,6 +75,29 @@ void GraphicsView::refreshForStyleChange() {
 	this->update();
 
 	this->setCacheMode(oldCache);
+}
+
+void GraphicsView::emitViewTransform() {
+	if (!this->syncInProgress && this->syncActive) {
+		QPointF center = mapToScene(viewport()->rect().center());
+		emit viewTransformChanged(this->transform(), center);
+	}
+}
+
+void GraphicsView::setSyncActive(bool active) {
+	this->syncActive = active;
+}
+
+void GraphicsView::applyViewTransform(QTransform t, QPointF center) {
+	this->syncInProgress = true;
+	this->setTransform(t);
+	this->centerOn(center);
+	this->syncInProgress = false;
+}
+
+void GraphicsView::scrollContentsBy(int dx, int dy) {
+	QGraphicsView::scrollContentsBy(dx, dy);
+	emitViewTransform();
 }
 
 void GraphicsView::mouseDoubleClickEvent(QMouseEvent* event) {
@@ -142,6 +167,7 @@ void GraphicsView::keyPressEvent(QKeyEvent* event) {
 
 		case Qt::Key_R:
 			this->rotate(90);
+			emitViewTransform();
 			break;
 
 		case Qt::Key_V:
@@ -152,12 +178,14 @@ void GraphicsView::keyPressEvent(QKeyEvent* event) {
 			// Mirror horizontal axis
 			this->scale(-1, 1);
 			this->vflipped = !this->vflipped;
+			emitViewTransform();
 			break;
 
 		case Qt::Key_H:
 			// Mirror on vertical axis
 			this->scale(1, -1);
 			this->hflipped = !this->hflipped;
+			emitViewTransform();
 			break;
 
 		default:
@@ -219,13 +247,17 @@ void GraphicsView::contextMenuEvent(QContextMenuEvent* event) {
 	// View transform operations
 	QAction* rotateAction = menu.addAction(tr("Rotate 90%1").arg(QChar(0x00B0)));
 	rotateAction->setShortcut(QKeySequence(Qt::Key_R));
-	connect(rotateAction, &QAction::triggered, this, [this]() { this->rotate(90); });
+	connect(rotateAction, &QAction::triggered, this, [this]() {
+		this->rotate(90);
+		emitViewTransform();
+	});
 
 	QAction* flipHAction = menu.addAction(tr("Flip Horizontal"));
 	flipHAction->setShortcut(QKeySequence(Qt::Key_H));
 	connect(flipHAction, &QAction::triggered, this, [this]() {
 		this->scale(1, -1);
 		this->hflipped = !this->hflipped;
+		emitViewTransform();
 	});
 
 	QAction* flipVAction = menu.addAction(tr("Flip Vertical"));
@@ -233,6 +265,7 @@ void GraphicsView::contextMenuEvent(QContextMenuEvent* event) {
 	connect(flipVAction, &QAction::triggered, this, [this]() {
 		this->scale(-1, 1);
 		this->vflipped = !this->vflipped;
+		emitViewTransform();
 	});
 
 	menu.addSeparator();

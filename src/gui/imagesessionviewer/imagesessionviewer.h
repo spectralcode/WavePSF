@@ -44,6 +44,9 @@ public slots:
 	void configurePatchGrid(int cols, int rows, int borderExtension);
 	void refreshOutputViewer();
 	void setDisplaySettings(bool autoRange, double min, double max);
+	void setViewSyncEnabled(bool enabled);
+
+	bool isViewSyncEnabled() const;
 
 private slots:
 	// Internal UI interactions
@@ -111,6 +114,9 @@ private:
 
 	// State tracking
 	bool updatingControls;
+	bool viewSyncEnabled;
+	QMetaObject::Connection viewSyncConn1;
+	QMetaObject::Connection viewSyncConn2;
 };
 
 #endif // IMAGESESSIONVIEWER_H

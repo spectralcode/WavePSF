@@ -28,7 +28,8 @@ private:
 	bool vflipped;
 	bool acceptFileDrops;
 	bool isHighlightedForDrop;
-
+	bool syncInProgress;
+	bool syncActive;
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
 	void mousePressEvent(QMouseEvent* event) override;
 	void mouseMoveEvent(QMouseEvent* event) override;
@@ -42,6 +43,7 @@ private:
 	void setDropHighlight(bool highlight);
 
 protected:
+	void scrollContentsBy(int dx, int dy) override;
 	void dragEnterEvent(QDragEnterEvent* event) override;
 	void dragMoveEvent(QDragMoveEvent* event) override;
 	void dragLeaveEvent(QDragLeaveEvent* event) override;
@@ -50,6 +52,7 @@ protected:
 public slots:
 	void zoomIn();
 	void zoomOut();
+	void emitViewTransform();
 	void displayFullScene();
 	void displayFrame(uchar* frame, int width, int height);
 	void displayFrame(QImage frame);
@@ -57,6 +60,8 @@ public slots:
 	void setRectsVisible(bool visible);
 	void highlightSingleRect(int rectId);
 	void highlightMultipleRects(const QVector<int>& rectIds);
+	void applyViewTransform(QTransform transform, QPointF centerInScene);
+	void setSyncActive(bool active);
 
 signals:
 	void info(QString);
@@ -71,6 +76,7 @@ signals:
 	void togglePressed();
 	void toggleReleased();
 	void fileDropRequested(const QString& filePath);
+	void viewTransformChanged(QTransform transform, QPointF centerInScene);
 };
 
 #endif // GRAPHICSVIEW_H
