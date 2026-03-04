@@ -24,6 +24,7 @@ class PSFGenerationWidget;
 class ProcessingControlWidget;
 class PSFSettingsDialog;
 class AboutDialog;
+class ShortcutsDialog;
 
 class MainWindow : public QMainWindow {
 	Q_OBJECT
@@ -130,6 +131,7 @@ private:
 	QAction* toggleMessageConsoleAction;
 
 	// Help actions
+	QAction* shortcutsAction;
 	QAction* aboutAction;
 
 	// Settings state
@@ -140,6 +142,7 @@ private:
 	PSFGenerationWidget* psfGenerationWidget;
 	ProcessingControlWidget* processingControlWidget;
 	PSFSettingsDialog* settingsDialog;
+	ShortcutsDialog* shortcutsDialog;
 	AboutDialog* aboutDialog;
 
 signals:

@@ -11,6 +11,7 @@
 #include "gui/messageconsole/messagerouter.h"
 #include "gui/messageconsole/messageconsoledock.h"
 #include "gui/aboutdialog.h"
+#include "gui/shortcutsdialog.h"
 
 
 #include <QFileDialog>
@@ -56,7 +57,7 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	  deconvolveAllAction(nullptr),
 	  sessionViewer(nullptr),
 	  psfGenerationWidget(nullptr), processingControlWidget(nullptr),
-	  settingsDialog(nullptr), aboutDialog(nullptr) {
+	  settingsDialog(nullptr), shortcutsDialog(nullptr), aboutDialog(nullptr) {
 	MessageRouter::instance()->install();
 	this->ui->setupUi(this);
 	this->setupMenuBar();
@@ -331,6 +332,20 @@ void MainWindow::setupExtrasMenu() {
 
 void MainWindow::setupHelpMenu() {
 	this->helpMenu = this->menuBar()->addMenu("&Help");
+
+	this->shortcutsAction = this->helpMenu->addAction(tr("&Keyboard Shortcuts"));
+	this->shortcutsAction->setShortcut(QKeySequence(Qt::Key_F1));
+	this->shortcutsAction->setStatusTip(tr("Show all keyboard shortcuts"));
+	connect(this->shortcutsAction, &QAction::triggered, this, [this]() {
+		if (!this->shortcutsDialog) {
+			this->shortcutsDialog = new ShortcutsDialog(this);
+		}
+		this->shortcutsDialog->show();
+		this->shortcutsDialog->raise();
+		this->shortcutsDialog->activateWindow();
+	});
+
+	this->helpMenu->addSeparator();
 
 	this->aboutAction = this->helpMenu->addAction("&About WavePSF");
 	this->aboutAction->setStatusTip("About this application");
