@@ -40,6 +40,7 @@ namespace {
 	const char* LAST_OPEN_DIR_GROUND_TRUTH_KEY = "last_open_dir_ground_truth";
 	const char* LAST_NAME_FILTER_INPUT_KEY = "last_name_filter_input";
 	const char* LAST_NAME_FILTER_GROUND_TRUTH_KEY = "last_name_filter_ground_truth";
+	const char* WINDOW_MAXIMIZED_KEY = "window_maximized";
 	const char* DOCK_STATE_KEY = "dock_state_v1";
 	const char* MESSAGE_CONSOLE_VISIBLE_KEY = "message_console_visible";
 }
@@ -715,6 +716,9 @@ void MainWindow::loadSettings() {
 
 	this->resize(this->windowSize);
 	this->move(this->windowPosition);
+	if (settings.value(WINDOW_MAXIMIZED_KEY, false).toBool()) {
+		this->showMaximized();
+	}
 
 	// Load widget settings
 	this->consoleWidget()->setSettings(this->guiSettings->getStoredSettings(this->consoleWidget()->getName()));
@@ -724,12 +728,16 @@ void MainWindow::loadSettings() {
 }
 
 void MainWindow::saveSettings() {
-	this->windowSize = this->size();
-	this->windowPosition = this->pos();
+	// Save normal (non-maximized) geometry so restore works correctly
+	if (!this->isMaximized()) {
+		this->windowSize = this->size();
+		this->windowPosition = this->pos();
+	}
 
 	QVariantMap settings;
 	settings[WINDOW_SIZE_KEY] = this->windowSize;
 	settings[WINDOW_POSITION_KEY] = this->windowPosition;
+	settings[WINDOW_MAXIMIZED_KEY] = this->isMaximized();
 	settings[LAST_OPEN_DIR_INPUT_KEY] = this->lastOpenDirInput;
 	settings[LAST_OPEN_DIR_GROUND_TRUTH_KEY] = this->lastOpenDirGroundTruth;
 	settings[LAST_NAME_FILTER_INPUT_KEY] = this->lastNameFilterInput;
