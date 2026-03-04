@@ -19,7 +19,6 @@ class PSFSettingsDialog : public QDialog
 	Q_OBJECT
 public:
 	explicit PSFSettingsDialog(const PSFSettings& settings,
-							   const QMap<QString, QVariantMap>& allGeneratorSettings,
 							   bool autoRange, double displayMin, double displayMax,
 							   QWidget* parent = nullptr);
 
@@ -41,8 +40,7 @@ private slots:
 
 private:
 	void setupUI();
-	void populateFromSettings(const PSFSettings& settings,
-							  const QMap<QString, QVariantMap>& allGeneratorSettings);
+	void populateFromSettings(const PSFSettings& settings);
 	void rebuildOverrideTable(const QVector<int>& indices);
 	bool validateSettings() const;
 	void updateValidationState();

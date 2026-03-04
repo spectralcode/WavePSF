@@ -353,7 +353,6 @@ void MainWindow::openSettings() {
 
 	this->settingsDialog = new PSFSettingsDialog(
 		this->currentPSFSettings,
-		this->applicationController->getAllCachedGeneratorSettings(),
 		this->sessionViewer->getAutoRangeEnabled(),
 		this->sessionViewer->getDisplayRangeMin(),
 		this->sessionViewer->getDisplayRangeMax(),

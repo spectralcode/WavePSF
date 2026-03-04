@@ -48,16 +48,6 @@ ImageSession* ApplicationController::getImageSession() const
 	return this->imageSession;
 }
 
-QMap<QString, QVariantMap> ApplicationController::getAllCachedGeneratorSettings() const
-{
-	QMap<QString, QVariantMap> result = this->cachedGeneratorSettings;
-	if (this->psfModule) {
-		PSFSettings current = this->psfModule->getPSFSettings();
-		result[current.generatorTypeName] = current.generatorSettings;
-	}
-	return result;
-}
-
 bool ApplicationController::openInputFile(const QString& filePath)
 {
 	return this->loadFileToSession(filePath, false);
@@ -197,18 +187,15 @@ void ApplicationController::setGeneratorType(const QString& typeName)
 		return;
 	}
 
-	// Save current state for the outgoing generator type
+	// Save current coefficients and parameter table for the outgoing generator type
 	this->storeCurrentCoefficients();
-	this->cachedGeneratorSettings[oldTypeName] =
-		this->psfModule->getPSFSettings().generatorSettings;
 	if (this->parameterTable != nullptr) {
 		this->cachedParameterTables[oldTypeName] = this->parameterTable;
 		this->parameterTable = nullptr;
 	}
 
-	// Switch generator, passing cached structural settings if available
-	QVariantMap newSettings = this->cachedGeneratorSettings.value(typeName);
-	this->psfModule->setGeneratorType(typeName, newSettings);
+	// Switch generator (PSFModule handles caching generator settings internally)
+	this->psfModule->setGeneratorType(typeName);
 
 	// Restore or create parameter table for the new type
 	if (this->cachedParameterTables.contains(typeName)) {

@@ -120,6 +120,14 @@ QVariantMap serializePSFSettings(const PSFSettings& settings)
 	}
 	map["coefficient_range_overrides"] = overrides;
 
+	// Serialize per-type generator settings
+	QVariantMap allGenMap;
+	for (auto it = settings.allGeneratorSettings.constBegin();
+		 it != settings.allGeneratorSettings.constEnd(); ++it) {
+		allGenMap[it.key()] = it.value();
+	}
+	map["all_generator_settings"] = allGenMap;
+
 	return map;
 }
 
@@ -173,6 +181,14 @@ PSFSettings deserializePSFSettings(const QVariantMap& map)
 			double min = range["min"].toDouble();
 			double max = range["max"].toDouble();
 			settings.coefficientRangeOverrides[nollIndex] = qMakePair(min, max);
+		}
+	}
+
+	// Deserialize per-type generator settings
+	if (map.contains("all_generator_settings")) {
+		QVariantMap allGenMap = map["all_generator_settings"].toMap();
+		for (auto it = allGenMap.constBegin(); it != allGenMap.constEnd(); ++it) {
+			settings.allGeneratorSettings[it.key()] = it.value().toMap();
 		}
 	}
 

@@ -11,6 +11,7 @@ struct PSFSettings {
 	// --- Generator identity ---
 	QString generatorTypeName = "Zernike";
 	QVariantMap generatorSettings; // generator-specific config (serialized via IWavefrontGenerator)
+	QMap<QString, QVariantMap> allGeneratorSettings; // type name → serialized settings for ALL known generators
 
 	// --- Zernike generator settings (convenience accessors, kept for UI compatibility) ---
 	// Flexible Noll index specification: "2-21", "1-5, 7, 11", "4, 11, 15-21"

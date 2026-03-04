@@ -35,7 +35,7 @@ public slots:
 	af::array deconvolve(const af::array& input);
 
 	// Generator switching
-	void setGeneratorType(const QString& typeName, const QVariantMap& cachedSettings = QVariantMap());
+	void setGeneratorType(const QString& typeName);
 
 	// PSF settings
 	void applyPSFSettings(const PSFSettings& settings);
@@ -64,6 +64,7 @@ private:
 	Deconvolver* deconvolver;
 
 	int gridSize;
+	QMap<QString, QVariantMap> allGeneratorSettings;
 	QVector<WavefrontParameter> cachedDescriptors;
 	af::array currentWavefront;
 	af::array currentPSF;

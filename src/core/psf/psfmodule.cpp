@@ -70,6 +70,11 @@ PSFSettings PSFModule::getPSFSettings() const
 	s.normalizationMode = static_cast<int>(this->calculator->getNormalizationMode());
 	s.paddingFactor = this->calculator->getPaddingFactor();
 	s.apertureGeometry = this->calculator->getApertureGeometry();
+
+	// Include settings for all known generator types (active generator is always current)
+	s.allGeneratorSettings = this->allGeneratorSettings;
+	s.allGeneratorSettings[s.generatorTypeName] = s.generatorSettings;
+
 	return s;
 }
 
@@ -127,19 +132,24 @@ af::array PSFModule::deconvolve(const af::array& input)
 	return this->deconvolver->deconvolve(input, psf);
 }
 
-void PSFModule::setGeneratorType(const QString& typeName, const QVariantMap& cachedSettings)
+void PSFModule::setGeneratorType(const QString& typeName)
 {
 	if (this->generator->typeName() == typeName) {
 		return;
 	}
 
+	// Cache outgoing generator's settings before destroying it
+	this->allGeneratorSettings[this->generator->typeName()] =
+		this->generator->serializeSettings();
+
 	delete this->generator;
 	this->generator = dynamic_cast<IWavefrontGenerator*>(
 		WavefrontGeneratorFactory::create(typeName, this));
 
-	// Restore structural settings (noll indices, ranges, grid config) if previously cached
-	if (!cachedSettings.isEmpty()) {
-		this->generator->deserializeSettings(cachedSettings);
+	// Restore from cache if previously used
+	QVariantMap cached = this->allGeneratorSettings.value(typeName);
+	if (!cached.isEmpty()) {
+		this->generator->deserializeSettings(cached);
 	}
 
 	emit generatorTypeChanged(typeName);
@@ -149,6 +159,9 @@ void PSFModule::setGeneratorType(const QString& typeName, const QVariantMap& cac
 
 void PSFModule::applyPSFSettings(const PSFSettings& settings)
 {
+	// Restore cached settings for all generator types
+	this->allGeneratorSettings = settings.allGeneratorSettings;
+
 	// Switch generator type if needed
 	if (this->generator->typeName() != settings.generatorTypeName) {
 		delete this->generator;

@@ -18,7 +18,6 @@
 
 
 PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
-								   const QMap<QString, QVariantMap>& allGeneratorSettings,
 								   bool autoRange, double displayMin, double displayMax,
 								   QWidget* parent)
 	: QDialog(parent)
@@ -27,7 +26,7 @@ PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
 {
 	this->setWindowTitle(tr("Settings"));
 	this->setupUI();
-	this->populateFromSettings(settings, allGeneratorSettings);
+	this->populateFromSettings(settings);
 
 	// Populate display settings
 	this->displayAutoRangeCheck->setChecked(autoRange);
@@ -59,56 +58,53 @@ PSFSettings PSFSettingsDialog::getSettings() const
 	PSFSettings s;
 	s.generatorTypeName = this->currentGeneratorTypeName;
 
-	if (s.generatorTypeName == QLatin1String("Zernike")) {
-		// Zernike settings
-		s.nollIndexSpec = this->nollIndicesEdit->text().trimmed();
-		s.globalMinCoefficient = this->globalMinSpin->value();
-		s.globalMaxCoefficient = this->globalMaxSpin->value();
-		s.coefficientStep = this->initialSettings.coefficientStep;
-
-		// Per-Zernike overrides from table
-		for (int row = 0; row < this->overrideTable->rowCount(); ++row) {
-			QCheckBox* checkBox = qobject_cast<QCheckBox*>(
-				this->overrideTable->cellWidget(row, 2));
-			if (checkBox && checkBox->isChecked()) {
-				int nollIndex = this->overrideTable->item(row, 0)->text().toInt();
-				QDoubleSpinBox* minSpin = qobject_cast<QDoubleSpinBox*>(
-					this->overrideTable->cellWidget(row, 3));
-				QDoubleSpinBox* maxSpin = qobject_cast<QDoubleSpinBox*>(
-					this->overrideTable->cellWidget(row, 4));
-				if (minSpin && maxSpin) {
-					s.coefficientRangeOverrides[nollIndex] = qMakePair(minSpin->value(), maxSpin->value());
-				}
+	// Always capture settings from BOTH generator GroupBoxes
+	QVariantMap zernikeGs;
+	zernikeGs["noll_index_spec"] = this->nollIndicesEdit->text().trimmed();
+	zernikeGs["global_min"] = this->globalMinSpin->value();
+	zernikeGs["global_max"] = this->globalMaxSpin->value();
+	zernikeGs["step"] = this->initialSettings.coefficientStep;
+	QVariantMap overrides;
+	for (int row = 0; row < this->overrideTable->rowCount(); ++row) {
+		QCheckBox* checkBox = qobject_cast<QCheckBox*>(
+			this->overrideTable->cellWidget(row, 2));
+		if (checkBox && checkBox->isChecked()) {
+			int nollIndex = this->overrideTable->item(row, 0)->text().toInt();
+			QDoubleSpinBox* minSpin = qobject_cast<QDoubleSpinBox*>(
+				this->overrideTable->cellWidget(row, 3));
+			QDoubleSpinBox* maxSpin = qobject_cast<QDoubleSpinBox*>(
+				this->overrideTable->cellWidget(row, 4));
+			if (minSpin && maxSpin) {
+				QVariantMap range;
+				range["min"] = minSpin->value();
+				range["max"] = maxSpin->value();
+				overrides[QString::number(nollIndex)] = range;
+				s.coefficientRangeOverrides[nollIndex] = qMakePair(minSpin->value(), maxSpin->value());
 			}
 		}
+	}
+	zernikeGs["range_overrides"] = overrides;
+	s.allGeneratorSettings[QStringLiteral("Zernike")] = zernikeGs;
 
-		// Serialize Zernike-specific settings into generatorSettings
-		QVariantMap gs;
-		gs["noll_index_spec"] = s.nollIndexSpec;
-		gs["global_min"] = s.globalMinCoefficient;
-		gs["global_max"] = s.globalMaxCoefficient;
-		gs["step"] = s.coefficientStep;
-		QVariantMap overrides;
-		for (auto it = s.coefficientRangeOverrides.constBegin();
-			 it != s.coefficientRangeOverrides.constEnd(); ++it) {
-			QVariantMap range;
-			range["min"] = it.value().first;
-			range["max"] = it.value().second;
-			overrides[QString::number(it.key())] = range;
-		}
-		gs["range_overrides"] = overrides;
-		s.generatorSettings = gs;
-	} else {
-		// Deformable Mirror settings
-		QVariantMap gs;
-		gs["actuator_rows"] = this->dmRowsSpin->value();
-		gs["actuator_cols"] = this->dmColsSpin->value();
-		gs["coupling_coefficient"] = this->dmCouplingSpin->value();
-		gs["gaussian_index"] = this->dmGaussianIndexSpin->value();
-		gs["command_min"] = this->dmCommandMinSpin->value();
-		gs["command_max"] = this->dmCommandMaxSpin->value();
-		gs["command_step"] = this->dmCommandStepSpin->value();
-		s.generatorSettings = gs;
+	QVariantMap dmGs;
+	dmGs["actuator_rows"] = this->dmRowsSpin->value();
+	dmGs["actuator_cols"] = this->dmColsSpin->value();
+	dmGs["coupling_coefficient"] = this->dmCouplingSpin->value();
+	dmGs["gaussian_index"] = this->dmGaussianIndexSpin->value();
+	dmGs["command_min"] = this->dmCommandMinSpin->value();
+	dmGs["command_max"] = this->dmCommandMaxSpin->value();
+	dmGs["command_step"] = this->dmCommandStepSpin->value();
+	s.allGeneratorSettings[QStringLiteral("Deformable Mirror")] = dmGs;
+
+	// Active generator's generatorSettings is the matching entry
+	s.generatorSettings = s.allGeneratorSettings.value(s.generatorTypeName);
+
+	// Zernike convenience fields (for backward compat with PSFModule)
+	if (s.generatorTypeName == QLatin1String("Zernike")) {
+		s.nollIndexSpec = zernikeGs["noll_index_spec"].toString();
+		s.globalMinCoefficient = zernikeGs["global_min"].toDouble();
+		s.globalMaxCoefficient = zernikeGs["global_max"].toDouble();
+		s.coefficientStep = this->initialSettings.coefficientStep;
 	}
 
 	// PSF calculation (common)
@@ -373,9 +369,14 @@ void PSFSettingsDialog::setupUI()
 	this->resize(500, 600);
 }
 
-void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings,
-											  const QMap<QString, QVariantMap>& allGenSettings)
+void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 {
+	// Use allGeneratorSettings from PSFSettings; fall back to active generatorSettings for backward compat
+	QMap<QString, QVariantMap> allGenSettings = settings.allGeneratorSettings;
+	if (allGenSettings.isEmpty() && !settings.generatorSettings.isEmpty()) {
+		allGenSettings[settings.generatorTypeName] = settings.generatorSettings;
+	}
+
 	// Populate Zernike fields from the Zernike-specific settings map
 	QVariantMap zernikeGs = allGenSettings.value(QStringLiteral("Zernike"));
 	QString nollSpec = zernikeGs.value("noll_index_spec", "2-21").toString();
