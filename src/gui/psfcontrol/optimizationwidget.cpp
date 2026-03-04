@@ -305,7 +305,7 @@ void OptimizationWidget::setupPlotSection()
 {
 	this->metricPlot = new QCustomPlot(this);
 	this->metricPlot->addGraph();
-	this->metricPlot->graph(0)->setPen(QPen(QColor(0, 120, 215), 1.0));
+	this->metricPlot->graph(0)->setPen(QPen(QColor(0, 120, 215), 1.5));
 	this->metricPlot->xAxis->setLabel(tr("Iteration"));
 	this->metricPlot->yAxis->setLabel(tr("Metric"));
 
