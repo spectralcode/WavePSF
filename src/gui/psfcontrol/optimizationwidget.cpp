@@ -768,7 +768,7 @@ void OptimizationWidget::setSettings(const QVariantMap& settings)
 	}
 	this->startCoeffSourceComboBox->setCurrentIndex(settings.value("startCoeffSource", 0).toInt());
 	this->sourceParamSpinBox->setValue(settings.value("sourceParam", 0).toInt());
-	this->optimizeAllCheck->setChecked(settings.value("optimizeAll", true).toBool());
+	this->optimizeAllCheck->setChecked(settings.value("optimizeAll", false).toBool());
 	this->coefficientSpecLineEdit->setText(settings.value("coefficientSpec", "2-8").toString());
 	this->livePreviewCheckBox->setChecked(settings.value("livePreview", true).toBool());
 	this->livePreviewIntervalSpinBox->setValue(settings.value("livePreviewInterval", 10).toInt());

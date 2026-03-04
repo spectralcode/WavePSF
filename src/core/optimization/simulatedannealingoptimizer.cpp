@@ -6,17 +6,17 @@
 
 
 SimulatedAnnealingOptimizer::SimulatedAnnealingOptimizer()
-	: startTemperature(1.0)
+	: startTemperature(0.4)
 	, endTemperature(0.001)
-	, coolingFactor(0.95)
-	, startPerturbance(0.05)
-	, endPerturbance(0.001)
-	, iterationsPerTemperature(10)
+	, coolingFactor(0.996)
+	, startPerturbance(0.002)
+	, endPerturbance(0.0002)
+	, iterationsPerTemperature(1)
 	, liveEndTemperature(0.001)
-	, liveCoolingFactor(0.95)
-	, liveStartPerturbance(0.05)
-	, liveEndPerturbance(0.001)
-	, liveIterationsPerTemperature(10)
+	, liveCoolingFactor(0.996)
+	, liveStartPerturbance(0.002)
+	, liveEndPerturbance(0.0002)
+	, liveIterationsPerTemperature(1)
 {
 }
 
@@ -30,22 +30,22 @@ QVector<OptimizerParameter> SimulatedAnnealingOptimizer::getParameterDescriptors
 	return {
 		{ "startTemperature",        "Start Temperature",
 		  "Initial temperature for Metropolis acceptance criterion.\nHigher = more likely to accept worse solutions early on.",
-		  0.001,   1000.0, 0.1,   1.0,   3 },
+		  0.001,   1000.0, 0.1,   0.4,   3 },
 		{ "endTemperature",          "End Temperature",
 		  "Final temperature at which the algorithm stops.\nLower = longer annealing schedule.",
 		  0.00001, 100.0,  0.001, 0.001, 5 },
 		{ "coolingFactor",           "Cooling Factor",
 		  "Temperature multiplier per step (0-1).\nCloser to 1 = slower cooling, more thorough search.",
-		  0.01,    0.9999, 0.01,  0.95,  4 },
+		  0.01,    0.9999, 0.001, 0.996, 4 },
 		{ "startPerturbance",        "Start Perturbance",
 		  "Initial random step size for coefficient perturbation.\nLarger = bigger jumps early on.",
-		  0.0001,  10.0,   0.01,  0.05,  4 },
+		  0.0001,  10.0,   0.001, 0.002, 4 },
 		{ "endPerturbance",          "End Perturbance",
 		  "Final perturbation size.\nSmaller = finer refinement near the end.",
-		  0.0001,  10.0,   0.001, 0.001, 4 },
+		  0.0001,  10.0,   0.0001, 0.0002, 4 },
 		{ "iterationsPerTemperature","Iterations/Temperature",
 		  "Number of trial moves at each temperature level before cooling.",
-		  1,       10000,  1,     10,    0 }
+		  1,       10000,  1,     1,     0 }
 	};
 }
 

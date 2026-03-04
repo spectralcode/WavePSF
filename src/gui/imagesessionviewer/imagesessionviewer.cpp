@@ -28,8 +28,8 @@ namespace {
 	const double DEFAULT_MIN = 0.0;
 	const double DEFAULT_MAX = 255.0;
 	const bool  DEFAULT_SYNC_VIEWS = false;
-	const int DEFAULT_PATCH_COLS = 4;
-	const int DEFAULT_PATCH_ROWS = 4;
+	const int DEFAULT_PATCH_COLS = 6;
+	const int DEFAULT_PATCH_ROWS = 8;
 	const int DEFAULT_BORDER_EXTENSION = 10;
 }
 

@@ -18,8 +18,8 @@ struct PSFSettings {
 	QString nollIndexSpec = "2-21";
 
 	// Coefficient range
-	double globalMinCoefficient = -0.3;
-	double globalMaxCoefficient = 0.3;
+	double globalMinCoefficient = -0.03;
+	double globalMaxCoefficient = 0.03;
 	double coefficientStep = 0.001;
 	QMap<int, QPair<double,double>> coefficientRangeOverrides; // nollIndex -> (min, max)
 
