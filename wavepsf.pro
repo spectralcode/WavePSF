@@ -2,6 +2,9 @@ QT += core gui widgets printsupport
 
 CONFIG += c++11
 TARGET = WavePSF
+VERSION = 1.0.0
+DEFINES += APP_NAME=\\\"$$TARGET\\\"
+DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 include($$PWD/pri/logging.pri) #disable debug messages on release build
 

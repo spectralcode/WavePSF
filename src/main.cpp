@@ -16,16 +16,14 @@ int main(int argc, char *argv[])
 	MessageRouter::instance()->install();
 
 	//application properties
-	a.setApplicationName("WavePSF");
-	a.setApplicationVersion("0.1");
+	a.setApplicationName(APP_NAME);
+	a.setApplicationVersion(APP_VERSION);
 	a.setWindowIcon(QIcon(QStringLiteral(":/icons/wavepsf.ico")));
 	
 	//create settings managers
 	QString settingsDir = QCoreApplication::applicationDirPath(); //file paths next to executable
 	//QString settingsDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation); //file paths in user's app data directory
 	SettingsFileManager guiSettings(QDir(settingsDir).filePath("wavepsf.ini"));
-
-	//todo: hier weitermachen: remove paraemterSettings, only use guiSettings from now on (maybe rename it?) and rename gui.ini to wavepsf.ini
 
 	//create style manager
 	StyleManager styleManager(&a, &guiSettings);
@@ -35,7 +33,7 @@ int main(int argc, char *argv[])
 	
 	//create and show main window
 	MainWindow w(&guiSettings, &styleManager, &applicationController);
-	w.setWindowTitle("WavePSF");
+	w.setWindowTitle(a.applicationName());
 	w.show();
 	
 	return a.exec();
