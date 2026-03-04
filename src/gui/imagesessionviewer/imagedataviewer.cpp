@@ -94,6 +94,10 @@ void ImageDataViewer::disconnectImageData()
 void ImageDataViewer::connectReferenceImageData(const ImageData* referenceImageData)
 {
 	this->referenceImageData = referenceImageData;
+	this->gtToggleButton->setVisible(referenceImageData != nullptr);
+	if (referenceImageData == nullptr) {
+		this->gtToggleButton->setChecked(false);
+	}
 }
 
 const ImageData* ImageDataViewer::getImageData() const
@@ -103,8 +107,7 @@ const ImageData* ImageDataViewer::getImageData() const
 
 void ImageDataViewer::setCurrentFrame(int frame)
 {
-	const ImageData* dataSource = this->getCurrentDataSource();
-	if (dataSource != nullptr && frame >= 0 && frame < dataSource->getFrames()) {
+	if (this->imageData != nullptr && frame >= 0 && frame < this->imageData->getFrames()) {
 		this->displayFrame(frame);
 	}
 }
@@ -358,7 +361,9 @@ void ImageDataViewer::beginReferencePreview()
 
 void ImageDataViewer::endReferencePreview()
 {
-	this->showReference(false);
+	if (!this->gtToggleButton->isChecked()) {
+		this->showReference(false);
+	}
 	emit toggleReleased();
 }
 
@@ -374,6 +379,16 @@ void ImageDataViewer::setupUI()
 	this->labelViewerName->setStyleSheet("#viewerNameLabel { font-weight: bold; color: #333; }");
 	topBarLayout->addWidget(this->labelViewerName);
 	topBarLayout->addStretch();
+
+	this->gtToggleButton = new QToolButton(this);
+	this->gtToggleButton->setText(tr("GT"));
+	this->gtToggleButton->setCheckable(true);
+	this->gtToggleButton->setVisible(false);
+	this->gtToggleButton->setAutoRaise(true);
+	this->gtToggleButton->setStyleSheet("QToolButton { padding: 0px 4px; }");
+	this->gtToggleButton->setToolTip(tr("Toggle ground truth preview (shortcut: click on patch and hold X)"));
+	topBarLayout->addWidget(this->gtToggleButton);
+
 	mainLayout->addLayout(topBarLayout);
 
 	this->frameView = new GraphicsView(this);
@@ -417,6 +432,9 @@ void ImageDataViewer::connectSignals()
 	connect(this->frameView, &GraphicsView::togglePressed, this, &ImageDataViewer::beginReferencePreview);
 	connect(this->frameView, &GraphicsView::toggleReleased, this, &ImageDataViewer::endReferencePreview);
 	connect(this->frameView, &GraphicsView::fileDropRequested, this, &ImageDataViewer::inputFileDropRequested);
+	connect(this->gtToggleButton, &QToolButton::clicked, this, [this](bool checked) {
+		this->showReference(checked);
+	});
 }
 
 void ImageDataViewer::updateInfoDisplay()
@@ -426,7 +444,7 @@ void ImageDataViewer::updateInfoDisplay()
 
 void ImageDataViewer::showReference(bool show)
 {
-	if(	this->showingReference == show){
+	if (this->showingReference == show) {
 		return;
 	}
 	this->showingReference = show;

@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QLabel>
+#include <QToolButton>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFocusEvent>
@@ -85,6 +86,7 @@ private:
 
 	GraphicsView* frameView;
 	QLabel* labelViewerName;
+	QToolButton* gtToggleButton;
 	QLabel* labelFrameName;
 	QLabel* labelX;
 	QLabel* labelXCoordinate;
