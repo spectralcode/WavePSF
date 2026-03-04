@@ -51,5 +51,3 @@ Should work, not tested yet.
 
 ## License
 GPL-3.0 License. See [LICENSE](LICENSE) for details.
-
-If you need a different licensing arrangement, feel free to reach out: zabic<span style="display:none">magic</span>@spectralcode&#46;&#100;&#101;</em></p>
