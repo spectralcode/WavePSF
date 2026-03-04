@@ -612,6 +612,5 @@ void ImageSessionViewer::updateDataInViewers()
 			});
 		}
 
-		LOG_INFO() << "Data connected to viewers";
 	}
 }
