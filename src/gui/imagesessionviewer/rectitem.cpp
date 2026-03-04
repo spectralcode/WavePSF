@@ -32,7 +32,9 @@ void RectItem::setRectSelected(bool selected)
 {
 	if(selected){
 		this->setPen(this->penActive);
+		this->setZValue(1.0);
 	} else {
 		this->setPen(this->penInactive);
+		this->setZValue(0.0);
 	}
 }
