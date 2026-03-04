@@ -1,5 +1,6 @@
 #include "deconvolver.h"
 #include "utils/logging.h"
+#include <algorithm>
 
 
 Deconvolver::Deconvolver(int iterations, QObject* parent)
@@ -154,17 +155,22 @@ QStringList Deconvolver::getAlgorithmNames()
 
 af::array Deconvolver::wienerDeconvolution(const af::array& blurredInput, const af::array& psf, float nsr) const
 {
-	// The PSF is center-placed (fftshift'd from PSFCalculator). Move peak to origin
-	// so that FFT zero-padding or cropping always preserves the peak correctly.
+	// Standard ifftshift: move PSF center to origin so the linear phase term
+	// from tip/tilt correctly shifts the deconvolved output.
 	int psfRows = psf.dims(0);
 	int psfCols = psf.dims(1);
 	af::array psfCorner = af::shift(psf, -(psfRows / 2), -(psfCols / 2));
 
-	// Fourier Transform of the blurred image
-	af::array G = af::fft2(blurredInput);
+	// Compute at the larger of image and PSF size to avoid truncating the PSF.
+	// When PSF > image: zero-pad image to PSF size (no PSF truncation).
+	// When PSF <= image: zero-pad PSF to image size (standard behavior).
+	int inRows = blurredInput.dims(0);
+	int inCols = blurredInput.dims(1);
+	int compRows = (std::max)(inRows, psfRows);
+	int compCols = (std::max)(inCols, psfCols);
 
-	// Fourier Transform of the PSF, padded/cropped to input dimensions
-	af::array H = af::fft2(psfCorner, blurredInput.dims(0), blurredInput.dims(1));
+	af::array G = af::fft2(blurredInput, compRows, compCols);
+	af::array H = af::fft2(psfCorner, compRows, compCols);
 
 	// Conjugate of the PSF spectrum
 	af::array HConj = af::conjg(H);
@@ -174,9 +180,10 @@ af::array Deconvolver::wienerDeconvolution(const af::array& blurredInput, const 
 
 	// Apply filter in frequency domain and inverse FFT
 	af::array F = WienerFilter * G;
-	af::array result = af::ifft2(F);
+	af::array result = af::real(af::ifft2(F));
 
-	return af::real(result);
+	// Crop back to original image size (only differs when PSF was larger than image)
+	return result(af::seq(inRows), af::seq(inCols));
 }
 
 void Deconvolver::conserveTotalIntensity(const af::array& blurredInput, af::array& result)
