@@ -305,9 +305,9 @@ void OptimizationWidget::setupPlotSection()
 {
 	this->metricPlot = new QCustomPlot(this);
 	this->metricPlot->addGraph();
+	this->metricPlot->graph(0)->setPen(QPen(QColor(0, 120, 215), 1.0));
 	this->metricPlot->xAxis->setLabel(tr("Iteration"));
 	this->metricPlot->yAxis->setLabel(tr("Metric"));
-	this->metricPlot->graph(0)->setPen(QPen(QColor(0, 120, 215), 1.5));
 
 	// Enable zoom and pan
 	this->metricPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
@@ -555,7 +555,7 @@ void OptimizationWidget::updateProgress(const OptimizationProgress& progress)
 
 	// Accumulate plot data (cheap)
 	this->plotIterations.append(this->plotIterations.size());
-	this->plotMetricValues.append(progress.bestMetric);
+	this->plotMetricValues.append(progress.currentMetric);
 	this->metricPlot->graph(0)->setData(this->plotIterations, this->plotMetricValues);
 
 	// Throttle the expensive replot() to ~5/sec to keep GUI responsive
