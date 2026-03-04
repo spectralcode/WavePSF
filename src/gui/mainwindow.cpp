@@ -81,10 +81,6 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	this->updateStyleMenuChecks(this->styleManager->getStyleMode());
 
 	qApp->installEventFilter(this);
-
-	LOG_INFO() << tr("test info");
-	LOG_WARNING() << tr("test warning");
-	LOG_DEBUG() << "test debug";
 }
 
 MainWindow::~MainWindow() {
