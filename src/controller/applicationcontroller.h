@@ -62,6 +62,7 @@ public slots:
 	// Session state management - slots for GUI widgets
 	void setCurrentFrame(int frame);
 	void setCurrentPatch(int x, int y);
+	void navigatePatch(int dx, int dy);
 	void configurePatchGrid(int cols, int rows, int borderExtension = 0);
 
 	// PSF pipeline - slots for GUI widgets

@@ -136,6 +136,7 @@ signals:
 	void inputFileDropRequested(const QString& filePath);
 
 	void viewTransformChanged(QTransform transform, QPointF centerInScene);
+	void navigatePatch(int dx, int dy);
 };
 
 #endif // IMAGEDATAVIEWER_H

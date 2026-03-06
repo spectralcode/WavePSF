@@ -464,6 +464,8 @@ void MainWindow::connectImageSessionViewer() {
 				this->applicationController, &ApplicationController::pasteCoefficients);
 		connect(this->sessionViewer, &ImageSessionViewer::resetCoefficientsRequested,
 				this->applicationController, &ApplicationController::resetPSFCoefficients);
+		connect(this->sessionViewer, &ImageSessionViewer::navigatePatch,
+				this->applicationController, &ApplicationController::navigatePatch);
 
 		LOG_DEBUG() << "ImageSessionViewer signal connections established";
 	}

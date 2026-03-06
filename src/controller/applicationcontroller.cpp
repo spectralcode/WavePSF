@@ -76,6 +76,14 @@ void ApplicationController::setCurrentPatch(int x, int y)
 	}
 }
 
+void ApplicationController::navigatePatch(int dx, int dy)
+{
+	if (!this->hasInputData()) return;
+	int x = qBound(0, this->getCurrentPatchX() + dx, this->getPatchGridCols() - 1);
+	int y = qBound(0, this->getCurrentPatchY() + dy, this->getPatchGridRows() - 1);
+	this->setCurrentPatch(x, y);
+}
+
 void ApplicationController::configurePatchGrid(int cols, int rows, int borderExtension)
 {
 	if (this->imageSession != nullptr) {

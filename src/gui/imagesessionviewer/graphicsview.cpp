@@ -188,6 +188,32 @@ void GraphicsView::keyPressEvent(QKeyEvent* event) {
 			emitViewTransform();
 			break;
 
+		case Qt::Key_Left:
+		case Qt::Key_Right:
+		case Qt::Key_Up:
+		case Qt::Key_Down: {
+			double vx = 0, vy = 0;
+			if      (event->key() == Qt::Key_Left)  vx = -1;
+			else if (event->key() == Qt::Key_Right) vx =  1;
+			else if (event->key() == Qt::Key_Up)    vy = -1;
+			else                                    vy =  1;
+
+			bool invertible;
+			QTransform inv = this->transform().inverted(&invertible);
+			if (invertible) {
+				double sx = inv.m11() * vx + inv.m21() * vy;
+				double sy = inv.m12() * vx + inv.m22() * vy;
+				int dx = 0, dy = 0;
+				if (qAbs(sx) >= qAbs(sy))
+					dx = (sx >= 0) ? 1 : -1;
+				else
+					dy = (sy >= 0) ? 1 : -1;
+				emit navigatePatch(dx, dy);
+			}
+			event->accept();
+			break;
+		}
+
 		default:
 			QGraphicsView::keyPressEvent(event);
 	}

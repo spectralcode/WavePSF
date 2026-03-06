@@ -481,6 +481,10 @@ void ImageSessionViewer::connectSignals()
 	connect(this->outputViewer, &ImageDataViewer::copyPressed, this, &ImageSessionViewer::copyCoefficientsRequested);
 	connect(this->outputViewer, &ImageDataViewer::pastePressed, this, &ImageSessionViewer::pasteCoefficientsRequested);
 	connect(this->outputViewer, &ImageDataViewer::deletePressed, this, &ImageSessionViewer::resetCoefficientsRequested);
+
+	// Forward patch navigation from both viewers
+	connect(this->inputViewer,  &ImageDataViewer::navigatePatch, this, &ImageSessionViewer::navigatePatch);
+	connect(this->outputViewer, &ImageDataViewer::navigatePatch, this, &ImageSessionViewer::navigatePatch);
 }
 
 void ImageSessionViewer::updateFrameControls()

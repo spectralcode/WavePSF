@@ -433,6 +433,7 @@ void ImageDataViewer::connectSignals()
 	connect(this->frameView, &GraphicsView::toggleReleased, this, &ImageDataViewer::endReferencePreview);
 	connect(this->frameView, &GraphicsView::fileDropRequested, this, &ImageDataViewer::inputFileDropRequested);
 	connect(this->frameView, &GraphicsView::viewTransformChanged, this, &ImageDataViewer::viewTransformChanged);
+	connect(this->frameView, &GraphicsView::navigatePatch, this, &ImageDataViewer::navigatePatch);
 	connect(this->gtToggleButton, &QToolButton::clicked, this, [this](bool checked) {
 		this->showReference(checked);
 	});

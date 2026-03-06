@@ -72,6 +72,8 @@ signals:
 	void pasteCoefficientsRequested();
 	void resetCoefficientsRequested();
 
+	void navigatePatch(int dx, int dy);
+
 	// Settings propagation
 	void patchGridConfigurationRequested(int cols, int rows, int borderExtension);
 

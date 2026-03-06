@@ -77,6 +77,7 @@ signals:
 	void toggleReleased();
 	void fileDropRequested(const QString& filePath);
 	void viewTransformChanged(QTransform transform, QPointF centerInScene);
+	void navigatePatch(int dx, int dy);
 };
 
 #endif // GRAPHICSVIEW_H
