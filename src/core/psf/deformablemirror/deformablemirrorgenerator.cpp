@@ -14,9 +14,9 @@ namespace {
 	const int    DEF_ACTUATOR_COLS        = 8;
 	const double DEF_COUPLING_COEFFICIENT = 0.25;
 	const double DEF_GAUSSIAN_INDEX       = 1.5;
-	const double DEF_COMMAND_MIN          = -1.0;
-	const double DEF_COMMAND_MAX          =  1.0;
-	const double DEF_COMMAND_STEP         =  0.01;
+	const double DEF_COMMAND_MIN          = -10.0;
+	const double DEF_COMMAND_MAX          =  10.0;
+	const double DEF_COMMAND_STEP         =  0.1;
 }
 
 
