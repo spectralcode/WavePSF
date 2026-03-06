@@ -278,20 +278,14 @@ void PSFSettingsDialog::setupUI()
 	dmLayout->addRow(tr("Command Step:"), this->dmCommandStepSpin);
 
 	// Auto-apply DM settings on any value change for live preview
-	connect(this->dmRowsSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-			this, &PSFSettingsDialog::onApplyClicked);
-	connect(this->dmColsSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-			this, &PSFSettingsDialog::onApplyClicked);
-	connect(this->dmCouplingSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-			this, &PSFSettingsDialog::onApplyClicked);
-	connect(this->dmGaussianIndexSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-			this, &PSFSettingsDialog::onApplyClicked);
-	connect(this->dmCommandMinSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-			this, &PSFSettingsDialog::onApplyClicked);
-	connect(this->dmCommandMaxSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-			this, &PSFSettingsDialog::onApplyClicked);
-	connect(this->dmCommandStepSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-			this, &PSFSettingsDialog::onApplyClicked);
+	auto emitSettings = [this]() { emit settingsApplied(this->getSettings()); };
+	connect(this->dmRowsSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, emitSettings);
+	connect(this->dmColsSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, emitSettings);
+	connect(this->dmCouplingSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitSettings);
+	connect(this->dmGaussianIndexSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitSettings);
+	connect(this->dmCommandMinSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitSettings);
+	connect(this->dmCommandMaxSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitSettings);
+	connect(this->dmCommandStepSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitSettings);
 
 	wavefrontLayout->addWidget(this->dmGroupBox);
 
