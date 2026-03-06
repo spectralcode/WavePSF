@@ -80,7 +80,6 @@ QVector<WavefrontGeneratorSetting> DeformableMirrorGenerator::getSettingsDescrip
 		  2, 64, 1, static_cast<double>(DEF_ACTUATOR_COLS), 0 },
 		{ KEY_COUPLING_COEFFICIENT, "Coupling Coefficient",
 		  "Inter-actuator coupling (typical 0.05-0.30).\n"
-		  "Fraction of peak influence reaching the adjacent actuator.\n"
 		  "Higher = smoother wavefront, more overlap between actuators.\n"
 		  "Lower = sharper, more localized actuator influence.",
 		  0.01, 1.0, 0.01, DEF_COUPLING_COEFFICIENT, 3 },
