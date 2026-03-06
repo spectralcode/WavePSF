@@ -10,7 +10,7 @@ class PSFCalculator : public QObject
 public:
 	enum NormalizationMode { SumNormalization = 0, PeakNormalization = 1, NoNormalization = 2 };
 
-	explicit PSFCalculator(double phaseScale = 114.240, double apertureRadius = 0.4, QObject* parent = nullptr);
+	explicit PSFCalculator(double phaseScale = 1.0, double apertureRadius = 1.0, QObject* parent = nullptr);
 	~PSFCalculator() override;
 
 	af::array computePSF(const af::array& wavefront);

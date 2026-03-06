@@ -18,9 +18,9 @@ struct PSFSettings {
 	QString nollIndexSpec = "2-21";
 
 	// Coefficient range
-	double globalMinCoefficient = -0.03;
-	double globalMaxCoefficient = 0.03;
-	double coefficientStep = 0.001;
+	double globalMinCoefficient = -3.0;
+	double globalMaxCoefficient = 3.0;
+	double coefficientStep = 0.1;
 	QMap<int, QPair<double,double>> coefficientRangeOverrides; // nollIndex -> (min, max)
 
 	// --- Common PSF calculator settings (shared by all generators) ---

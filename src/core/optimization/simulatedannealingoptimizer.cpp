@@ -17,24 +17,24 @@ namespace {
 	const double DEF_START_TEMPERATURE          = 0.4;
 	const double DEF_END_TEMPERATURE            = 0.001;
 	const double DEF_COOLING_FACTOR             = 0.996;
-	const double DEF_START_PERTURBANCE          = 0.002;
-	const double DEF_END_PERTURBANCE            = 0.0002;
+	const double DEF_START_PERTURBANCE          = 0.2;
+	const double DEF_END_PERTURBANCE            = 0.02;
 	const int    DEF_ITERATIONS_PER_TEMPERATURE = 1;
 }
 
 
 SimulatedAnnealingOptimizer::SimulatedAnnealingOptimizer()
-	: startTemperature(0.4)
-	, endTemperature(0.001)
-	, coolingFactor(0.996)
-	, startPerturbance(0.002)
-	, endPerturbance(0.0002)
-	, iterationsPerTemperature(1)
-	, liveEndTemperature(0.001)
-	, liveCoolingFactor(0.996)
-	, liveStartPerturbance(0.002)
-	, liveEndPerturbance(0.0002)
-	, liveIterationsPerTemperature(1)
+	: startTemperature(DEF_START_TEMPERATURE)
+	, endTemperature(DEF_END_TEMPERATURE)
+	, coolingFactor(DEF_COOLING_FACTOR)
+	, startPerturbance(DEF_START_PERTURBANCE)
+	, endPerturbance(DEF_END_PERTURBANCE)
+	, iterationsPerTemperature(DEF_ITERATIONS_PER_TEMPERATURE)
+	, liveEndTemperature(DEF_END_TEMPERATURE)
+	, liveCoolingFactor(DEF_COOLING_FACTOR)
+	, liveStartPerturbance(DEF_START_PERTURBANCE)
+	, liveEndPerturbance(DEF_END_PERTURBANCE)
+	, liveIterationsPerTemperature(DEF_ITERATIONS_PER_TEMPERATURE)
 {
 }
 
@@ -57,10 +57,10 @@ QVector<OptimizerParameter> SimulatedAnnealingOptimizer::getParameterDescriptors
 		  0.01,    0.9999, 0.001, 0.996, 4 },
 		{ KEY_START_PERTURBANCE,          "Start Perturbance",
 		  "Initial random step size for coefficient perturbation.\nLarger = bigger jumps early on.",
-		  0.0001,  10.0,   0.001, 0.002, 4 },
+		  0.0001,  10.0,   0.001, DEF_START_PERTURBANCE, 4 },
 		{ KEY_END_PERTURBANCE,            "End Perturbance",
 		  "Final perturbation size.\nSmaller = finer refinement near the end.",
-		  0.0001,  10.0,   0.0001, 0.0002, 4 },
+		  0.0001,  10.0,   0.0001, DEF_END_PERTURBANCE, 4 },
 		{ KEY_ITERATIONS_PER_TEMPERATURE, "Iterations/Temperature",
 		  "Number of trial moves at each temperature level before cooling.",
 		  1,       10000,  1,     1,     0 }
