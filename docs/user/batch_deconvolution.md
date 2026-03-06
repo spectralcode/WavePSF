@@ -5,7 +5,7 @@ Deconvolves all patches of every frame in one go using stored Zernike coefficien
 ## Workflow
 
 1. Load input image data (**File > Open Image Data**)
-2. Load a CSV parameter file (**File > Load Parameters**)
+2. Load a CSV parameter file (**File > Load Wavefront Coefficients**)
 3. Run **Processing > Deconvolve All Frames** (Ctrl+Shift+D)
 
 A progress dialog shows the current frame and patch. Press **Cancel** to stop early — patches processed so far are kept.

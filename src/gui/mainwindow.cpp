@@ -153,15 +153,15 @@ void MainWindow::setupFileMenu() {
 	this->fileMenu->addSeparator();
 
 	// Save Parameters action
-	this->saveParametersAction = new QAction("&Save Parameters...", this);
+	this->saveParametersAction = new QAction("&Save Wavefront Coefficients...", this);
 	this->saveParametersAction->setShortcut(QKeySequence::Save);
-	this->saveParametersAction->setStatusTip("Save wavefront parameters to CSV file");
+	this->saveParametersAction->setStatusTip("Save wavefront coefficients to CSV file");
 	connect(this->saveParametersAction, &QAction::triggered, this, &MainWindow::saveParameters);
 	this->fileMenu->addAction(this->saveParametersAction);
 
 	// Load Parameters action
-	this->loadParametersAction = new QAction("&Load Parameters...", this);
-	this->loadParametersAction->setStatusTip("Load wavefront parameters from CSV file");
+	this->loadParametersAction = new QAction("&Load Wavefront Coefficients...", this);
+	this->loadParametersAction->setStatusTip("Load wavefront coefficients from CSV file");
 	connect(this->loadParametersAction, &QAction::triggered, this, &MainWindow::loadParameters);
 	this->fileMenu->addAction(this->loadParametersAction);
 

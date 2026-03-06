@@ -56,7 +56,7 @@ QString ShortcutsDialog::buildHtml(const QString& keyColor)
 	html += section(tr("File Operations"));
 	html += row(tr("Ctrl+O"),          tr("Open image data"));
 	html += row(tr("Ctrl+G"),          tr("Open ground truth image"));
-	html += row(tr("Ctrl+S"),          tr("Save parameters (CSV)"));
+	html += row(tr("Ctrl+S"),          tr("Save Wavefront Coefficients (CSV)"));
 	html += row(tr("Ctrl+Shift+S"),    tr("Save output data"));
 	html += row(tr("Ctrl+Q"),          tr("Exit"));
 	html += QStringLiteral("</table>");
