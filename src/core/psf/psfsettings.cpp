@@ -13,7 +13,7 @@ namespace {
 	const QString KEY_COEFFICIENT_STEP            = QStringLiteral("coefficient_step");
 	const QString KEY_COEFFICIENT_RANGE_OVERRIDES = QStringLiteral("coefficient_range_overrides");
 	const QString KEY_GRID_SIZE                   = QStringLiteral("grid_size");
-	const QString KEY_WAVELENGTH_NM               = QStringLiteral("wavelength_nm");
+	const QString KEY_PHASE_SCALE                 = QStringLiteral("phase_scale");
 	const QString KEY_APERTURE_RADIUS             = QStringLiteral("aperture_radius");
 	const QString KEY_NORMALIZATION_MODE          = QStringLiteral("normalization_mode");
 	const QString KEY_PADDING_FACTOR              = QStringLiteral("padding_factor");
@@ -24,11 +24,11 @@ namespace {
 	// Default values (match PSFSettings struct defaults)
 	const QString DEF_GENERATOR_TYPE_NAME    = QStringLiteral("Zernike");
 	const QString DEF_NOLL_INDEX_SPEC        = QStringLiteral("2-21");
-	const double  DEF_GLOBAL_MIN_COEFFICIENT = -0.03;
-	const double  DEF_GLOBAL_MAX_COEFFICIENT =  0.03;
-	const double  DEF_COEFFICIENT_STEP       =  0.001;
+	const double  DEF_GLOBAL_MIN_COEFFICIENT = -3.0;
+	const double  DEF_GLOBAL_MAX_COEFFICIENT =  3.0;
+	const double  DEF_COEFFICIENT_STEP       =  0.1;
 	const int     DEF_GRID_SIZE              =  128;
-	const double  DEF_WAVELENGTH_NM          =  55.0;
+	const double  DEF_PHASE_SCALE            =  1.0;
 	const double  DEF_APERTURE_RADIUS        =  1.0;
 	const int     DEF_NORMALIZATION_MODE     =  0;
 	const int     DEF_PADDING_FACTOR         =  1;
@@ -136,7 +136,7 @@ QVariantMap serializePSFSettings(const PSFSettings& settings)
 	map[KEY_GLOBAL_MAX_COEFFICIENT] = settings.globalMaxCoefficient;
 	map[KEY_COEFFICIENT_STEP]       = settings.coefficientStep;
 	map[KEY_GRID_SIZE]              = settings.gridSize;
-	map[KEY_WAVELENGTH_NM]          = settings.wavelengthNm;
+	map[KEY_PHASE_SCALE]            = settings.phaseScale;
 	map[KEY_APERTURE_RADIUS]        = settings.apertureRadius;
 	map[KEY_NORMALIZATION_MODE]     = settings.normalizationMode;
 	map[KEY_PADDING_FACTOR]         = settings.paddingFactor;
@@ -175,7 +175,7 @@ PSFSettings deserializePSFSettings(const QVariantMap& map)
 	settings.globalMaxCoefficient = map.value(KEY_GLOBAL_MAX_COEFFICIENT,  DEF_GLOBAL_MAX_COEFFICIENT).toDouble();
 	settings.coefficientStep      = map.value(KEY_COEFFICIENT_STEP,        DEF_COEFFICIENT_STEP).toDouble();
 	settings.gridSize             = map.value(KEY_GRID_SIZE,               DEF_GRID_SIZE).toInt();
-	settings.wavelengthNm         = map.value(KEY_WAVELENGTH_NM,           DEF_WAVELENGTH_NM).toDouble();
+	settings.phaseScale           = map.value(KEY_PHASE_SCALE,             DEF_PHASE_SCALE).toDouble();
 	settings.apertureRadius       = map.value(KEY_APERTURE_RADIUS,         DEF_APERTURE_RADIUS).toDouble();
 	settings.normalizationMode    = map.value(KEY_NORMALIZATION_MODE,      DEF_NORMALIZATION_MODE).toInt();
 	settings.paddingFactor        = map.value(KEY_PADDING_FACTOR,          DEF_PADDING_FACTOR).toInt();

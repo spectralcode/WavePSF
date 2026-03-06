@@ -21,7 +21,7 @@ PSFModule::PSFModule(QObject* parent)
 	}
 
 	this->generator = new ZernikeGenerator(2, 21, this);
-	this->calculator = new PSFCalculator(0.055, 0.4, this);
+	this->calculator = new PSFCalculator(1.0, 1.0, this);
 	this->deconvolver = new Deconvolver(128, this);
 
 	connect(this->deconvolver, &Deconvolver::error, this, &PSFModule::error);
@@ -74,7 +74,7 @@ PSFSettings PSFModule::getPSFSettings() const
 		s.coefficientRangeOverrides = zg->getRangeOverrides();
 	}
 	s.gridSize = this->gridSize;
-	s.wavelengthNm = this->calculator->getLambda() * 1000.0;  // µm → nm
+	s.phaseScale = this->calculator->getPhaseScale();
 	s.apertureRadius = this->calculator->getApertureRadius();
 	s.normalizationMode = static_cast<int>(this->calculator->getNormalizationMode());
 	s.paddingFactor = this->calculator->getPaddingFactor();
@@ -207,7 +207,7 @@ void PSFModule::applyPSFSettings(const PSFSettings& settings)
 	}
 
 	this->gridSize = settings.gridSize;
-	this->calculator->setLambda(settings.wavelengthNm / 1000.0);  // nm → µm
+	this->calculator->setPhaseScale(settings.phaseScale);
 	this->calculator->setApertureRadius(settings.apertureRadius);
 	this->calculator->setApertureGeometry(settings.apertureGeometry);
 	this->calculator->setNormalizationMode(

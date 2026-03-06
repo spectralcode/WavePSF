@@ -10,13 +10,13 @@ class PSFCalculator : public QObject
 public:
 	enum NormalizationMode { SumNormalization = 0, PeakNormalization = 1, NoNormalization = 2 };
 
-	explicit PSFCalculator(double lambda = 0.055, double apertureRadius = 0.4, QObject* parent = nullptr);
+	explicit PSFCalculator(double phaseScale = 114.240, double apertureRadius = 0.4, QObject* parent = nullptr);
 	~PSFCalculator() override;
 
 	af::array computePSF(const af::array& wavefront);
 
-	void setLambda(double lambda);
-	double getLambda() const;
+	void setPhaseScale(double phaseScale);
+	double getPhaseScale() const;
 	void setApertureRadius(double radius);
 	double getApertureRadius() const;
 	void setNormalizationMode(NormalizationMode mode);
@@ -27,7 +27,7 @@ public:
 	int getApertureGeometry() const;
 
 private:
-	double lambda;
+	double phaseScale;
 	double apertureRadius;
 	NormalizationMode normMode;
 	int paddingFactor;

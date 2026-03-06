@@ -78,6 +78,7 @@ private:
 	QComboBox* apertureGeometryCombo;
 	QComboBox* normalizationCombo;
 	QComboBox* paddingFactorCombo;
+	QDoubleSpinBox* phaseScaleSpin;
 
 	// Display controls
 	QCheckBox* displayAutoRangeCheck;

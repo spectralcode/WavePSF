@@ -4,9 +4,9 @@
 #include <algorithm>
 
 namespace {
-	const double DEF_GLOBAL_MIN = -0.03;
-	const double DEF_GLOBAL_MAX =  0.03;
-	const double DEF_STEP       =  0.001;
+	const double DEF_GLOBAL_MIN = -3.0;
+	const double DEF_GLOBAL_MAX =  3;
+	const double DEF_STEP       =  0.1;
 }
 
 

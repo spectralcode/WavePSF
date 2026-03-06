@@ -65,7 +65,7 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 	}
 	generator->deserializeSettings(config.psfSettings.generatorSettings);
 
-	PSFCalculator calculator(config.psfSettings.wavelengthNm / 1000.0,
+	PSFCalculator calculator(config.psfSettings.phaseScale,
 							 config.psfSettings.apertureRadius);
 	calculator.setNormalizationMode(
 		static_cast<PSFCalculator::NormalizationMode>(config.psfSettings.normalizationMode));

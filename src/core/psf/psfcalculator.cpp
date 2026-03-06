@@ -2,9 +2,9 @@
 #include "apertureutils.h"
 
 
-PSFCalculator::PSFCalculator(double lambda, double apertureRadius, QObject* parent)
+PSFCalculator::PSFCalculator(double phaseScale, double apertureRadius, QObject* parent)
 	: QObject(parent)
-	, lambda(lambda)
+	, phaseScale(phaseScale)
 	, apertureRadius(apertureRadius)
 	, normMode(SumNormalization)
 	, paddingFactor(1)
@@ -25,11 +25,12 @@ af::array PSFCalculator::computePSF(const af::array& wavefront)
 		this->buildApertureCache(gridSize);
 	}
 
-	// scaling factor converts from unit of wavefront to radians of phase, but is actually
+	// scaling factor (= 2pi/lambda) converts from unit of wavefront to radians of phase, but is actually
 	// not needed here since the Zernike coefficients (the thing the optimization algorithm optimizes) 
 	// are dimensionless and can be interpreted as phase values directly.
-	// todo: maybe remove scaling factor here (currently onle kept to match an earlier implementaion)
-	float phaseScale = static_cast<float>(2.0 * af::Pi / this->lambda);
+	// I keep this for now as it allows me to recreate some results that were 
+	//generated with a different code, where the phase scale value 114.240 was hardcoded
+	float phaseScale = static_cast<float>(this->phaseScale);
 	af::array phase = phaseScale * wavefront;
 
 	// Pupil function = complex(cos(phase), sin(phase)) * aperture mask
@@ -76,14 +77,14 @@ af::array PSFCalculator::computePSF(const af::array& wavefront)
 	return psf;
 }
 
-void PSFCalculator::setLambda(double lambda)
+void PSFCalculator::setPhaseScale(double phaseScale)
 {
-	this->lambda = lambda;
+	this->phaseScale = phaseScale;
 }
 
-double PSFCalculator::getLambda() const
+double PSFCalculator::getPhaseScale() const
 {
-	return this->lambda;
+	return this->phaseScale;
 }
 
 void PSFCalculator::setApertureRadius(double radius)

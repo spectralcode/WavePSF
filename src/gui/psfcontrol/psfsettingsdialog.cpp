@@ -47,6 +47,8 @@ PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
 			this, [this]() { emit settingsApplied(this->getSettings()); });
 	connect(this->apertureGeometryCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 			this, [this]() { emit settingsApplied(this->getSettings()); });
+	connect(this->phaseScaleSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, [this]() { emit settingsApplied(this->getSettings()); });
 
 	// Restore original settings on Cancel/close (but keep current generator type)
 	connect(this, &QDialog::rejected, this, [this]() {
@@ -108,7 +110,7 @@ PSFSettings PSFSettingsDialog::getSettings() const
 
 	// PSF calculation (common)
 	s.gridSize = this->gridSizeCombo->currentText().toInt();
-	s.wavelengthNm = this->initialSettings.wavelengthNm;
+	s.phaseScale = this->phaseScaleSpin->value();
 	s.apertureRadius = this->apertureRadiusSpin->value();
 	s.apertureGeometry = this->apertureGeometryCombo->currentIndex();
 	s.normalizationMode = this->normalizationCombo->currentIndex();
@@ -253,6 +255,16 @@ void PSFSettingsDialog::setupUI()
 		"Increases computation time."));
 	psfLayout->addRow(tr("Padding Factor:"), this->paddingFactorCombo);
 
+	this->phaseScaleSpin = new QDoubleSpinBox(psfTab);
+	this->phaseScaleSpin->setRange(0.001, 10000.0);
+	this->phaseScaleSpin->setDecimals(3);
+	this->phaseScaleSpin->setSingleStep(1.0);
+	this->phaseScaleSpin->setToolTip(tr(
+		"Phase scale in rad per wavefront unit.\n"
+		"The wavefront is multiplied by this value as first step of PSF calculation.\n"
+		"Default value: 1.0."));
+	psfLayout->addRow(tr("Phase scale:"), this->phaseScaleSpin);
+
 	tabWidget->addTab(psfTab, tr("PSF Calculation"));
 
 	// --- Display tab ---
@@ -355,6 +367,7 @@ void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 	}
 
 	this->apertureRadiusSpin->setValue(settings.apertureRadius);
+	this->phaseScaleSpin->setValue(settings.phaseScale);
 	this->apertureGeometryCombo->setCurrentIndex(settings.apertureGeometry);
 	this->normalizationCombo->setCurrentIndex(settings.normalizationMode);
 
