@@ -2,7 +2,7 @@
 
 ## General Concept
 
-ApplicationController serves as a **lightweight coordinator** between GUI widgets and business logic. It maintains strict separation: GUI never directly calls business methods, and business logic never directly updates GUI.
+ApplicationController serves as a coordinator between GUI widgets and business logic. It maintains strict separation: GUI never directly calls business methods, and business logic never directly updates GUI.
 
 ## Architecture Pattern
 
@@ -16,7 +16,7 @@ GUI Widgets ←signal/slot→ ApplicationController ←direct calls→ Business 
 
 ## Key Responsibilities
 
-1. **Owns business modules**: ImageSession, future PSFModule, OptimizationModule, etc.
+1. **Owns business modules**: ImageSession, PSFModule, WavefrontParameterTable, OptimizationWorker, TableInterpolator
 2. **Translates requests**: Receives GUI signals, calls business methods
 3. **Forwards notifications**: Business signals → GUI signals (mostly direct signal-to-signal)
 4. **Coordinates initialization**: Broadcasts current state to GUI after connections
@@ -51,11 +51,11 @@ signals:
 **Implementation (.cpp):**
 ```cpp
 // In initializeComponents()
-this->psfModule = new PSFModule(this->imageSession, this);
+this->psfModule = new PSFModule(this);
 
 // In connectSessionSignals() or new connectPSFModuleSignals()
-connect(this->psfModule, &PSFModule::parametersChanged,
-        this, &ApplicationController::psfParametersChanged);
+connect(this->psfModule, &PSFModule::psfUpdated,
+        this, &ApplicationController::psfUpdated);
 ```
 
 ### 2. Create GUI Widget
