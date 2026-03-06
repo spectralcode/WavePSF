@@ -111,6 +111,14 @@ void InterpolationWidget::setupUI()
 	this->plot->legend->setVisible(true);
 	this->plot->legend->setFont(QFont(font().family(), 8));
 
+	// Interactions
+	this->plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+	connect(this->plot, &QCustomPlot::mouseDoubleClick,
+			this, [this]() {
+				this->plot->rescaleAxes();
+				this->plot->replot();
+			});
+
 	// Context menu
 	this->plot->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(this->plot, &QWidget::customContextMenuRequested,
@@ -219,6 +227,12 @@ void InterpolationWidget::showPlotContextMenu(const QPoint& pos)
 	QAction* saveAction = menu.addAction(tr("Save Plot as..."));
 	connect(saveAction, &QAction::triggered, this, [this]() {
 		PlotUtils::savePlotToDisk(this->plot, this);
+	});
+	menu.addSeparator();
+	QAction* resetAction = menu.addAction(tr("Reset View"));
+	connect(resetAction, &QAction::triggered, this, [this]() {
+		this->plot->rescaleAxes();
+		this->plot->replot();
 	});
 	menu.exec(this->plot->mapToGlobal(pos));
 }
