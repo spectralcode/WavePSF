@@ -73,6 +73,7 @@ QString ShortcutsDialog::buildHtml(const QString& keyColor)
 
 	// --- Input/Output Viewer ---
 	html += section(tr("Input/Output Viewer (click viewer to activate)"));
+	html += row(tr("Arrow keys"),      tr("Navigate to adjacent patch (direction adapts to current rotation/flip)"));
 	html += row(tr("Hold X"),          tr("Preview ground truth image while held"));
 	html += row(tr("R"),               tr("Rotate view 90&deg; clockwise"));
 	html += row(tr("H"),               tr("Flip image horizontal"));
