@@ -34,16 +34,19 @@
 #include <QApplication>
 
 namespace {
-	const char* SETTINGS_GROUP = "main_window";
-	const char* WINDOW_SIZE_KEY = "window_size";
-	const char* WINDOW_POSITION_KEY = "window_position";
-	const char* LAST_OPEN_DIR_INPUT_KEY = "last_open_dir_input";
-	const char* LAST_OPEN_DIR_GROUND_TRUTH_KEY = "last_open_dir_ground_truth";
-	const char* LAST_NAME_FILTER_INPUT_KEY = "last_name_filter_input";
-	const char* LAST_NAME_FILTER_GROUND_TRUTH_KEY = "last_name_filter_ground_truth";
-	const char* WINDOW_MAXIMIZED_KEY = "window_maximized";
-	const char* DOCK_STATE_KEY = "dock_state_v1";
-	const char* MESSAGE_CONSOLE_VISIBLE_KEY = "message_console_visible";
+	const QString SETTINGS_GROUP       = QStringLiteral("main_window");
+	const QString KEY_WINDOW_SIZE      = QStringLiteral("window_size");
+	const QString KEY_WINDOW_POSITION  = QStringLiteral("window_position");
+	const QString KEY_WINDOW_MAXIMIZED = QStringLiteral("window_maximized");
+	const QString KEY_LAST_OPEN_DIR_INPUT = QStringLiteral("last_open_dir_input");
+	const QString KEY_LAST_OPEN_DIR_GT    = QStringLiteral("last_open_dir_ground_truth");
+	const QString KEY_LAST_FILTER_INPUT   = QStringLiteral("last_name_filter_input");
+	const QString KEY_LAST_FILTER_GT      = QStringLiteral("last_name_filter_ground_truth");
+	const QString KEY_DOCK_STATE          = QStringLiteral("dock_state_v1");
+	const QString KEY_CONSOLE_VISIBLE     = QStringLiteral("message_console_visible");
+
+	const bool DEF_WINDOW_MAXIMIZED = false;
+	const bool DEF_CONSOLE_VISIBLE  = false;
 }
 
 MainWindow::MainWindow(SettingsFileManager* guiSettings,
@@ -712,24 +715,24 @@ void MainWindow::updateStyleMenuChecks(StyleManager::StyleMode newStyle) {
 void MainWindow::loadSettings() {
 	QVariantMap settings = this->guiSettings->getStoredSettings(SETTINGS_GROUP);
 
-	this->windowSize = settings.value(WINDOW_SIZE_KEY, QSize(1200, 800)).toSize();
-	this->windowPosition = settings.value(WINDOW_POSITION_KEY, QPoint(100, 100)).toPoint();
-	this->lastOpenDirInput = settings.value(LAST_OPEN_DIR_INPUT_KEY, QString()).toString();
-	this->lastOpenDirGroundTruth = settings.value(LAST_OPEN_DIR_GROUND_TRUTH_KEY, QString()).toString();
-	this->lastNameFilterInput = settings.value(LAST_NAME_FILTER_INPUT_KEY, QString()).toString();
-	this->lastNameFilterGroundTruth = settings.value(LAST_NAME_FILTER_GROUND_TRUTH_KEY, QString()).toString();
+	this->windowSize         = settings.value(KEY_WINDOW_SIZE,     QSize(1200, 800)).toSize();
+	this->windowPosition     = settings.value(KEY_WINDOW_POSITION,  QPoint(100, 100)).toPoint();
+	this->lastOpenDirInput   = settings.value(KEY_LAST_OPEN_DIR_INPUT, QString()).toString();
+	this->lastOpenDirGroundTruth    = settings.value(KEY_LAST_OPEN_DIR_GT,   QString()).toString();
+	this->lastNameFilterInput       = settings.value(KEY_LAST_FILTER_INPUT,  QString()).toString();
+	this->lastNameFilterGroundTruth = settings.value(KEY_LAST_FILTER_GT,     QString()).toString();
 
-	if (settings.contains(DOCK_STATE_KEY)) {
-		this->restoreState(settings.value(DOCK_STATE_KEY).toByteArray());
+	if (settings.contains(KEY_DOCK_STATE)) {
+		this->restoreState(settings.value(KEY_DOCK_STATE).toByteArray());
 	}
 
-	const bool showConsole = settings.value(MESSAGE_CONSOLE_VISIBLE_KEY, false).toBool();
+	const bool showConsole = settings.value(KEY_CONSOLE_VISIBLE, DEF_CONSOLE_VISIBLE).toBool();
 	if (this->messageConsoleDock) this->messageConsoleDock->setVisible(showConsole);
 	if (this->toggleMessageConsoleAction) this->toggleMessageConsoleAction->setChecked(showConsole);
 
 	this->resize(this->windowSize);
 	this->move(this->windowPosition);
-	if (settings.value(WINDOW_MAXIMIZED_KEY, false).toBool()) {
+	if (settings.value(KEY_WINDOW_MAXIMIZED, DEF_WINDOW_MAXIMIZED).toBool()) {
 		this->showMaximized();
 	}
 
@@ -748,15 +751,15 @@ void MainWindow::saveSettings() {
 	}
 
 	QVariantMap settings;
-	settings[WINDOW_SIZE_KEY] = this->windowSize;
-	settings[WINDOW_POSITION_KEY] = this->windowPosition;
-	settings[WINDOW_MAXIMIZED_KEY] = this->isMaximized();
-	settings[LAST_OPEN_DIR_INPUT_KEY] = this->lastOpenDirInput;
-	settings[LAST_OPEN_DIR_GROUND_TRUTH_KEY] = this->lastOpenDirGroundTruth;
-	settings[LAST_NAME_FILTER_INPUT_KEY] = this->lastNameFilterInput;
-	settings[LAST_NAME_FILTER_GROUND_TRUTH_KEY] = this->lastNameFilterGroundTruth;
-	settings[DOCK_STATE_KEY] = this->saveState();
-	settings[MESSAGE_CONSOLE_VISIBLE_KEY] = (this->messageConsoleDock && this->messageConsoleDock->isVisible());
+	settings[KEY_WINDOW_SIZE]      = this->windowSize;
+	settings[KEY_WINDOW_POSITION]  = this->windowPosition;
+	settings[KEY_WINDOW_MAXIMIZED] = this->isMaximized();
+	settings[KEY_LAST_OPEN_DIR_INPUT] = this->lastOpenDirInput;
+	settings[KEY_LAST_OPEN_DIR_GT]    = this->lastOpenDirGroundTruth;
+	settings[KEY_LAST_FILTER_INPUT]   = this->lastNameFilterInput;
+	settings[KEY_LAST_FILTER_GT]      = this->lastNameFilterGroundTruth;
+	settings[KEY_DOCK_STATE]       = this->saveState();
+	settings[KEY_CONSOLE_VISIBLE]  = (this->messageConsoleDock && this->messageConsoleDock->isVisible());
 	this->guiSettings->storeSettings(SETTINGS_GROUP, settings);
 
 	this->guiSettings->storeSettings(this->consoleWidget()->getName(), this->consoleWidget()->getSettings());

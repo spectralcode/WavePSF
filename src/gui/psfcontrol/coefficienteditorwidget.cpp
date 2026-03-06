@@ -9,7 +9,7 @@
 #include <QEvent>
 
 namespace {
-	const char* SETTINGS_GROUP = "coefficient_editor";
+	const QString SETTINGS_GROUP = QStringLiteral("coefficient_editor");
 }
 
 
@@ -65,31 +65,7 @@ CoefficientEditorWidget::~CoefficientEditorWidget()
 
 QString CoefficientEditorWidget::getName() const
 {
-	return QLatin1String(SETTINGS_GROUP);
-}
-
-QVariantMap CoefficientEditorWidget::getSettings() const
-{
-	QVariantMap settings;
-	for (const CoefficientRow& row : qAsConst(this->rows)) {
-		settings.insert(QString::number(row.id), row.spinBox->value());
-	}
-	return settings;
-}
-
-void CoefficientEditorWidget::setSettings(const QVariantMap& settings)
-{
-	this->updatingControls = true;
-	for (CoefficientRow& row : this->rows) {
-		QString key = QString::number(row.id);
-		if (settings.contains(key)) {
-			double value = settings.value(key).toDouble();
-			row.spinBox->setValue(value);
-			row.slider->setValue(static_cast<int>(value * SLIDER_SCALE_FACTOR));
-			emit coefficientChanged(row.id, value);
-		}
-	}
-	this->updatingControls = false;
+	return SETTINGS_GROUP;
 }
 
 void CoefficientEditorWidget::setValues(const QVector<double>& values)

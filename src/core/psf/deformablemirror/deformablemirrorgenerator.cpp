@@ -1,16 +1,34 @@
 #include "deformablemirrorgenerator.h"
 #include <QtMath>
 
+namespace {
+	const QString KEY_ACTUATOR_ROWS        = QStringLiteral("actuator_rows");
+	const QString KEY_ACTUATOR_COLS        = QStringLiteral("actuator_cols");
+	const QString KEY_COUPLING_COEFFICIENT = QStringLiteral("coupling_coefficient");
+	const QString KEY_GAUSSIAN_INDEX       = QStringLiteral("gaussian_index");
+	const QString KEY_COMMAND_MIN          = QStringLiteral("command_min");
+	const QString KEY_COMMAND_MAX          = QStringLiteral("command_max");
+	const QString KEY_COMMAND_STEP         = QStringLiteral("command_step");
+
+	const int    DEF_ACTUATOR_ROWS        = 8;
+	const int    DEF_ACTUATOR_COLS        = 8;
+	const double DEF_COUPLING_COEFFICIENT = 0.25;
+	const double DEF_GAUSSIAN_INDEX       = 1.5;
+	const double DEF_COMMAND_MIN          = -1.0;
+	const double DEF_COMMAND_MAX          =  1.0;
+	const double DEF_COMMAND_STEP         =  0.01;
+}
+
 
 DeformableMirrorGenerator::DeformableMirrorGenerator(QObject* parent)
 	: QObject(parent)
-	, actuatorRows(8)
-	, actuatorCols(8)
-	, couplingCoefficient(0.15)
-	, gaussianIndex(2.0)
-	, commandMin(-1.0)
-	, commandMax(1.0)
-	, commandStep(0.01)
+	, actuatorRows(DEF_ACTUATOR_ROWS)
+	, actuatorCols(DEF_ACTUATOR_COLS)
+	, couplingCoefficient(DEF_COUPLING_COEFFICIENT)
+	, gaussianIndex(DEF_GAUSSIAN_INDEX)
+	, commandMin(DEF_COMMAND_MIN)
+	, commandMax(DEF_COMMAND_MAX)
+	, commandStep(DEF_COMMAND_STEP)
 	, cachedGridSize(0)
 {
 	this->rebuildActuatorLayout();
@@ -28,25 +46,25 @@ QString DeformableMirrorGenerator::typeName() const
 QVariantMap DeformableMirrorGenerator::serializeSettings() const
 {
 	QVariantMap map;
-	map["actuator_rows"] = this->actuatorRows;
-	map["actuator_cols"] = this->actuatorCols;
-	map["coupling_coefficient"] = this->couplingCoefficient;
-	map["gaussian_index"] = this->gaussianIndex;
-	map["command_min"] = this->commandMin;
-	map["command_max"] = this->commandMax;
-	map["command_step"] = this->commandStep;
+	map[KEY_ACTUATOR_ROWS]        = this->actuatorRows;
+	map[KEY_ACTUATOR_COLS]        = this->actuatorCols;
+	map[KEY_COUPLING_COEFFICIENT] = this->couplingCoefficient;
+	map[KEY_GAUSSIAN_INDEX]       = this->gaussianIndex;
+	map[KEY_COMMAND_MIN]          = this->commandMin;
+	map[KEY_COMMAND_MAX]          = this->commandMax;
+	map[KEY_COMMAND_STEP]         = this->commandStep;
 	return map;
 }
 
 void DeformableMirrorGenerator::deserializeSettings(const QVariantMap& settings)
 {
-	int rows = settings.value("actuator_rows", this->actuatorRows).toInt();
-	int cols = settings.value("actuator_cols", this->actuatorCols).toInt();
-	this->couplingCoefficient = settings.value("coupling_coefficient", this->couplingCoefficient).toDouble();
-	this->gaussianIndex = settings.value("gaussian_index", this->gaussianIndex).toDouble();
-	this->commandMin = settings.value("command_min", this->commandMin).toDouble();
-	this->commandMax = settings.value("command_max", this->commandMax).toDouble();
-	this->commandStep = settings.value("command_step", this->commandStep).toDouble();
+	int rows = settings.value(KEY_ACTUATOR_ROWS,        DEF_ACTUATOR_ROWS).toInt();
+	int cols = settings.value(KEY_ACTUATOR_COLS,        DEF_ACTUATOR_COLS).toInt();
+	this->couplingCoefficient = settings.value(KEY_COUPLING_COEFFICIENT, DEF_COUPLING_COEFFICIENT).toDouble();
+	this->gaussianIndex       = settings.value(KEY_GAUSSIAN_INDEX,       DEF_GAUSSIAN_INDEX).toDouble();
+	this->commandMin          = settings.value(KEY_COMMAND_MIN,          DEF_COMMAND_MIN).toDouble();
+	this->commandMax          = settings.value(KEY_COMMAND_MAX,          DEF_COMMAND_MAX).toDouble();
+	this->commandStep         = settings.value(KEY_COMMAND_STEP,         DEF_COMMAND_STEP).toDouble();
 	this->cachedGridSize = 0; // Invalidate influence cache (coupling/gaussian may have changed)
 	this->setActuatorGrid(rows, cols);
 }

@@ -64,20 +64,28 @@ QString SettingsFileManager::getSettingsFilePath() const {
 }
 
 void SettingsFileManager::storeValues(QSettings* settings, QString groupName, QVariantMap settingsMap) {
-	QMapIterator<QString, QVariant> i(settingsMap);
 	settings->beginGroup(groupName);
+	QMapIterator<QString, QVariant> i(settingsMap);
 	while (i.hasNext()) {
 		i.next();
-		settings->setValue(i.key(), i.value());
+		if (i.value().type() == QVariant::Map) {
+			storeValues(settings, i.key(), i.value().toMap()); // recurse → [groupName/key] section
+		} else {
+			settings->setValue(i.key(), i.value()); // leaf value: plain text in INI
+		}
 	}
 	settings->endGroup();
 }
 
 void SettingsFileManager::loadValues(QSettings* settings, QString groupName, QVariantMap* settingsMap) {
 	settings->beginGroup(groupName);
-	QStringList keys = settings->allKeys();
-	for (int i = 0; i < keys.size(); i++) {
-		settingsMap->insert(keys.at(i), settings->value(keys.at(i)));
+	for (const QString& key : settings->childKeys()) {
+		settingsMap->insert(key, settings->value(key));
+	}
+	for (const QString& group : settings->childGroups()) {
+		QVariantMap subMap;
+		loadValues(settings, group, &subMap);
+		settingsMap->insert(group, subMap);
 	}
 	settings->endGroup();
 }

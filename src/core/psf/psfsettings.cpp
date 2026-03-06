@@ -2,6 +2,39 @@
 #include <QStringList>
 #include <algorithm>
 
+namespace {
+	// Key names
+	const QString KEY_GENERATOR_TYPE_NAME         = QStringLiteral("generator_type_name");
+	const QString KEY_GENERATOR_SETTINGS          = QStringLiteral("generator_settings");
+	const QString KEY_ALL_GENERATOR_SETTINGS      = QStringLiteral("all_generator_settings");
+	const QString KEY_NOLL_INDEX_SPEC             = QStringLiteral("noll_index_spec");
+	const QString KEY_GLOBAL_MIN_COEFFICIENT      = QStringLiteral("global_min_coefficient");
+	const QString KEY_GLOBAL_MAX_COEFFICIENT      = QStringLiteral("global_max_coefficient");
+	const QString KEY_COEFFICIENT_STEP            = QStringLiteral("coefficient_step");
+	const QString KEY_COEFFICIENT_RANGE_OVERRIDES = QStringLiteral("coefficient_range_overrides");
+	const QString KEY_GRID_SIZE                   = QStringLiteral("grid_size");
+	const QString KEY_WAVELENGTH_NM               = QStringLiteral("wavelength_nm");
+	const QString KEY_APERTURE_RADIUS             = QStringLiteral("aperture_radius");
+	const QString KEY_NORMALIZATION_MODE          = QStringLiteral("normalization_mode");
+	const QString KEY_PADDING_FACTOR              = QStringLiteral("padding_factor");
+	const QString KEY_APERTURE_GEOMETRY           = QStringLiteral("aperture_geometry");
+	const QString KEY_RANGE_MIN                   = QStringLiteral("min");
+	const QString KEY_RANGE_MAX                   = QStringLiteral("max");
+
+	// Default values (match PSFSettings struct defaults)
+	const QString DEF_GENERATOR_TYPE_NAME    = QStringLiteral("Zernike");
+	const QString DEF_NOLL_INDEX_SPEC        = QStringLiteral("2-21");
+	const double  DEF_GLOBAL_MIN_COEFFICIENT = -0.03;
+	const double  DEF_GLOBAL_MAX_COEFFICIENT =  0.03;
+	const double  DEF_COEFFICIENT_STEP       =  0.001;
+	const int     DEF_GRID_SIZE              =  128;
+	const double  DEF_WAVELENGTH_NM          =  55.0;
+	const double  DEF_APERTURE_RADIUS        =  1.0;
+	const int     DEF_NORMALIZATION_MODE     =  0;
+	const int     DEF_PADDING_FACTOR         =  1;
+	const int     DEF_APERTURE_GEOMETRY      =  0;
+}
+
 
 QVector<int> parseIndexSpec(const QString& spec)
 {
@@ -96,29 +129,29 @@ QVector<int> parseFrameSpec(const QString& spec)
 QVariantMap serializePSFSettings(const PSFSettings& settings)
 {
 	QVariantMap map;
-	map["generator_type_name"] = settings.generatorTypeName;
-	map["generator_settings"] = settings.generatorSettings;
-	map["noll_index_spec"] = settings.nollIndexSpec;
-	map["global_min_coefficient"] = settings.globalMinCoefficient;
-	map["global_max_coefficient"] = settings.globalMaxCoefficient;
-	map["coefficient_step"] = settings.coefficientStep;
-	map["grid_size"] = settings.gridSize;
-	map["wavelength_nm"] = settings.wavelengthNm;
-	map["aperture_radius"] = settings.apertureRadius;
-	map["normalization_mode"] = settings.normalizationMode;
-	map["padding_factor"] = settings.paddingFactor;
-	map["aperture_geometry"] = settings.apertureGeometry;
+	map[KEY_GENERATOR_TYPE_NAME]    = settings.generatorTypeName;
+	map[KEY_GENERATOR_SETTINGS]     = settings.generatorSettings;
+	map[KEY_NOLL_INDEX_SPEC]        = settings.nollIndexSpec;
+	map[KEY_GLOBAL_MIN_COEFFICIENT] = settings.globalMinCoefficient;
+	map[KEY_GLOBAL_MAX_COEFFICIENT] = settings.globalMaxCoefficient;
+	map[KEY_COEFFICIENT_STEP]       = settings.coefficientStep;
+	map[KEY_GRID_SIZE]              = settings.gridSize;
+	map[KEY_WAVELENGTH_NM]          = settings.wavelengthNm;
+	map[KEY_APERTURE_RADIUS]        = settings.apertureRadius;
+	map[KEY_NORMALIZATION_MODE]     = settings.normalizationMode;
+	map[KEY_PADDING_FACTOR]         = settings.paddingFactor;
+	map[KEY_APERTURE_GEOMETRY]      = settings.apertureGeometry;
 
 	// Serialize range overrides
 	QVariantMap overrides;
 	for (auto it = settings.coefficientRangeOverrides.constBegin();
 		 it != settings.coefficientRangeOverrides.constEnd(); ++it) {
 		QVariantMap range;
-		range["min"] = it.value().first;
-		range["max"] = it.value().second;
+		range[KEY_RANGE_MIN] = it.value().first;
+		range[KEY_RANGE_MAX] = it.value().second;
 		overrides[QString::number(it.key())] = range;
 	}
-	map["coefficient_range_overrides"] = overrides;
+	map[KEY_COEFFICIENT_RANGE_OVERRIDES] = overrides;
 
 	// Serialize per-type generator settings
 	QVariantMap allGenMap;
@@ -126,7 +159,7 @@ QVariantMap serializePSFSettings(const PSFSettings& settings)
 		 it != settings.allGeneratorSettings.constEnd(); ++it) {
 		allGenMap[it.key()] = it.value();
 	}
-	map["all_generator_settings"] = allGenMap;
+	map[KEY_ALL_GENERATOR_SETTINGS] = allGenMap;
 
 	return map;
 }
@@ -135,58 +168,34 @@ PSFSettings deserializePSFSettings(const QVariantMap& map)
 {
 	PSFSettings settings;
 
-	if (map.contains("generator_type_name")) {
-		settings.generatorTypeName = map["generator_type_name"].toString();
-	}
-	if (map.contains("generator_settings")) {
-		settings.generatorSettings = map["generator_settings"].toMap();
-	}
-	if (map.contains("noll_index_spec")) {
-		settings.nollIndexSpec = map["noll_index_spec"].toString();
-	}
-	if (map.contains("global_min_coefficient")) {
-		settings.globalMinCoefficient = map["global_min_coefficient"].toDouble();
-	}
-	if (map.contains("global_max_coefficient")) {
-		settings.globalMaxCoefficient = map["global_max_coefficient"].toDouble();
-	}
-	if (map.contains("coefficient_step")) {
-		settings.coefficientStep = map["coefficient_step"].toDouble();
-	}
-	if (map.contains("grid_size")) {
-		settings.gridSize = map["grid_size"].toInt();
-	}
-	if (map.contains("wavelength_nm")) {
-		settings.wavelengthNm = map["wavelength_nm"].toDouble();
-	}
-	if (map.contains("aperture_radius")) {
-		settings.apertureRadius = map["aperture_radius"].toDouble();
-	}
-	if (map.contains("normalization_mode")) {
-		settings.normalizationMode = map["normalization_mode"].toInt();
-	}
-	if (map.contains("padding_factor")) {
-		settings.paddingFactor = map["padding_factor"].toInt();
-	}
-	if (map.contains("aperture_geometry")) {
-		settings.apertureGeometry = map["aperture_geometry"].toInt();
-	}
+	settings.generatorTypeName    = map.value(KEY_GENERATOR_TYPE_NAME,    DEF_GENERATOR_TYPE_NAME).toString();
+	settings.generatorSettings    = map.value(KEY_GENERATOR_SETTINGS).toMap();
+	settings.nollIndexSpec        = map.value(KEY_NOLL_INDEX_SPEC,         DEF_NOLL_INDEX_SPEC).toString();
+	settings.globalMinCoefficient = map.value(KEY_GLOBAL_MIN_COEFFICIENT,  DEF_GLOBAL_MIN_COEFFICIENT).toDouble();
+	settings.globalMaxCoefficient = map.value(KEY_GLOBAL_MAX_COEFFICIENT,  DEF_GLOBAL_MAX_COEFFICIENT).toDouble();
+	settings.coefficientStep      = map.value(KEY_COEFFICIENT_STEP,        DEF_COEFFICIENT_STEP).toDouble();
+	settings.gridSize             = map.value(KEY_GRID_SIZE,               DEF_GRID_SIZE).toInt();
+	settings.wavelengthNm         = map.value(KEY_WAVELENGTH_NM,           DEF_WAVELENGTH_NM).toDouble();
+	settings.apertureRadius       = map.value(KEY_APERTURE_RADIUS,         DEF_APERTURE_RADIUS).toDouble();
+	settings.normalizationMode    = map.value(KEY_NORMALIZATION_MODE,      DEF_NORMALIZATION_MODE).toInt();
+	settings.paddingFactor        = map.value(KEY_PADDING_FACTOR,          DEF_PADDING_FACTOR).toInt();
+	settings.apertureGeometry     = map.value(KEY_APERTURE_GEOMETRY,       DEF_APERTURE_GEOMETRY).toInt();
 
 	// Deserialize range overrides
-	if (map.contains("coefficient_range_overrides")) {
-		QVariantMap overrides = map["coefficient_range_overrides"].toMap();
+	if (map.contains(KEY_COEFFICIENT_RANGE_OVERRIDES)) {
+		QVariantMap overrides = map[KEY_COEFFICIENT_RANGE_OVERRIDES].toMap();
 		for (auto it = overrides.constBegin(); it != overrides.constEnd(); ++it) {
 			QVariantMap range = it.value().toMap();
 			int nollIndex = it.key().toInt();
-			double min = range["min"].toDouble();
-			double max = range["max"].toDouble();
-			settings.coefficientRangeOverrides[nollIndex] = qMakePair(min, max);
+			double minVal = range[KEY_RANGE_MIN].toDouble();
+			double maxVal = range[KEY_RANGE_MAX].toDouble();
+			settings.coefficientRangeOverrides[nollIndex] = qMakePair(minVal, maxVal);
 		}
 	}
 
 	// Deserialize per-type generator settings
-	if (map.contains("all_generator_settings")) {
-		QVariantMap allGenMap = map["all_generator_settings"].toMap();
+	if (map.contains(KEY_ALL_GENERATOR_SETTINGS)) {
+		QVariantMap allGenMap = map[KEY_ALL_GENERATOR_SETTINGS].toMap();
 		for (auto it = allGenMap.constBegin(); it != allGenMap.constEnd(); ++it) {
 			settings.allGeneratorSettings[it.key()] = it.value().toMap();
 		}

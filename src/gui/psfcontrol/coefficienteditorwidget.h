@@ -19,8 +19,6 @@ public:
 	~CoefficientEditorWidget() override;
 
 	QString getName() const;
-	QVariantMap getSettings() const;
-	void setSettings(const QVariantMap& settings);
 
 public slots:
 	void setParameterDescriptors(QVector<WavefrontParameter> descriptors);

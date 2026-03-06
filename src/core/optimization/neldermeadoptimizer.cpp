@@ -2,6 +2,11 @@
 #include <QtMath>
 #include <algorithm>
 
+namespace {
+	const QString KEY_MAX_ITERATIONS   = QStringLiteral("max_iterations");
+	const QString KEY_INITIAL_STEP_SIZE = QStringLiteral("initial_step_size");
+}
+
 
 NelderMeadOptimizer::NelderMeadOptimizer()
 	: maxIterations(1000)
@@ -17,10 +22,10 @@ QString NelderMeadOptimizer::typeName() const
 QVector<OptimizerParameter> NelderMeadOptimizer::getParameterDescriptors() const
 {
 	return {
-		{ "maxIterations", "Max Iterations",
+		{ KEY_MAX_ITERATIONS,    "Max Iterations",
 		  "Maximum number of simplex operations before stopping.",
 		  1, 100000, 10, 1000, 0 },
-		{ "initialStepSize", "Initial Step Size",
+		{ KEY_INITIAL_STEP_SIZE, "Initial Step Size",
 		  "Simplex size as fraction of parameter range.\nSmaller = finer local search.\nLarger = broader exploration.\nTypical: 0.01-0.2.",
 		  0.001, 1.0, 0.001, 0.05, 3 }
 	};
@@ -29,15 +34,15 @@ QVector<OptimizerParameter> NelderMeadOptimizer::getParameterDescriptors() const
 QVariantMap NelderMeadOptimizer::serializeSettings() const
 {
 	QVariantMap map;
-	map["maxIterations"] = this->maxIterations;
-	map["initialStepSize"] = this->initialStepSize;
+	map[KEY_MAX_ITERATIONS]    = this->maxIterations;
+	map[KEY_INITIAL_STEP_SIZE] = this->initialStepSize;
 	return map;
 }
 
 void NelderMeadOptimizer::deserializeSettings(const QVariantMap& settings)
 {
-	this->maxIterations = settings.value("maxIterations", this->maxIterations).toInt();
-	this->initialStepSize = settings.value("initialStepSize", this->initialStepSize).toDouble();
+	this->maxIterations   = settings.value(KEY_MAX_ITERATIONS,    this->maxIterations).toInt();
+	this->initialStepSize = settings.value(KEY_INITIAL_STEP_SIZE, this->initialStepSize).toDouble();
 }
 
 OptimizerResult NelderMeadOptimizer::run(

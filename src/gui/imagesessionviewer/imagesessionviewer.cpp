@@ -13,24 +13,24 @@
 #include "gui/verticalscrollarea.h"
 
 namespace {
-	const char* SETTINGS_GROUP = "image_session_viewer";
-	const char* AUTO_RANGE_ENABLED_KEY = "auto_range_enabled";
-	const char* DISPLAY_RANGE_MIN_KEY = "display_range_min";
-	const char* DISPLAY_RANGE_MAX_KEY = "display_range_max";
-	const char* PATCH_GRID_COLS_KEY = "patchGridCols";
-	const char* PATCH_GRID_ROWS_KEY = "patchGridRows";
-	const char* PATCH_BORDER_EXTENSION_KEY = "patchBorderExtension";
-	const char* RIGHT_SPLITTER_STATE_KEY = "right_splitter_state";
-	const char* MAIN_SPLITTER_STATE_KEY = "main_splitter_state";
-	const char* SYNC_VIEWS_KEY = "sync_views";
+	const QString SETTINGS_GROUP            = QStringLiteral("image_session_viewer");
+	const QString KEY_AUTO_RANGE_ENABLED    = QStringLiteral("auto_range_enabled");
+	const QString KEY_DISPLAY_RANGE_MIN     = QStringLiteral("display_range_min");
+	const QString KEY_DISPLAY_RANGE_MAX     = QStringLiteral("display_range_max");
+	const QString KEY_PATCH_GRID_COLS       = QStringLiteral("patch_grid_cols");
+	const QString KEY_PATCH_GRID_ROWS       = QStringLiteral("patch_grid_rows");
+	const QString KEY_PATCH_BORDER_EXT      = QStringLiteral("patch_border_extension");
+	const QString KEY_RIGHT_SPLITTER_STATE  = QStringLiteral("right_splitter_state");
+	const QString KEY_MAIN_SPLITTER_STATE   = QStringLiteral("main_splitter_state");
+	const QString KEY_SYNC_VIEWS            = QStringLiteral("sync_views");
 
-	const bool	DEFAULT_AUTO_RANGE = true;
-	const double DEFAULT_MIN = 0.0;
-	const double DEFAULT_MAX = 255.0;
-	const bool  DEFAULT_SYNC_VIEWS = false;
-	const int DEFAULT_PATCH_COLS = 6;
-	const int DEFAULT_PATCH_ROWS = 8;
-	const int DEFAULT_BORDER_EXTENSION = 10;
+	const bool   DEF_AUTO_RANGE_ENABLED    = true;
+	const double DEF_DISPLAY_RANGE_MIN     = 0.0;
+	const double DEF_DISPLAY_RANGE_MAX     = 255.0;
+	const bool   DEF_SYNC_VIEWS            = false;
+	const int    DEF_PATCH_GRID_COLS       = 6;
+	const int    DEF_PATCH_GRID_ROWS       = 8;
+	const int    DEF_PATCH_BORDER_EXT      = 10;
 }
 
 ImageSessionViewer::ImageSessionViewer(QWidget* parent)
@@ -66,24 +66,24 @@ void ImageSessionViewer::addBottomPanel(QWidget* widget)
 
 QString ImageSessionViewer::getName() const
 {
-	return QLatin1String(SETTINGS_GROUP);
+	return SETTINGS_GROUP;
 }
 
 QVariantMap ImageSessionViewer::getSettings() const
 {
 	QVariantMap settingsMap;
-	settingsMap.insert(AUTO_RANGE_ENABLED_KEY, this->autoRangeEnabled);
-	settingsMap.insert(DISPLAY_RANGE_MIN_KEY, this->displayRangeMin);
-	settingsMap.insert(DISPLAY_RANGE_MAX_KEY, this->displayRangeMax);
-	settingsMap.insert(SYNC_VIEWS_KEY, this->viewSyncEnabled);
-	settingsMap.insert(PATCH_GRID_COLS_KEY, this->imageSession->getPatchGridCols());
-	settingsMap.insert(PATCH_GRID_ROWS_KEY, this->imageSession->getPatchGridRows());
-	settingsMap.insert(PATCH_BORDER_EXTENSION_KEY, this->imageSession->getPatchBorderExtension());
+	settingsMap.insert(KEY_AUTO_RANGE_ENABLED, this->autoRangeEnabled);
+	settingsMap.insert(KEY_DISPLAY_RANGE_MIN,  this->displayRangeMin);
+	settingsMap.insert(KEY_DISPLAY_RANGE_MAX,  this->displayRangeMax);
+	settingsMap.insert(KEY_SYNC_VIEWS,         this->viewSyncEnabled);
+	settingsMap.insert(KEY_PATCH_GRID_COLS,    this->imageSession->getPatchGridCols());
+	settingsMap.insert(KEY_PATCH_GRID_ROWS,    this->imageSession->getPatchGridRows());
+	settingsMap.insert(KEY_PATCH_BORDER_EXT,   this->imageSession->getPatchBorderExtension());
 	if (this->rightSplitter) {
-		settingsMap.insert(RIGHT_SPLITTER_STATE_KEY, this->rightSplitter->saveState());
+		settingsMap.insert(KEY_RIGHT_SPLITTER_STATE, this->rightSplitter->saveState());
 	}
 	if (this->mainSplitter) {
-		settingsMap.insert(MAIN_SPLITTER_STATE_KEY, this->mainSplitter->saveState());
+		settingsMap.insert(KEY_MAIN_SPLITTER_STATE, this->mainSplitter->saveState());
 	}
 
 	return settingsMap;
@@ -92,26 +92,24 @@ QVariantMap ImageSessionViewer::getSettings() const
 
 void ImageSessionViewer::setSettings(const QVariantMap& settingsMap)
 {
-	//read settings, use default values if settingsMap empty
-	const bool autoRange = settingsMap.value(AUTO_RANGE_ENABLED_KEY, DEFAULT_AUTO_RANGE).toBool();
-	const double minV = settingsMap.value(DISPLAY_RANGE_MIN_KEY, DEFAULT_MIN).toDouble();
-	const double maxV = settingsMap.value(DISPLAY_RANGE_MAX_KEY, DEFAULT_MAX).toDouble();
-	const bool syncViews = settingsMap.value(SYNC_VIEWS_KEY, DEFAULT_SYNC_VIEWS).toBool();
-	const int cols = settingsMap.value(PATCH_GRID_COLS_KEY, DEFAULT_PATCH_COLS).toInt();
-	const int rows = settingsMap.value(PATCH_GRID_ROWS_KEY, DEFAULT_PATCH_ROWS).toInt();
-	const int border = settingsMap.value(PATCH_BORDER_EXTENSION_KEY, DEFAULT_BORDER_EXTENSION).toInt();
+	const bool   autoRange  = settingsMap.value(KEY_AUTO_RANGE_ENABLED, DEF_AUTO_RANGE_ENABLED).toBool();
+	const double minV       = settingsMap.value(KEY_DISPLAY_RANGE_MIN,  DEF_DISPLAY_RANGE_MIN).toDouble();
+	const double maxV       = settingsMap.value(KEY_DISPLAY_RANGE_MAX,  DEF_DISPLAY_RANGE_MAX).toDouble();
+	const bool   syncViews  = settingsMap.value(KEY_SYNC_VIEWS,         DEF_SYNC_VIEWS).toBool();
+	const int    cols       = settingsMap.value(KEY_PATCH_GRID_COLS,    DEF_PATCH_GRID_COLS).toInt();
+	const int    rows       = settingsMap.value(KEY_PATCH_GRID_ROWS,    DEF_PATCH_GRID_ROWS).toInt();
+	const int    border     = settingsMap.value(KEY_PATCH_BORDER_EXT,   DEF_PATCH_BORDER_EXT).toInt();
 
-	//update internal state and apply settings
 	this->setDisplaySettings(autoRange, minV, maxV);
 	this->setViewSyncEnabled(syncViews);
 	this->configurePatchGrid(cols, rows, border);
 	emit patchGridConfigurationRequested(cols, rows, border);
 
-	if (settingsMap.contains(RIGHT_SPLITTER_STATE_KEY) && this->rightSplitter) {
-		this->rightSplitter->restoreState(settingsMap.value(RIGHT_SPLITTER_STATE_KEY).toByteArray());
+	if (settingsMap.contains(KEY_RIGHT_SPLITTER_STATE) && this->rightSplitter) {
+		this->rightSplitter->restoreState(settingsMap.value(KEY_RIGHT_SPLITTER_STATE).toByteArray());
 	}
-	if (settingsMap.contains(MAIN_SPLITTER_STATE_KEY) && this->mainSplitter) {
-		this->mainSplitter->restoreState(settingsMap.value(MAIN_SPLITTER_STATE_KEY).toByteArray());
+	if (settingsMap.contains(KEY_MAIN_SPLITTER_STATE) && this->mainSplitter) {
+		this->mainSplitter->restoreState(settingsMap.value(KEY_MAIN_SPLITTER_STATE).toByteArray());
 	}
 }
 
@@ -155,8 +153,8 @@ void ImageSessionViewer::setCurrentFrame(int frame)
 void ImageSessionViewer::highlightPatch(int x, int y)
 {
 	// Convert x,y coordinates to linear patch ID for the viewers
-	int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEFAULT_PATCH_COLS;
-	int rows = this->imageSession != nullptr ? this->imageSession->getPatchGridRows() : DEFAULT_PATCH_ROWS;
+	int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEF_PATCH_GRID_COLS;
+	int rows = this->imageSession != nullptr ? this->imageSession->getPatchGridRows() : DEF_PATCH_GRID_ROWS;
 	int patchId = y * cols + x;
 	int totalPatches = cols * rows;
 
@@ -233,7 +231,7 @@ void ImageSessionViewer::setFrameFromSpinBox(int frame)
 void ImageSessionViewer::setPatchFromSlider(int patchId)
 {
 	if (!this->updatingControls) {
-		int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEFAULT_PATCH_COLS;
+		int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEF_PATCH_GRID_COLS;
 		int x = patchId % cols;
 		int y = patchId / cols;
 		emit patchChangeRequested(x, y);
@@ -243,7 +241,7 @@ void ImageSessionViewer::setPatchFromSlider(int patchId)
 void ImageSessionViewer::setPatchFromSpinBox(int patchId)
 {
 	if (!this->updatingControls) {
-		int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEFAULT_PATCH_COLS;
+		int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEF_PATCH_GRID_COLS;
 		int x = patchId % cols;
 		int y = patchId / cols;
 		emit patchChangeRequested(x, y);
@@ -312,7 +310,7 @@ double ImageSessionViewer::getDisplayRangeMax() const
 void ImageSessionViewer::handleInputPatchSelected(int patchId)
 {
 	// Convert linear patch ID back to x,y coordinates
-	int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEFAULT_PATCH_COLS;
+	int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEF_PATCH_GRID_COLS;
 	int x = patchId % cols;
 	int y = patchId / cols;
 
@@ -322,7 +320,7 @@ void ImageSessionViewer::handleInputPatchSelected(int patchId)
 void ImageSessionViewer::handleOutputPatchSelected(int patchId)
 {
 	// Convert linear patch ID back to x,y coordinates
-	int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEFAULT_PATCH_COLS;
+	int cols = this->imageSession != nullptr ? this->imageSession->getPatchGridCols() : DEF_PATCH_GRID_COLS;
 	int x = patchId % cols;
 	int y = patchId / cols;
 

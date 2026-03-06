@@ -233,7 +233,7 @@ void PSFSettingsDialog::setupUI()
 	this->dmCouplingSpin->setRange(0.01, 1.00);
 	this->dmCouplingSpin->setDecimals(3);
 	this->dmCouplingSpin->setSingleStep(0.01);
-	this->dmCouplingSpin->setValue(0.15);
+	this->dmCouplingSpin->setValue(0.25);
 	this->dmCouplingSpin->setToolTip(tr(
 		"Inter-actuator coupling (typical 0.05-0.30).\n"
 		"Fraction of peak influence reaching the adjacent actuator.\n"
@@ -245,7 +245,7 @@ void PSFSettingsDialog::setupUI()
 	this->dmGaussianIndexSpin->setRange(0.01, 10.0);
 	this->dmGaussianIndexSpin->setDecimals(2);
 	this->dmGaussianIndexSpin->setSingleStep(0.1);
-	this->dmGaussianIndexSpin->setValue(2.0);
+	this->dmGaussianIndexSpin->setValue(1.5);
 	this->dmGaussianIndexSpin->setToolTip(tr(
 		"Shape exponent of the influence function (typical 1.5-2.5).\n"
 		"2.0 = standard Gaussian shape.\n"
@@ -385,12 +385,12 @@ void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 
 	// Populate Zernike fields from the Zernike-specific settings map
 	QVariantMap zernikeGs = allGenSettings.value(QStringLiteral("Zernike"));
-	QString nollSpec = zernikeGs.value("noll_index_spec", "2-21").toString();
+	QString nollSpec = zernikeGs.value("noll_index_spec").toString();
 	this->nollIndicesEdit->blockSignals(true);
 	this->nollIndicesEdit->setText(nollSpec);
 	this->nollIndicesEdit->blockSignals(false);
-	this->globalMinSpin->setValue(zernikeGs.value("global_min", -0.3).toDouble());
-	this->globalMaxSpin->setValue(zernikeGs.value("global_max", 0.3).toDouble());
+	this->globalMinSpin->setValue(zernikeGs.value("global_min").toDouble());
+	this->globalMaxSpin->setValue(zernikeGs.value("global_max").toDouble());
 
 	QVector<int> indices = ZernikeGenerator::parseNollIndexSpec(nollSpec);
 	this->rebuildOverrideTable(indices);
@@ -419,13 +419,13 @@ void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 
 	// Populate DM fields from the DM-specific settings map
 	QVariantMap dmGs = allGenSettings.value(QStringLiteral("Deformable Mirror"));
-	this->dmRowsSpin->setValue(dmGs.value("actuator_rows", 8).toInt());
-	this->dmColsSpin->setValue(dmGs.value("actuator_cols", 8).toInt());
-	this->dmCouplingSpin->setValue(dmGs.value("coupling_coefficient", 0.15).toDouble());
-	this->dmGaussianIndexSpin->setValue(dmGs.value("gaussian_index", 2.0).toDouble());
-	this->dmCommandMinSpin->setValue(dmGs.value("command_min", -1.0).toDouble());
-	this->dmCommandMaxSpin->setValue(dmGs.value("command_max", 1.0).toDouble());
-	this->dmCommandStepSpin->setValue(dmGs.value("command_step", 0.01).toDouble());
+	this->dmRowsSpin->setValue(dmGs.value("actuator_rows").toInt());
+	this->dmColsSpin->setValue(dmGs.value("actuator_cols").toInt());
+	this->dmCouplingSpin->setValue(dmGs.value("coupling_coefficient").toDouble());
+	this->dmGaussianIndexSpin->setValue(dmGs.value("gaussian_index").toDouble());
+	this->dmCommandMinSpin->setValue(dmGs.value("command_min").toDouble());
+	this->dmCommandMaxSpin->setValue(dmGs.value("command_max").toDouble());
+	this->dmCommandStepSpin->setValue(dmGs.value("command_step").toDouble());
 
 	// Common PSF calculation fields
 	int gridIdx = this->gridSizeCombo->findText(QString::number(settings.gridSize));

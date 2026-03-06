@@ -14,7 +14,23 @@
 #include <QEvent>
 
 namespace {
-	const char* SETTINGS_GROUP = "deconvolution_settings";
+	const QString SETTINGS_GROUP = QStringLiteral("deconvolution_settings");
+
+	// Key names
+	const QString KEY_ALGORITHM             = QStringLiteral("algorithm");
+	const QString KEY_ITERATIONS            = QStringLiteral("iterations");
+	const QString KEY_RELAXATION_FACTOR     = QStringLiteral("relaxation_factor");
+	const QString KEY_REGULARIZATION_FACTOR = QStringLiteral("regularization_factor");
+	const QString KEY_NOISE_TO_SIGNAL       = QStringLiteral("noise_to_signal_factor");
+	const QString KEY_LIVE_MODE             = QStringLiteral("live_mode");
+
+	// Default values
+	const int    DEF_ALGORITHM             = 0;
+	const int    DEF_ITERATIONS            = 128;
+	const double DEF_RELAXATION_FACTOR     = 0.65;
+	const double DEF_REGULARIZATION_FACTOR = 0.005;
+	const double DEF_NOISE_TO_SIGNAL       = 0.01;
+	const bool   DEF_LIVE_MODE             = true;
 }
 
 
@@ -50,7 +66,7 @@ void DeconvolutionSettingsWidget::setupUI()
 	this->iterationsLabel = new QLabel(tr("Iterations:"), controlsWidget);
 	this->iterationsSpinBox = new QSpinBox(controlsWidget);
 	this->iterationsSpinBox->setRange(1, 10240);
-	this->iterationsSpinBox->setValue(128);
+	this->iterationsSpinBox->setValue(DEF_ITERATIONS);
 	this->installScrollGuard(this->iterationsSpinBox);
 	formLayout->addRow(this->iterationsLabel, this->iterationsSpinBox);
 
@@ -59,7 +75,7 @@ void DeconvolutionSettingsWidget::setupUI()
 	this->relaxationFactorSpinBox = new QDoubleSpinBox(controlsWidget);
 	this->relaxationFactorSpinBox->setRange(0.0001, 1000.0);
 	this->relaxationFactorSpinBox->setDecimals(4);
-	this->relaxationFactorSpinBox->setValue(0.65);
+	this->relaxationFactorSpinBox->setValue(DEF_RELAXATION_FACTOR);
 	this->relaxationFactorSpinBox->setSingleStep(0.01);
 	this->installScrollGuard(this->relaxationFactorSpinBox);
 	formLayout->addRow(this->relaxationLabel, this->relaxationFactorSpinBox);
@@ -69,7 +85,7 @@ void DeconvolutionSettingsWidget::setupUI()
 	this->regularizationFactorSpinBox = new QDoubleSpinBox(controlsWidget);
 	this->regularizationFactorSpinBox->setRange(0.0001, 1.0);
 	this->regularizationFactorSpinBox->setDecimals(4);
-	this->regularizationFactorSpinBox->setValue(0.005);
+	this->regularizationFactorSpinBox->setValue(DEF_REGULARIZATION_FACTOR);
 	this->regularizationFactorSpinBox->setSingleStep(0.001);
 	this->installScrollGuard(this->regularizationFactorSpinBox);
 	formLayout->addRow(this->regularizationLabel, this->regularizationFactorSpinBox);
@@ -79,7 +95,7 @@ void DeconvolutionSettingsWidget::setupUI()
 	this->noiseToSignalFactorSpinBox = new QDoubleSpinBox(controlsWidget);
 	this->noiseToSignalFactorSpinBox->setRange(0.0001, 1.0);
 	this->noiseToSignalFactorSpinBox->setDecimals(4);
-	this->noiseToSignalFactorSpinBox->setValue(0.01);
+	this->noiseToSignalFactorSpinBox->setValue(DEF_NOISE_TO_SIGNAL);
 	this->noiseToSignalFactorSpinBox->setSingleStep(0.001);
 	this->installScrollGuard(this->noiseToSignalFactorSpinBox);
 	formLayout->addRow(this->noiseToSignalLabel, this->noiseToSignalFactorSpinBox);
@@ -178,29 +194,29 @@ void DeconvolutionSettingsWidget::updateParameterVisibility(int algorithmIndex)
 
 QString DeconvolutionSettingsWidget::getName() const
 {
-	return QLatin1String(SETTINGS_GROUP);
+	return SETTINGS_GROUP;
 }
 
 QVariantMap DeconvolutionSettingsWidget::getSettings() const
 {
 	QVariantMap settings;
-	settings.insert("algorithm", this->algorithmComboBox->currentIndex());
-	settings.insert("iterations", this->iterationsSpinBox->value());
-	settings.insert("relaxationFactor", this->relaxationFactorSpinBox->value());
-	settings.insert("regularizationFactor", this->regularizationFactorSpinBox->value());
-	settings.insert("noiseToSignalFactor", this->noiseToSignalFactorSpinBox->value());
-	settings.insert("liveMode", this->liveModeCheckBox->isChecked());
+	settings.insert(KEY_ALGORITHM,             this->algorithmComboBox->currentIndex());
+	settings.insert(KEY_ITERATIONS,            this->iterationsSpinBox->value());
+	settings.insert(KEY_RELAXATION_FACTOR,     this->relaxationFactorSpinBox->value());
+	settings.insert(KEY_REGULARIZATION_FACTOR, this->regularizationFactorSpinBox->value());
+	settings.insert(KEY_NOISE_TO_SIGNAL,       this->noiseToSignalFactorSpinBox->value());
+	settings.insert(KEY_LIVE_MODE,             this->liveModeCheckBox->isChecked());
 	return settings;
 }
 
 void DeconvolutionSettingsWidget::setSettings(const QVariantMap& settings)
 {
-	this->algorithmComboBox->setCurrentIndex(settings.value("algorithm", 0).toInt());
-	this->iterationsSpinBox->setValue(settings.value("iterations", 128).toInt());
-	this->relaxationFactorSpinBox->setValue(settings.value("relaxationFactor", 0.65).toDouble());
-	this->regularizationFactorSpinBox->setValue(settings.value("regularizationFactor", 0.005).toDouble());
-	this->noiseToSignalFactorSpinBox->setValue(settings.value("noiseToSignalFactor", 0.01).toDouble());
-	this->liveModeCheckBox->setChecked(settings.value("liveMode", true).toBool());
+	this->algorithmComboBox->setCurrentIndex(      settings.value(KEY_ALGORITHM,             DEF_ALGORITHM).toInt());
+	this->iterationsSpinBox->setValue(             settings.value(KEY_ITERATIONS,            DEF_ITERATIONS).toInt());
+	this->relaxationFactorSpinBox->setValue(       settings.value(KEY_RELAXATION_FACTOR,     DEF_RELAXATION_FACTOR).toDouble());
+	this->regularizationFactorSpinBox->setValue(   settings.value(KEY_REGULARIZATION_FACTOR, DEF_REGULARIZATION_FACTOR).toDouble());
+	this->noiseToSignalFactorSpinBox->setValue(    settings.value(KEY_NOISE_TO_SIGNAL,        DEF_NOISE_TO_SIGNAL).toDouble());
+	this->liveModeCheckBox->setChecked(            settings.value(KEY_LIVE_MODE,              DEF_LIVE_MODE).toBool());
 }
 
 void DeconvolutionSettingsWidget::installScrollGuard(QWidget* widget)

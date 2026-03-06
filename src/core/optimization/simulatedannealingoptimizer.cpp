@@ -4,6 +4,24 @@
 #include <QtMath>
 #include <limits>
 
+namespace {
+	// Key names
+	const QString KEY_START_TEMPERATURE          = QStringLiteral("start_temperature");
+	const QString KEY_END_TEMPERATURE            = QStringLiteral("end_temperature");
+	const QString KEY_COOLING_FACTOR             = QStringLiteral("cooling_factor");
+	const QString KEY_START_PERTURBANCE          = QStringLiteral("start_perturbance");
+	const QString KEY_END_PERTURBANCE            = QStringLiteral("end_perturbance");
+	const QString KEY_ITERATIONS_PER_TEMPERATURE = QStringLiteral("iterations_per_temperature");
+
+	// Default values (match constructor initialization)
+	const double DEF_START_TEMPERATURE          = 0.4;
+	const double DEF_END_TEMPERATURE            = 0.001;
+	const double DEF_COOLING_FACTOR             = 0.996;
+	const double DEF_START_PERTURBANCE          = 0.002;
+	const double DEF_END_PERTURBANCE            = 0.0002;
+	const int    DEF_ITERATIONS_PER_TEMPERATURE = 1;
+}
+
 
 SimulatedAnnealingOptimizer::SimulatedAnnealingOptimizer()
 	: startTemperature(0.4)
@@ -28,22 +46,22 @@ QString SimulatedAnnealingOptimizer::typeName() const
 QVector<OptimizerParameter> SimulatedAnnealingOptimizer::getParameterDescriptors() const
 {
 	return {
-		{ "startTemperature",        "Start Temperature",
+		{ KEY_START_TEMPERATURE,          "Start Temperature",
 		  "Initial temperature for Metropolis acceptance criterion.\nHigher = more likely to accept worse solutions early on.",
 		  0.001,   1000.0, 0.1,   0.4,   3 },
-		{ "endTemperature",          "End Temperature",
+		{ KEY_END_TEMPERATURE,            "End Temperature",
 		  "Final temperature at which the algorithm stops.\nLower = longer annealing schedule.",
 		  0.00001, 100.0,  0.001, 0.001, 5 },
-		{ "coolingFactor",           "Cooling Factor",
+		{ KEY_COOLING_FACTOR,             "Cooling Factor",
 		  "Temperature multiplier per step (0-1).\nCloser to 1 = slower cooling, more thorough search.",
 		  0.01,    0.9999, 0.001, 0.996, 4 },
-		{ "startPerturbance",        "Start Perturbance",
+		{ KEY_START_PERTURBANCE,          "Start Perturbance",
 		  "Initial random step size for coefficient perturbation.\nLarger = bigger jumps early on.",
 		  0.0001,  10.0,   0.001, 0.002, 4 },
-		{ "endPerturbance",          "End Perturbance",
+		{ KEY_END_PERTURBANCE,            "End Perturbance",
 		  "Final perturbation size.\nSmaller = finer refinement near the end.",
 		  0.0001,  10.0,   0.0001, 0.0002, 4 },
-		{ "iterationsPerTemperature","Iterations/Temperature",
+		{ KEY_ITERATIONS_PER_TEMPERATURE, "Iterations/Temperature",
 		  "Number of trial moves at each temperature level before cooling.",
 		  1,       10000,  1,     1,     0 }
 	};
@@ -52,23 +70,23 @@ QVector<OptimizerParameter> SimulatedAnnealingOptimizer::getParameterDescriptors
 QVariantMap SimulatedAnnealingOptimizer::serializeSettings() const
 {
 	QVariantMap map;
-	map["startTemperature"] = this->startTemperature;
-	map["endTemperature"] = this->endTemperature;
-	map["coolingFactor"] = this->coolingFactor;
-	map["startPerturbance"] = this->startPerturbance;
-	map["endPerturbance"] = this->endPerturbance;
-	map["iterationsPerTemperature"] = this->iterationsPerTemperature;
+	map[KEY_START_TEMPERATURE]          = this->startTemperature;
+	map[KEY_END_TEMPERATURE]            = this->endTemperature;
+	map[KEY_COOLING_FACTOR]             = this->coolingFactor;
+	map[KEY_START_PERTURBANCE]          = this->startPerturbance;
+	map[KEY_END_PERTURBANCE]            = this->endPerturbance;
+	map[KEY_ITERATIONS_PER_TEMPERATURE] = this->iterationsPerTemperature;
 	return map;
 }
 
 void SimulatedAnnealingOptimizer::deserializeSettings(const QVariantMap& settings)
 {
-	this->startTemperature = settings.value("startTemperature", this->startTemperature).toDouble();
-	this->endTemperature = settings.value("endTemperature", this->endTemperature).toDouble();
-	this->coolingFactor = settings.value("coolingFactor", this->coolingFactor).toDouble();
-	this->startPerturbance = settings.value("startPerturbance", this->startPerturbance).toDouble();
-	this->endPerturbance = settings.value("endPerturbance", this->endPerturbance).toDouble();
-	this->iterationsPerTemperature = settings.value("iterationsPerTemperature", this->iterationsPerTemperature).toInt();
+	this->startTemperature          = settings.value(KEY_START_TEMPERATURE,          DEF_START_TEMPERATURE).toDouble();
+	this->endTemperature            = settings.value(KEY_END_TEMPERATURE,            DEF_END_TEMPERATURE).toDouble();
+	this->coolingFactor             = settings.value(KEY_COOLING_FACTOR,             DEF_COOLING_FACTOR).toDouble();
+	this->startPerturbance          = settings.value(KEY_START_PERTURBANCE,          DEF_START_PERTURBANCE).toDouble();
+	this->endPerturbance            = settings.value(KEY_END_PERTURBANCE,            DEF_END_PERTURBANCE).toDouble();
+	this->iterationsPerTemperature  = settings.value(KEY_ITERATIONS_PER_TEMPERATURE, DEF_ITERATIONS_PER_TEMPERATURE).toInt();
 
 	// Initialize live copies
 	QMutexLocker locker(&this->liveParamsMutex);
@@ -82,16 +100,16 @@ void SimulatedAnnealingOptimizer::deserializeSettings(const QVariantMap& setting
 void SimulatedAnnealingOptimizer::updateLiveParameters(const QVariantMap& params)
 {
 	QMutexLocker locker(&this->liveParamsMutex);
-	if (params.contains("endTemperature"))
-		this->liveEndTemperature = params.value("endTemperature").toDouble();
-	if (params.contains("coolingFactor"))
-		this->liveCoolingFactor = params.value("coolingFactor").toDouble();
-	if (params.contains("startPerturbance"))
-		this->liveStartPerturbance = params.value("startPerturbance").toDouble();
-	if (params.contains("endPerturbance"))
-		this->liveEndPerturbance = params.value("endPerturbance").toDouble();
-	if (params.contains("iterationsPerTemperature"))
-		this->liveIterationsPerTemperature = params.value("iterationsPerTemperature").toInt();
+	if (params.contains(KEY_END_TEMPERATURE))
+		this->liveEndTemperature = params.value(KEY_END_TEMPERATURE).toDouble();
+	if (params.contains(KEY_COOLING_FACTOR))
+		this->liveCoolingFactor = params.value(KEY_COOLING_FACTOR).toDouble();
+	if (params.contains(KEY_START_PERTURBANCE))
+		this->liveStartPerturbance = params.value(KEY_START_PERTURBANCE).toDouble();
+	if (params.contains(KEY_END_PERTURBANCE))
+		this->liveEndPerturbance = params.value(KEY_END_PERTURBANCE).toDouble();
+	if (params.contains(KEY_ITERATIONS_PER_TEMPERATURE))
+		this->liveIterationsPerTemperature = params.value(KEY_ITERATIONS_PER_TEMPERATURE).toInt();
 }
 
 OptimizerResult SimulatedAnnealingOptimizer::run(

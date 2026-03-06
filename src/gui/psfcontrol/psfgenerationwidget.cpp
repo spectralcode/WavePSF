@@ -10,7 +10,9 @@
 #include <QLabel>
 
 namespace {
-	const char* SETTINGS_GROUP = "psf_generation";
+	const QString SETTINGS_GROUP     = QStringLiteral("psf_generation");
+	const QString KEY_PSF_SETTINGS   = QStringLiteral("psf_settings");
+	const QString KEY_WAVEFRONT_PLOT = QStringLiteral("wavefront_plot");
 }
 
 
@@ -67,25 +69,21 @@ CoefficientEditorWidget* PSFGenerationWidget::coefficientEditor() const
 
 QString PSFGenerationWidget::getName() const
 {
-	return QLatin1String(SETTINGS_GROUP);
+	return SETTINGS_GROUP;
 }
 
 QVariantMap PSFGenerationWidget::getSettings() const
 {
 	QVariantMap settings;
-	settings.insert("coefficients", this->coeffEditor->getSettings());
-	settings.insert("psf_settings", serializePSFSettings(this->currentSettings));
-	settings.insert("wavefront_plot", this->wavefrontPlot->getSettings());
+	settings.insert(KEY_PSF_SETTINGS,   serializePSFSettings(this->currentSettings));
+	settings.insert(KEY_WAVEFRONT_PLOT, this->wavefrontPlot->getSettings());
 	return settings;
 }
 
 void PSFGenerationWidget::setSettings(const QVariantMap& settings)
 {
-	this->coeffEditor->setSettings(settings.value("coefficients").toMap());
-	if (settings.contains("psf_settings")) {
-		this->currentSettings = deserializePSFSettings(settings.value("psf_settings").toMap());
-	}
-	this->wavefrontPlot->setSettings(settings.value("wavefront_plot").toMap());
+	this->currentSettings = deserializePSFSettings(settings.value(KEY_PSF_SETTINGS).toMap());
+	this->wavefrontPlot->setSettings(settings.value(KEY_WAVEFRONT_PLOT).toMap());
 }
 
 PSFSettings PSFGenerationWidget::getPSFSettings() const

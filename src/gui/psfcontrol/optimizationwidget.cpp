@@ -23,7 +23,36 @@
 #include "gui/plotutils.h"
 
 namespace {
-	const char* SETTINGS_GROUP = "optimization";
+	const QString SETTINGS_GROUP = QStringLiteral("optimization");
+
+	// Key names
+	const QString KEY_MODE                  = QStringLiteral("mode");
+	const QString KEY_ALGORITHM_NAME        = QStringLiteral("algorithm_name");
+	const QString KEY_ALL_ALGO_PARAMS       = QStringLiteral("all_algorithm_parameters");
+	const QString KEY_METRIC_MODE           = QStringLiteral("metric_mode");
+	const QString KEY_METRIC_TYPE           = QStringLiteral("metric_type");
+	const QString KEY_METRIC_MULTIPLIER     = QStringLiteral("metric_multiplier");
+	const QString KEY_PATCHES               = QStringLiteral("patches");
+	const QString KEY_FRAMES                = QStringLiteral("frames");
+	const QString KEY_START_COEFF_SOURCE    = QStringLiteral("start_coeff_source");
+	const QString KEY_SOURCE_PARAM          = QStringLiteral("source_param");
+	const QString KEY_OPTIMIZE_ALL          = QStringLiteral("optimize_all");
+	const QString KEY_COEFFICIENT_SPEC      = QStringLiteral("coefficient_spec");
+	const QString KEY_LIVE_PREVIEW          = QStringLiteral("live_preview");
+	const QString KEY_LIVE_PREVIEW_INTERVAL = QStringLiteral("live_preview_interval");
+
+	// Default values
+	const int     DEF_MODE                  = 0;
+	const QString DEF_ALGORITHM_NAME        = QStringLiteral("Simulated Annealing");
+	const int     DEF_METRIC_MODE           = 1;
+	const int     DEF_METRIC_TYPE           = 1;
+	const double  DEF_METRIC_MULTIPLIER     = -100.0;
+	const int     DEF_START_COEFF_SOURCE    = 0;
+	const int     DEF_SOURCE_PARAM          = 0;
+	const bool    DEF_OPTIMIZE_ALL          = false;
+	const QString DEF_COEFFICIENT_SPEC      = QStringLiteral("2-8");
+	const bool    DEF_LIVE_PREVIEW          = true;
+	const int     DEF_LIVE_PREVIEW_INTERVAL = 10;
 }
 
 OptimizationWidget::OptimizationWidget(QWidget* parent)
@@ -129,7 +158,7 @@ void OptimizationWidget::setupInitialValuesSection(QVBoxLayout* layout)
 	this->sourceParamLabel = new QLabel(tr("Frame #:"), this->initialValuesGroup);
 	this->sourceParamSpinBox = new QSpinBox(this->initialValuesGroup);
 	this->sourceParamSpinBox->setRange(-100000, 100000);
-	this->sourceParamSpinBox->setValue(0);
+	this->sourceParamSpinBox->setValue(DEF_SOURCE_PARAM);
 	this->installScrollGuard(this->sourceParamSpinBox);
 	form->addRow(this->sourceParamLabel, this->sourceParamSpinBox);
 
@@ -185,7 +214,7 @@ void OptimizationWidget::setupMetricSection(QVBoxLayout* layout)
 
 	this->metricMultiplierSpinBox = new QDoubleSpinBox(metricGroup);
 	this->metricMultiplierSpinBox->setRange(-10000.0, 10000.0);
-	this->metricMultiplierSpinBox->setValue(1.0);
+	this->metricMultiplierSpinBox->setValue(DEF_METRIC_MULTIPLIER);
 	this->metricMultiplierSpinBox->setDecimals(2);
 	this->metricMultiplierSpinBox->setSingleStep(1.0);
 	this->installScrollGuard(this->metricMultiplierSpinBox);
@@ -212,7 +241,7 @@ void OptimizationWidget::setupCoefficientSection(QVBoxLayout* layout)
 	QVBoxLayout* coeffLayout = new QVBoxLayout(coeffGroup);
 
 	this->optimizeAllCheck = new QCheckBox(tr("Optimize All"), coeffGroup);
-	this->optimizeAllCheck->setChecked(true);
+	this->optimizeAllCheck->setChecked(DEF_OPTIMIZE_ALL);
 	this->optimizeAllCheck->setToolTip(tr("When checked, all visible coefficients are optimized"));
 	coeffLayout->addWidget(this->optimizeAllCheck);
 
@@ -221,7 +250,7 @@ void OptimizationWidget::setupCoefficientSection(QVBoxLayout* layout)
 	this->coefficientSpecLineEdit->setPlaceholderText(tr("e.g. 2-8, 11"));
 	this->coefficientSpecLineEdit->setToolTip(
 		tr("Parameter IDs to optimize (e.g. Noll indices for Zernike, comma-separated, ranges with dash)"));
-	this->coefficientSpecLineEdit->setEnabled(false);
+	this->coefficientSpecLineEdit->setEnabled(!DEF_OPTIMIZE_ALL);
 	coeffForm->addRow(tr("IDs:"), this->coefficientSpecLineEdit);
 	coeffLayout->addLayout(coeffForm);
 
@@ -254,7 +283,7 @@ void OptimizationWidget::setupControlSection(QVBoxLayout* layout)
 	previewLayout->addWidget(new QLabel(tr("every"), this));
 	this->livePreviewIntervalSpinBox = new QSpinBox(this);
 	this->livePreviewIntervalSpinBox->setRange(1, 100);
-	this->livePreviewIntervalSpinBox->setValue(10);
+	this->livePreviewIntervalSpinBox->setValue(DEF_LIVE_PREVIEW_INTERVAL);
 	this->livePreviewIntervalSpinBox->setEnabled(false);
 	this->installScrollGuard(this->livePreviewIntervalSpinBox);
 	previewLayout->addWidget(this->livePreviewIntervalSpinBox);
@@ -676,78 +705,58 @@ void OptimizationWidget::emitLivePreviewSettingsChanged()
 
 QString OptimizationWidget::getName() const
 {
-	return QLatin1String(SETTINGS_GROUP);
+	return SETTINGS_GROUP;
 }
 
 QVariantMap OptimizationWidget::getSettings() const
 {
 	QVariantMap settings;
-	settings.insert("mode", this->modeComboBox->currentIndex());
-	settings.insert("algorithmName", this->algorithmComboBox->currentText());
+	settings.insert(KEY_MODE,          this->modeComboBox->currentIndex());
+	settings.insert(KEY_ALGORITHM_NAME, this->algorithmComboBox->currentText());
 
 	// Save all cached algorithm parameters plus the current widget values
-	QVariantMap allAlgoParams = QVariantMap();
+	QVariantMap allAlgoParams;
 	for (auto it = this->cachedAlgorithmParameters.constBegin();
 		 it != this->cachedAlgorithmParameters.constEnd(); ++it) {
 		allAlgoParams.insert(it.key(), it.value());
 	}
 	// Overwrite with live widget values for the active algorithm
-	QString currentAlgo = this->algorithmComboBox->currentText();
-	allAlgoParams.insert(currentAlgo, this->readAlgorithmParameters());
-	settings.insert("allAlgorithmParameters", allAlgoParams);
+	allAlgoParams.insert(this->algorithmComboBox->currentText(), this->readAlgorithmParameters());
+	settings.insert(KEY_ALL_ALGO_PARAMS, allAlgoParams);
 
-	// Keep for backward compatibility
-	settings.insert("algorithmSettings", this->readAlgorithmParameters());
-	settings.insert("metricMode", this->metricModeComboBox->currentIndex());
-	settings.insert("metricType", this->metricTypeComboBox->currentIndex());
-	settings.insert("metricMultiplier", this->metricMultiplierSpinBox->value());
-	settings.insert("patches", this->patchesLineEdit->text());
-	settings.insert("frames", this->framesLineEdit->text());
-	settings.insert("startCoeffSource", this->startCoeffSourceComboBox->currentIndex());
-	settings.insert("sourceParam", this->sourceParamSpinBox->value());
-	settings.insert("optimizeAll", this->optimizeAllCheck->isChecked());
-	settings.insert("coefficientSpec", this->coefficientSpecLineEdit->text());
-	settings.insert("livePreview", this->livePreviewCheckBox->isChecked());
-	settings.insert("livePreviewInterval", this->livePreviewIntervalSpinBox->value());
+	settings.insert(KEY_METRIC_MODE,           this->metricModeComboBox->currentIndex());
+	settings.insert(KEY_METRIC_TYPE,           this->metricTypeComboBox->currentIndex());
+	settings.insert(KEY_METRIC_MULTIPLIER,     this->metricMultiplierSpinBox->value());
+	settings.insert(KEY_PATCHES,               this->patchesLineEdit->text());
+	settings.insert(KEY_FRAMES,                this->framesLineEdit->text());
+	settings.insert(KEY_START_COEFF_SOURCE,    this->startCoeffSourceComboBox->currentIndex());
+	settings.insert(KEY_SOURCE_PARAM,          this->sourceParamSpinBox->value());
+	settings.insert(KEY_OPTIMIZE_ALL,          this->optimizeAllCheck->isChecked());
+	settings.insert(KEY_COEFFICIENT_SPEC,      this->coefficientSpecLineEdit->text());
+	settings.insert(KEY_LIVE_PREVIEW,          this->livePreviewCheckBox->isChecked());
+	settings.insert(KEY_LIVE_PREVIEW_INTERVAL, this->livePreviewIntervalSpinBox->value());
 	return settings;
 }
 
 void OptimizationWidget::setSettings(const QVariantMap& settings)
 {
-	this->modeComboBox->setCurrentIndex(settings.value("mode", 0).toInt());
+	this->modeComboBox->setCurrentIndex(settings.value(KEY_MODE, DEF_MODE).toInt());
 
 	// Algorithm selection (triggers rebuild of parameter widgets)
-	QString algoName = settings.value("algorithmName", "Simulated Annealing").toString();
+	QString algoName = settings.value(KEY_ALGORITHM_NAME, DEF_ALGORITHM_NAME).toString();
 	int algoIdx = this->algorithmComboBox->findText(algoName);
 	if (algoIdx >= 0) {
 		this->algorithmComboBox->setCurrentIndex(algoIdx);
 	}
 
 	// Restore full algorithm parameter cache
-	QVariantMap allAlgoParams = settings.value("allAlgorithmParameters").toMap();
-	if (!allAlgoParams.isEmpty()) {
-		for (auto it = allAlgoParams.constBegin(); it != allAlgoParams.constEnd(); ++it) {
-			this->cachedAlgorithmParameters.insert(it.key(), it.value().toMap());
-		}
+	QVariantMap allAlgoParams = settings.value(KEY_ALL_ALGO_PARAMS).toMap();
+	for (auto it = allAlgoParams.constBegin(); it != allAlgoParams.constEnd(); ++it) {
+		this->cachedAlgorithmParameters.insert(it.key(), it.value().toMap());
 	}
 
-	// Determine current algorithm settings (with backward compatibility)
+	// Apply saved values for the current algorithm to the dynamic widgets
 	QVariantMap algoSettings = allAlgoParams.value(algoName).toMap();
-	if (algoSettings.isEmpty()) {
-		algoSettings = settings.value("algorithmSettings").toMap();
-	}
-	if (algoSettings.isEmpty() && settings.contains("startTemperature")) {
-		// Legacy SA settings - convert to new format
-		algoSettings.insert("startTemperature", settings.value("startTemperature"));
-		algoSettings.insert("endTemperature", settings.value("endTemperature"));
-		algoSettings.insert("coolingFactor", settings.value("coolingFactor"));
-		algoSettings.insert("startPerturbance", settings.value("startPerturbance",
-						settings.value("perturbance")));
-		algoSettings.insert("endPerturbance", settings.value("endPerturbance"));
-		algoSettings.insert("iterationsPerTemperature", settings.value("itersPerTemp"));
-	}
-
-	// Apply saved values to the dynamic widgets
 	for (auto it = algoSettings.constBegin(); it != algoSettings.constEnd(); ++it) {
 		QWidget* widget = this->algorithmParamWidgets.value(it.key(), nullptr);
 		if (!widget) continue;
@@ -757,21 +766,18 @@ void OptimizationWidget::setSettings(const QVariantMap& settings)
 		if (iSpin) { iSpin->setValue(it.value().toInt()); }
 	}
 
-	this->metricModeComboBox->setCurrentIndex(settings.value("metricMode", 1).toInt());
-	this->metricTypeComboBox->setCurrentIndex(settings.value("metricType", 1).toInt());
-	this->metricMultiplierSpinBox->setValue(settings.value("metricMultiplier", -100.0).toDouble());
-	if (settings.contains("patches")) {
-		this->patchesLineEdit->setText(settings.value("patches").toString());
-	}
-	if (settings.contains("frames")) {
-		this->framesLineEdit->setText(settings.value("frames").toString());
-	}
-	this->startCoeffSourceComboBox->setCurrentIndex(settings.value("startCoeffSource", 0).toInt());
-	this->sourceParamSpinBox->setValue(settings.value("sourceParam", 0).toInt());
-	this->optimizeAllCheck->setChecked(settings.value("optimizeAll", false).toBool());
-	this->coefficientSpecLineEdit->setText(settings.value("coefficientSpec", "2-8").toString());
-	this->livePreviewCheckBox->setChecked(settings.value("livePreview", true).toBool());
-	this->livePreviewIntervalSpinBox->setValue(settings.value("livePreviewInterval", 10).toInt());
+	this->metricModeComboBox->setCurrentIndex(settings.value(KEY_METRIC_MODE,           DEF_METRIC_MODE).toInt());
+	this->metricTypeComboBox->setCurrentIndex(settings.value(KEY_METRIC_TYPE,            DEF_METRIC_TYPE).toInt());
+	this->metricMultiplierSpinBox->setValue(   settings.value(KEY_METRIC_MULTIPLIER,     DEF_METRIC_MULTIPLIER).toDouble());
+	this->patchesLineEdit->setText(            settings.value(KEY_PATCHES,               QString()).toString());
+	this->framesLineEdit->setText(             settings.value(KEY_FRAMES,                QString()).toString());
+	this->startCoeffSourceComboBox->setCurrentIndex(settings.value(KEY_START_COEFF_SOURCE, DEF_START_COEFF_SOURCE).toInt());
+	this->sourceParamSpinBox->setValue(        settings.value(KEY_SOURCE_PARAM,          DEF_SOURCE_PARAM).toInt());
+	this->optimizeAllCheck->setChecked(        settings.value(KEY_OPTIMIZE_ALL,          DEF_OPTIMIZE_ALL).toBool());
+	this->coefficientSpecLineEdit->setEnabled(!this->optimizeAllCheck->isChecked());
+	this->coefficientSpecLineEdit->setText(    settings.value(KEY_COEFFICIENT_SPEC,      DEF_COEFFICIENT_SPEC).toString());
+	this->livePreviewCheckBox->setChecked(     settings.value(KEY_LIVE_PREVIEW,          DEF_LIVE_PREVIEW).toBool());
+	this->livePreviewIntervalSpinBox->setValue(settings.value(KEY_LIVE_PREVIEW_INTERVAL, DEF_LIVE_PREVIEW_INTERVAL).toInt());
 }
 
 void OptimizationWidget::installScrollGuard(QWidget* widget)

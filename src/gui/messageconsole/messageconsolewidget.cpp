@@ -12,9 +12,13 @@
 
 namespace {
 	// Settings group + keys (local to this file)
-	const char* SETTINGS_GROUP      = "message_console_widget";
-	const char* NEWEST_AT_TOP_KEY   = "newest_at_top";
-	const char* AUTOSCROLL_KEY      = "autoscroll";
+	const QString SETTINGS_GROUP    = QStringLiteral("message_console_widget");
+	const QString KEY_NEWEST_AT_TOP = QStringLiteral("newest_at_top");
+	const QString KEY_AUTOSCROLL    = QStringLiteral("autoscroll");
+
+	// Default values
+	const bool DEF_NEWEST_AT_TOP = false;
+	const bool DEF_AUTOSCROLL    = true;
 }
 
 namespace  {
@@ -73,21 +77,21 @@ MessageConsoleWidget::MessageConsoleWidget(QWidget* parent)
 
 QString MessageConsoleWidget::getName() const
 {
-	return QLatin1String(SETTINGS_GROUP);
+	return SETTINGS_GROUP;
 }
 
 QVariantMap MessageConsoleWidget::getSettings() const
 {
 	QVariantMap m;
-	m.insert(QLatin1String(NEWEST_AT_TOP_KEY), this->newestAtTop);
-	m.insert(QLatin1String(AUTOSCROLL_KEY), this->autoscroll);
+	m.insert(KEY_NEWEST_AT_TOP, this->newestAtTop);
+	m.insert(KEY_AUTOSCROLL,    this->autoscroll);
 	return m;
 }
 
 void MessageConsoleWidget::setSettings(const QVariantMap& m)
 {
-	this->newestAtTop = m.value(QLatin1String("newest_at_top"), false).toBool();
-	this->autoscroll  = m.value(QLatin1String("autoscroll"), true).toBool();
+	this->newestAtTop = m.value(KEY_NEWEST_AT_TOP, DEF_NEWEST_AT_TOP).toBool();
+	this->autoscroll  = m.value(KEY_AUTOSCROLL,    DEF_AUTOSCROLL).toBool();
 
 	// Sync UI + apply
 	if (this->actionNewestTop)	this->actionNewestTop->setChecked(this->newestAtTop);

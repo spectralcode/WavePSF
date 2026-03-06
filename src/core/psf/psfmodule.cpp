@@ -11,6 +11,15 @@ PSFModule::PSFModule(QObject* parent)
 	, gridSize(128)
 	, usingExternalPSF(false)
 {
+	// Pre-populate allGeneratorSettings with defaults from every known generator type.
+	// This ensures PSFSettingsDialog always finds a non-empty map for any type,
+	// even before it has been used or saved to INI.
+	for (const QString& typeName : WavefrontGeneratorFactory::availableTypeNames()) {
+		IWavefrontGenerator* gen = WavefrontGeneratorFactory::create(typeName, nullptr);
+		this->allGeneratorSettings[typeName] = gen->serializeSettings();
+		delete gen;
+	}
+
 	this->generator = new ZernikeGenerator(2, 21, this);
 	this->calculator = new PSFCalculator(0.055, 0.4, this);
 	this->deconvolver = new Deconvolver(128, this);
@@ -159,8 +168,12 @@ void PSFModule::setGeneratorType(const QString& typeName)
 
 void PSFModule::applyPSFSettings(const PSFSettings& settings)
 {
-	// Restore cached settings for all generator types
-	this->allGeneratorSettings = settings.allGeneratorSettings;
+	// Merge saved settings on top of pre-populated defaults.
+	// Using merge (not replace) preserves defaults for types not yet saved to INI.
+	for (auto it = settings.allGeneratorSettings.constBegin();
+		 it != settings.allGeneratorSettings.constEnd(); ++it) {
+		this->allGeneratorSettings[it.key()] = it.value();
+	}
 
 	// Switch generator type if needed
 	if (this->generator->typeName() != settings.generatorTypeName) {

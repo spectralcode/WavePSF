@@ -10,6 +10,22 @@
 #include <QShowEvent>
 #include "gui/plotutils.h"
 
+namespace {
+	const QString KEY_AUTO_SCALE       = QStringLiteral("auto_scale");
+	const QString KEY_SYMMETRIC_ZERO   = QStringLiteral("symmetric_zero");
+	const QString KEY_SHOW_GRID        = QStringLiteral("show_grid");
+	const QString KEY_SHOW_AXIS        = QStringLiteral("show_axis");
+	const QString KEY_SHOW_COLOR_SCALE = QStringLiteral("show_color_scale");
+	const QString KEY_COLORMAP_INDEX   = QStringLiteral("colormap_index");
+
+	const bool DEF_AUTO_SCALE       = true;
+	const bool DEF_SYMMETRIC_ZERO   = true;
+	const bool DEF_SHOW_GRID        = true;
+	const bool DEF_SHOW_AXIS        = true;
+	const bool DEF_SHOW_COLOR_SCALE = true;
+	const int  DEF_COLORMAP_INDEX   = 13; // Wavefront
+}
+
 
 WavefrontPlotWidget::WavefrontPlotWidget(QWidget* parent)
 	: QWidget(parent)
@@ -71,13 +87,13 @@ WavefrontPlotWidget::~WavefrontPlotWidget()
 QVariantMap WavefrontPlotWidget::getSettings() const
 {
 	QVariantMap settings;
-	settings.insert("autoScale", this->autoScaleAction->isChecked());
-	settings.insert("symmetricZero", this->symmetricZeroAction->isChecked());
-	settings.insert("showGrid", this->showGridAction->isChecked());
-	settings.insert("showAxis", this->showAxisAction->isChecked());
-	settings.insert("showColorScale", this->showColorScaleAction->isChecked());
+	settings.insert(KEY_AUTO_SCALE,       this->autoScaleAction->isChecked());
+	settings.insert(KEY_SYMMETRIC_ZERO,   this->symmetricZeroAction->isChecked());
+	settings.insert(KEY_SHOW_GRID,        this->showGridAction->isChecked());
+	settings.insert(KEY_SHOW_AXIS,        this->showAxisAction->isChecked());
+	settings.insert(KEY_SHOW_COLOR_SCALE, this->showColorScaleAction->isChecked());
 
-	int colormapIndex = 13;
+	int colormapIndex = DEF_COLORMAP_INDEX;
 	QList<QAction*> actions = this->gradientGroup->actions();
 	for (int i = 0; i < actions.size(); i++) {
 		if (actions[i]->isChecked()) {
@@ -85,7 +101,7 @@ QVariantMap WavefrontPlotWidget::getSettings() const
 			break;
 		}
 	}
-	settings.insert("colormapIndex", colormapIndex);
+	settings.insert(KEY_COLORMAP_INDEX, colormapIndex);
 	return settings;
 }
 
@@ -100,13 +116,13 @@ void WavefrontPlotWidget::setSettings(const QVariantMap& settings)
 	this->showAxisAction->blockSignals(true);
 	this->showColorScaleAction->blockSignals(true);
 
-	this->autoScaleAction->setChecked(settings.value("autoScale", true).toBool());
-	this->symmetricZeroAction->setChecked(settings.value("symmetricZero", true).toBool());
-	this->showGridAction->setChecked(settings.value("showGrid", true).toBool());
-	this->showAxisAction->setChecked(settings.value("showAxis", true).toBool());
-	this->showColorScaleAction->setChecked(settings.value("showColorScale", true).toBool());
+	this->autoScaleAction->setChecked(settings.value(KEY_AUTO_SCALE,       DEF_AUTO_SCALE).toBool());
+	this->symmetricZeroAction->setChecked(settings.value(KEY_SYMMETRIC_ZERO,   DEF_SYMMETRIC_ZERO).toBool());
+	this->showGridAction->setChecked(settings.value(KEY_SHOW_GRID,        DEF_SHOW_GRID).toBool());
+	this->showAxisAction->setChecked(settings.value(KEY_SHOW_AXIS,        DEF_SHOW_AXIS).toBool());
+	this->showColorScaleAction->setChecked(settings.value(KEY_SHOW_COLOR_SCALE, DEF_SHOW_COLOR_SCALE).toBool());
 
-	int colormapIndex = settings.value("colormapIndex", 13).toInt();
+	int colormapIndex = settings.value(KEY_COLORMAP_INDEX, DEF_COLORMAP_INDEX).toInt();
 	QList<QAction*> actions = this->gradientGroup->actions();
 	if (colormapIndex >= 0 && colormapIndex < actions.size()) {
 		actions[colormapIndex]->setChecked(true);
@@ -305,7 +321,7 @@ void WavefrontPlotWidget::setupContextMenu()
 
 	this->autoScaleAction = new QAction("Auto-Scale Range", this);
 	this->autoScaleAction->setCheckable(true);
-	this->autoScaleAction->setChecked(true);
+	this->autoScaleAction->setChecked(DEF_AUTO_SCALE);
 	connect(this->autoScaleAction, &QAction::toggled, this, [this]() {
 		this->applyDataRange();
 		this->plot->replot();
@@ -314,7 +330,7 @@ void WavefrontPlotWidget::setupContextMenu()
 
 	this->symmetricZeroAction = new QAction("Symmetric Zero", this);
 	this->symmetricZeroAction->setCheckable(true);
-	this->symmetricZeroAction->setChecked(true);
+	this->symmetricZeroAction->setChecked(DEF_SYMMETRIC_ZERO);
 	connect(this->symmetricZeroAction, &QAction::toggled, this, [this]() {
 		this->applyDataRange();
 		this->plot->replot();
@@ -325,7 +341,7 @@ void WavefrontPlotWidget::setupContextMenu()
 
 	this->showGridAction = new QAction(tr("Show Grid"), this);
 	this->showGridAction->setCheckable(true);
-	this->showGridAction->setChecked(true);
+	this->showGridAction->setChecked(DEF_SHOW_GRID);
 	connect(this->showGridAction, &QAction::toggled, this, [this](bool checked) {
 		this->plot->xAxis->grid()->setVisible(checked);
 		this->plot->yAxis->grid()->setVisible(checked);
@@ -335,7 +351,7 @@ void WavefrontPlotWidget::setupContextMenu()
 
 	this->showAxisAction = new QAction(tr("Show Axis"), this);
 	this->showAxisAction->setCheckable(true);
-	this->showAxisAction->setChecked(true);
+	this->showAxisAction->setChecked(DEF_SHOW_AXIS);
 	connect(this->showAxisAction, &QAction::toggled, this, [this](bool checked) {
 		this->plot->xAxis->setVisible(checked);
 		this->plot->yAxis->setVisible(checked);
@@ -351,7 +367,7 @@ void WavefrontPlotWidget::setupContextMenu()
 
 	this->showColorScaleAction = new QAction(tr("Show Color Scale"), this);
 	this->showColorScaleAction->setCheckable(true);
-	this->showColorScaleAction->setChecked(true);
+	this->showColorScaleAction->setChecked(DEF_SHOW_COLOR_SCALE);
 	connect(this->showColorScaleAction, &QAction::toggled, this, [this](bool visible) {
 		if (visible) {
 			this->colorScale->setVisible(true);
@@ -381,7 +397,7 @@ void WavefrontPlotWidget::setupContextMenu()
 	for (int i = 0; i < names.size(); i++) {
 		QAction* action = colorMapMenu->addAction(names[i]);
 		action->setCheckable(true);
-		action->setChecked(i == 13); // Wavefront default
+		action->setChecked(i == DEF_COLORMAP_INDEX);
 		this->gradientGroup->addAction(action);
 		connect(action, &QAction::triggered, this, [this, i]() {
 			this->applyGradient(i);

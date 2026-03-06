@@ -3,6 +3,13 @@
 #include <QtMath>
 #include <limits>
 
+namespace {
+	const QString KEY_MUTATION_FACTOR  = QStringLiteral("mutation_factor");
+	const QString KEY_CROSSOVER_RATE   = QStringLiteral("crossover_rate");
+	const QString KEY_POPULATION_SIZE  = QStringLiteral("population_size");
+	const QString KEY_MAX_GENERATIONS  = QStringLiteral("max_generations");
+}
+
 
 DifferentialEvolutionOptimizer::DifferentialEvolutionOptimizer()
 	: mutationFactor(0.8)
@@ -20,16 +27,16 @@ QString DifferentialEvolutionOptimizer::typeName() const
 QVector<OptimizerParameter> DifferentialEvolutionOptimizer::getParameterDescriptors() const
 {
 	return {
-		{ "mutationFactor", "Mutation Factor (F)",
+		{ KEY_MUTATION_FACTOR, "Mutation Factor (F)",
 		  "Scale factor for difference vectors.\nHigher = larger mutation steps.\nTypical: 0.5-1.0.",
 		  0.0, 2.0, 0.01, 0.8, 2 },
-		{ "crossoverRate", "Crossover Rate (CR)",
+		{ KEY_CROSSOVER_RATE, "Crossover Rate (CR)",
 		  "Probability of taking each dimension from the mutant.\nHigher = more dimensions changed per trial.\nTypical: 0.1-1.0.",
 		  0.0, 1.0, 0.01, 0.9, 2 },
-		{ "populationSize", "Population Size (0=auto)",
+		{ KEY_POPULATION_SIZE, "Population Size (0=auto)",
 		  "Number of individuals in the population.\n0 = automatic (N+2, min 6).",
 		  0, 1000, 1, 0, 0 },
-		{ "maxGenerations", "Max Generations",
+		{ KEY_MAX_GENERATIONS, "Max Generations",
 		  "Maximum number of generations before stopping.",
 		  1, 100000, 10, 300, 0 }
 	};
@@ -38,19 +45,19 @@ QVector<OptimizerParameter> DifferentialEvolutionOptimizer::getParameterDescript
 QVariantMap DifferentialEvolutionOptimizer::serializeSettings() const
 {
 	QVariantMap map;
-	map["mutationFactor"] = this->mutationFactor;
-	map["crossoverRate"] = this->crossoverRate;
-	map["populationSize"] = this->populationSize;
-	map["maxGenerations"] = this->maxGenerations;
+	map[KEY_MUTATION_FACTOR] = this->mutationFactor;
+	map[KEY_CROSSOVER_RATE]  = this->crossoverRate;
+	map[KEY_POPULATION_SIZE] = this->populationSize;
+	map[KEY_MAX_GENERATIONS] = this->maxGenerations;
 	return map;
 }
 
 void DifferentialEvolutionOptimizer::deserializeSettings(const QVariantMap& settings)
 {
-	this->mutationFactor = settings.value("mutationFactor", this->mutationFactor).toDouble();
-	this->crossoverRate = settings.value("crossoverRate", this->crossoverRate).toDouble();
-	this->populationSize = settings.value("populationSize", this->populationSize).toInt();
-	this->maxGenerations = settings.value("maxGenerations", this->maxGenerations).toInt();
+	this->mutationFactor = settings.value(KEY_MUTATION_FACTOR, this->mutationFactor).toDouble();
+	this->crossoverRate  = settings.value(KEY_CROSSOVER_RATE,  this->crossoverRate).toDouble();
+	this->populationSize = settings.value(KEY_POPULATION_SIZE, this->populationSize).toInt();
+	this->maxGenerations = settings.value(KEY_MAX_GENERATIONS, this->maxGenerations).toInt();
 }
 
 OptimizerResult DifferentialEvolutionOptimizer::run(

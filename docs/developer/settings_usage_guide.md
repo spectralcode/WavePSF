@@ -3,100 +3,125 @@
 
 ## Overview
 
-WavePSF stores all user-visible settings (anything the user can change in the GUI) in a single file: **`wavepsf.ini`**.
+WavePSF stores all user-visible settings in a single human-readable file: **`wavepsf.ini`**.
 
 Only **`MainWindow`** talks to the settings backend (`SettingsFileManager`). Each widget provides:
-- `QString getName() const;` — unique settings group
-- `QVariantMap getSettings() const;` — current state
+- `QString getName() const;` — unique settings group name (used as INI section)
+- `QVariantMap getSettings() const;` — current state as a flat or nested map
 - `void setSettings(const QVariantMap&)` — apply immediately (UI + logic)
-Settings are usually saved when the application is closed and restored on startup. 
 
-**On startup:** `MainWindow` restores its own geometry/state, creates widgets/docks, then calls `setSettings(...)` on each widget with data from `wavepsf.ini`.
+**On startup:** `MainWindow` restores its own geometry/state, then calls `setSettings(...)` on each widget with data loaded from `wavepsf.ini`.
 
-**On Shutdown (and key user actions):** `MainWindow` calls `getSettings()` on each widget and writes all settings back to `wavepsf.ini`.
+**On shutdown (and key user actions):** `MainWindow` calls `getSettings()` on each widget and writes all settings back to `wavepsf.ini`.
 
+Nested `QVariantMap` values are stored recursively as `[group/subgroup]` INI sections — not binary blobs — so the file is always human-readable and hand-editable.
 
 
 ## How to Add Settings to Your Class
 
-### 1) Include Dependencies
-	// MyWidget.cpp/.h
-	#include <QVariantMap>	// widget returns/accepts a map only
+### 1) Header: declare the three methods
 
-### 2) Header: add the three methods getName, getSettings, setSettings
-	// MyWidget.h
-	#ifndef MYWIDGET_H
-	#define MYWIDGET_H
+```cpp
+// MyWidget.h
+#ifndef MYWIDGET_H
+#define MYWIDGET_H
 
-	#include <QWidget>
-	#include <QVariantMap>
+#include <QWidget>
+#include <QVariantMap>
 
-	class MyWidget : public QWidget {
-		Q_OBJECT
-	public:
-		explicit MyWidget(QWidget* parent = nullptr);
+class MyWidget : public QWidget {
+    Q_OBJECT
+public:
+    explicit MyWidget(QWidget* parent = nullptr);
 
-		// Settings round-trip + unique group name
-		QString getName() const;
-		QVariantMap getSettings() const;
-		void setSettings(const QVariantMap& m);
+    QString getName() const;
+    QVariantMap getSettings() const;
+    void setSettings(const QVariantMap& m);
+};
 
-	private:
-		// Runtime defaults used if nothing is stored
-		bool showGrid = false;
-		int zoom = 100;
+#endif // MYWIDGET_H
+```
 
-		// Apply current state to UI + business logic
-		void applyState();
-	};
+### 2) Define KEY and DEF constants in the .cpp (anonymous namespace only)
 
-	#endif // MYWIDGET_H
+```cpp
+// MyWidget.cpp
+namespace {
+    const QString SETTINGS_GROUP = QStringLiteral("my_widget");
 
-### 3) Define constants in the .cpp only (anonymous namespace)
-	// MyWidget.cpp — constants local to this file
-	namespace {
-		const char* SETTINGS_GROUP = "my_widget";
-		const char* SHOW_GRID_KEY  = "show_grid";
-		const char* ZOOM_KEY       = "zoom";
-	}
+    // Key names — lower_snake_case, stored verbatim as INI keys
+    const QString KEY_SHOW_GRID = QStringLiteral("show_grid");
+    const QString KEY_ZOOM      = QStringLiteral("zoom");
 
-### 4) Implement getName / getSettings / setSettings (apply immediately)
-	// MyWidget.cpp
-	#include "MyWidget.h"
+    // Default values — used when the key is absent (fresh install, corrupt file)
+    const bool DEF_SHOW_GRID = false;
+    const int  DEF_ZOOM      = 100;
+}
+```
 
-	MyWidget::MyWidget(QWidget* parent) : QWidget(parent) {
-		// Use runtime defaults until MainWindow injects stored settings
-		this->applyState();	// update UI + logic
-	}
+Rules:
+- Always `const QString` + `QStringLiteral(...)`, never `const char*`
+- Key constant names: `KEY_` prefix, `UPPER_SNAKE_CASE`
+- Default constant names: `DEF_` prefix, `UPPER_SNAKE_CASE`
+- Key string values: `lower_snake_case`
+- Keep all constants in the `.cpp` anonymous namespace — never expose them in the header
 
-	QString MyWidget::getName() const {
-		return QLatin1String(SETTINGS_GROUP);
-	}
+### 3) Implement getName / getSettings / setSettings
 
-	QVariantMap MyWidget::getSettings() const {
-		QVariantMap m;
-		m.insert(QLatin1String(SHOW_GRID_KEY), this->showGrid);
-		m.insert(QLatin1String(ZOOM_KEY), this->zoom);
-		return m;
-	}
+```cpp
+QString MyWidget::getName() const {
+    return SETTINGS_GROUP;
+}
 
-	void MyWidget::setSettings(const QVariantMap& m) {
-		// Inline defaults keep it robust
-		const bool newShowGrid = m.value(QLatin1String(SHOW_GRID_KEY), false).toBool();
-		const int  newZoom     = m.value(QLatin1String(ZOOM_KEY), 100).toInt();
+QVariantMap MyWidget::getSettings() const {
+    QVariantMap m;
+    m.insert(KEY_SHOW_GRID, this->showGridAction->isChecked());
+    m.insert(KEY_ZOOM,      this->zoom);
+    return m;
+}
 
-		bool dirty = false;
-		if (this->showGrid != newShowGrid) { this->showGrid = newShowGrid; dirty = true; }
-		if (this->zoom != newZoom)         { this->zoom = newZoom;         dirty = true; }
+void MyWidget::setSettings(const QVariantMap& m) {
+    this->showGridAction->setChecked(m.value(KEY_SHOW_GRID, DEF_SHOW_GRID).toBool());
+    this->zoom = m.value(KEY_ZOOM, DEF_ZOOM).toInt();
+    // Apply to UI/logic immediately...
+}
+```
 
-		if (dirty) this->applyState();	// immediately update UI + business logic
-	}
+### 4) Nested maps (for child widgets or sub-settings)
 
-	void MyWidget::applyState() {
-		// Update UI + logic from showGrid/zoom
-		// e.g. this->plot->setGridVisible(this->showGrid);
-		// e.g. this->view->setZoom(this->zoom);
-	}
+If your widget owns child widgets that also have settings, nest them as sub-maps:
 
-### 5) Update MainWindow load/save
-    When adding a new widget loadSettings and saveSettings need to be updated to include the setSettings and getSettings methods from the new widget. This might change in the future. 
+```cpp
+namespace {
+    const QString SETTINGS_GROUP = QStringLiteral("my_widget");
+    const QString KEY_CHILD_PLOT = QStringLiteral("plot");
+    const QString KEY_SHOW_GRID  = QStringLiteral("show_grid");
+    const bool    DEF_SHOW_GRID  = true;
+}
+
+QVariantMap MyWidget::getSettings() const {
+    QVariantMap m;
+    m.insert(KEY_SHOW_GRID,  this->showGrid);
+    m.insert(KEY_CHILD_PLOT, this->plotWidget->getSettings());  // nested map
+    return m;
+}
+
+void MyWidget::setSettings(const QVariantMap& m) {
+    this->showGrid = m.value(KEY_SHOW_GRID, DEF_SHOW_GRID).toBool();
+    this->plotWidget->setSettings(m.value(KEY_CHILD_PLOT).toMap());
+}
+```
+
+This produces readable INI sections:
+```ini
+[my_widget]
+show_grid=true
+
+[my_widget/plot]
+colormap_index=13
+auto_scale=true
+```
+
+### 5) Register in MainWindow
+
+Add `getSettings()`/`setSettings()` calls for the new widget in `MainWindow::saveSettings()` and `MainWindow::loadSettings()`.

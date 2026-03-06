@@ -4,6 +4,12 @@
 #include <limits>
 #include <algorithm>
 
+namespace {
+	const QString KEY_INITIAL_SIGMA    = QStringLiteral("initial_sigma");
+	const QString KEY_POPULATION_SIZE  = QStringLiteral("population_size");
+	const QString KEY_MAX_GENERATIONS  = QStringLiteral("max_generations");
+}
+
 
 CMAESOptimizer::CMAESOptimizer()
 	: initialSigma(0.3)
@@ -20,13 +26,13 @@ QString CMAESOptimizer::typeName() const
 QVector<OptimizerParameter> CMAESOptimizer::getParameterDescriptors() const
 {
 	return {
-		{ "initialSigma",   "Initial Sigma",
+		{ KEY_INITIAL_SIGMA,   "Initial Sigma",
 		  "Initial step size as fraction of parameter range.\n0.3 = 30% of each parameter's bounds.\nTypical: 0.1-0.5.",
 		  0.001, 10.0,   0.01, 0.3, 3 },
-		{ "populationSize", "Population Size (0=auto)",
+		{ KEY_POPULATION_SIZE, "Population Size (0=auto)",
 		  "Number of candidate solutions per generation.\n0 = automatic (4 + 3*ln(N)).",
 		  0,     500,    1,    0,   0 },
-		{ "maxGenerations", "Max Generations",
+		{ KEY_MAX_GENERATIONS, "Max Generations",
 		  "Maximum number of evolutionary generations before stopping.",
 		  1,     100000, 10,   300, 0 }
 	};
@@ -35,17 +41,17 @@ QVector<OptimizerParameter> CMAESOptimizer::getParameterDescriptors() const
 QVariantMap CMAESOptimizer::serializeSettings() const
 {
 	QVariantMap map;
-	map["initialSigma"] = this->initialSigma;
-	map["populationSize"] = this->populationSize;
-	map["maxGenerations"] = this->maxGenerations;
+	map[KEY_INITIAL_SIGMA]    = this->initialSigma;
+	map[KEY_POPULATION_SIZE]  = this->populationSize;
+	map[KEY_MAX_GENERATIONS]  = this->maxGenerations;
 	return map;
 }
 
 void CMAESOptimizer::deserializeSettings(const QVariantMap& settings)
 {
-	this->initialSigma = settings.value("initialSigma", this->initialSigma).toDouble();
-	this->populationSize = settings.value("populationSize", this->populationSize).toInt();
-	this->maxGenerations = settings.value("maxGenerations", this->maxGenerations).toInt();
+	this->initialSigma   = settings.value(KEY_INITIAL_SIGMA,   this->initialSigma).toDouble();
+	this->populationSize = settings.value(KEY_POPULATION_SIZE, this->populationSize).toInt();
+	this->maxGenerations = settings.value(KEY_MAX_GENERATIONS, this->maxGenerations).toInt();
 }
 
 OptimizerResult CMAESOptimizer::run(
