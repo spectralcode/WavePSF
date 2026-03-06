@@ -4,14 +4,6 @@
 #include <algorithm>
 
 namespace {
-	const QString KEY_NOLL_INDEX_SPEC = QStringLiteral("noll_index_spec");
-	const QString KEY_GLOBAL_MIN      = QStringLiteral("global_min");
-	const QString KEY_GLOBAL_MAX      = QStringLiteral("global_max");
-	const QString KEY_STEP            = QStringLiteral("step");
-	const QString KEY_RANGE_OVERRIDES = QStringLiteral("range_overrides");
-	const QString KEY_RANGE_MIN       = QStringLiteral("min");
-	const QString KEY_RANGE_MAX       = QStringLiteral("max");
-
 	const double DEF_GLOBAL_MIN = -0.03;
 	const double DEF_GLOBAL_MAX =  0.03;
 	const double DEF_STEP       =  0.001;
@@ -44,41 +36,41 @@ QString ZernikeGenerator::typeName() const
 QVariantMap ZernikeGenerator::serializeSettings() const
 {
 	QVariantMap map;
-	map[KEY_NOLL_INDEX_SPEC] = formatNollIndexSpec(this->nollIndices);
-	map[KEY_GLOBAL_MIN]      = this->globalMinValue;
-	map[KEY_GLOBAL_MAX]      = this->globalMaxValue;
-	map[KEY_STEP]            = this->stepValue;
+	map[QLatin1String(KEY_NOLL_INDEX_SPEC)] = formatNollIndexSpec(this->nollIndices);
+	map[QLatin1String(KEY_GLOBAL_MIN)]      = this->globalMinValue;
+	map[QLatin1String(KEY_GLOBAL_MAX)]      = this->globalMaxValue;
+	map[QLatin1String(KEY_STEP)]            = this->stepValue;
 
 	QVariantMap overrides;
 	for (auto it = this->rangeOverrides.constBegin(); it != this->rangeOverrides.constEnd(); ++it) {
 		QVariantMap range;
-		range[KEY_RANGE_MIN] = it.value().first;
-		range[KEY_RANGE_MAX] = it.value().second;
+		range[QLatin1String(KEY_RANGE_MIN)] = it.value().first;
+		range[QLatin1String(KEY_RANGE_MAX)] = it.value().second;
 		overrides[QString::number(it.key())] = range;
 	}
-	map[KEY_RANGE_OVERRIDES] = overrides;
+	map[QLatin1String(KEY_RANGE_OVERRIDES)] = overrides;
 	return map;
 }
 
 void ZernikeGenerator::deserializeSettings(const QVariantMap& settings)
 {
-	if (settings.contains(KEY_NOLL_INDEX_SPEC)) {
-		QVector<int> indices = parseNollIndexSpec(settings[KEY_NOLL_INDEX_SPEC].toString());
+	if (settings.contains(QLatin1String(KEY_NOLL_INDEX_SPEC))) {
+		QVector<int> indices = parseNollIndexSpec(settings[QLatin1String(KEY_NOLL_INDEX_SPEC)].toString());
 		if (!indices.isEmpty() && indices != this->nollIndices) {
 			this->setNollIndices(indices);
 		}
 	}
 	this->setGlobalRange(
-		settings.value(KEY_GLOBAL_MIN, DEF_GLOBAL_MIN).toDouble(),
-		settings.value(KEY_GLOBAL_MAX, DEF_GLOBAL_MAX).toDouble()
+		settings.value(QLatin1String(KEY_GLOBAL_MIN), DEF_GLOBAL_MIN).toDouble(),
+		settings.value(QLatin1String(KEY_GLOBAL_MAX), DEF_GLOBAL_MAX).toDouble()
 	);
-	this->setStepValue(settings.value(KEY_STEP, DEF_STEP).toDouble());
+	this->setStepValue(settings.value(QLatin1String(KEY_STEP), DEF_STEP).toDouble());
 	this->clearAllParameterRanges();
-	QVariantMap overrides = settings.value(KEY_RANGE_OVERRIDES).toMap();
+	QVariantMap overrides = settings.value(QLatin1String(KEY_RANGE_OVERRIDES)).toMap();
 	for (auto it = overrides.constBegin(); it != overrides.constEnd(); ++it) {
 		QVariantMap range = it.value().toMap();
 		int nollIndex = it.key().toInt();
-		this->setParameterRange(nollIndex, range[KEY_RANGE_MIN].toDouble(), range[KEY_RANGE_MAX].toDouble());
+		this->setParameterRange(nollIndex, range[QLatin1String(KEY_RANGE_MIN)].toDouble(), range[QLatin1String(KEY_RANGE_MAX)].toDouble());
 	}
 }
 

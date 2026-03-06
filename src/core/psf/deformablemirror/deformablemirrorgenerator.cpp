@@ -69,6 +69,37 @@ void DeformableMirrorGenerator::deserializeSettings(const QVariantMap& settings)
 	this->setActuatorGrid(rows, cols);
 }
 
+QVector<WavefrontGeneratorSetting> DeformableMirrorGenerator::getSettingsDescriptors() const
+{
+	return {
+		{ KEY_ACTUATOR_ROWS,        "Actuator Rows",
+		  "Number of actuator rows in the grid.\nChanging this resets all actuator coefficients.",
+		  2, 64, 1, static_cast<double>(DEF_ACTUATOR_ROWS), 0 },
+		{ KEY_ACTUATOR_COLS,        "Actuator Columns",
+		  "Number of actuator columns in the grid.\nChanging this resets all actuator coefficients.",
+		  2, 64, 1, static_cast<double>(DEF_ACTUATOR_COLS), 0 },
+		{ KEY_COUPLING_COEFFICIENT, "Coupling Coefficient",
+		  "Inter-actuator coupling (typical 0.05-0.30).\n"
+		  "Fraction of peak influence reaching the adjacent actuator.\n"
+		  "Higher = smoother wavefront, more overlap between actuators.\n"
+		  "Lower = sharper, more localized actuator influence.",
+		  0.01, 1.0, 0.01, DEF_COUPLING_COEFFICIENT, 3 },
+		{ KEY_GAUSSIAN_INDEX,       "Gaussian Index",
+		  "Shape exponent of the influence function (typical 1.5-2.5).\n"
+		  "2.0 = standard Gaussian shape.\n< 1.0 = very broad.\nHigher = sharper.",
+		  0.01, 10.0, 0.1, DEF_GAUSSIAN_INDEX, 2 },
+		{ KEY_COMMAND_MIN,          "Command Min",
+		  "Minimum actuator command value (slider lower bound).",
+		  -100.0, 0.0, 0.1, DEF_COMMAND_MIN, 3 },
+		{ KEY_COMMAND_MAX,          "Command Max",
+		  "Maximum actuator command value (slider upper bound).",
+		  0.0, 100.0, 0.1, DEF_COMMAND_MAX, 3 },
+		{ KEY_COMMAND_STEP,         "Command Step",
+		  "Actuator command slider step size.",
+		  0.0001, 1.0, 0.001, DEF_COMMAND_STEP, 4 },
+	};
+}
+
 QVector<WavefrontParameter> DeformableMirrorGenerator::getParameterDescriptors() const
 {
 	QVector<WavefrontParameter> descriptors;

@@ -1,5 +1,6 @@
 #include "psfsettingsdialog.h"
 #include "core/psf/zernikegenerator.h"
+#include "core/psf/wavefrontgeneratorfactory.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -60,12 +61,12 @@ PSFSettings PSFSettingsDialog::getSettings() const
 	PSFSettings s;
 	s.generatorTypeName = this->currentGeneratorTypeName;
 
-	// Always capture settings from BOTH generator GroupBoxes
+	// Capture Zernike settings from custom UI
 	QVariantMap zernikeGs;
-	zernikeGs["noll_index_spec"] = this->nollIndicesEdit->text().trimmed();
-	zernikeGs["global_min"] = this->globalMinSpin->value();
-	zernikeGs["global_max"] = this->globalMaxSpin->value();
-	zernikeGs["step"] = this->initialSettings.coefficientStep;
+	zernikeGs[QLatin1String(ZernikeGenerator::KEY_NOLL_INDEX_SPEC)] = this->nollIndicesEdit->text().trimmed();
+	zernikeGs[QLatin1String(ZernikeGenerator::KEY_GLOBAL_MIN)] = this->globalMinSpin->value();
+	zernikeGs[QLatin1String(ZernikeGenerator::KEY_GLOBAL_MAX)] = this->globalMaxSpin->value();
+	zernikeGs[QLatin1String(ZernikeGenerator::KEY_STEP)] = this->initialSettings.coefficientStep;
 	QVariantMap overrides;
 	for (int row = 0; row < this->overrideTable->rowCount(); ++row) {
 		QCheckBox* checkBox = qobject_cast<QCheckBox*>(
@@ -78,34 +79,30 @@ PSFSettings PSFSettingsDialog::getSettings() const
 				this->overrideTable->cellWidget(row, 4));
 			if (minSpin && maxSpin) {
 				QVariantMap range;
-				range["min"] = minSpin->value();
-				range["max"] = maxSpin->value();
+				range[QLatin1String(ZernikeGenerator::KEY_RANGE_MIN)] = minSpin->value();
+				range[QLatin1String(ZernikeGenerator::KEY_RANGE_MAX)] = maxSpin->value();
 				overrides[QString::number(nollIndex)] = range;
 				s.coefficientRangeOverrides[nollIndex] = qMakePair(minSpin->value(), maxSpin->value());
 			}
 		}
 	}
-	zernikeGs["range_overrides"] = overrides;
+	zernikeGs[QLatin1String(ZernikeGenerator::KEY_RANGE_OVERRIDES)] = overrides;
 	s.allGeneratorSettings[QStringLiteral("Zernike")] = zernikeGs;
 
-	QVariantMap dmGs;
-	dmGs["actuator_rows"] = this->dmRowsSpin->value();
-	dmGs["actuator_cols"] = this->dmColsSpin->value();
-	dmGs["coupling_coefficient"] = this->dmCouplingSpin->value();
-	dmGs["gaussian_index"] = this->dmGaussianIndexSpin->value();
-	dmGs["command_min"] = this->dmCommandMinSpin->value();
-	dmGs["command_max"] = this->dmCommandMaxSpin->value();
-	dmGs["command_step"] = this->dmCommandStepSpin->value();
-	s.allGeneratorSettings[QStringLiteral("Deformable Mirror")] = dmGs;
+	// Capture descriptor-based generator settings from auto-generated widgets
+	for (auto it = this->generatorSettingWidgets.constBegin();
+	     it != this->generatorSettingWidgets.constEnd(); ++it) {
+		s.allGeneratorSettings[it.key()] = this->readGeneratorSettingsWidgets(it.key());
+	}
 
 	// Active generator's generatorSettings is the matching entry
 	s.generatorSettings = s.allGeneratorSettings.value(s.generatorTypeName);
 
 	// Zernike convenience fields (for backward compat with PSFModule)
 	if (s.generatorTypeName == QLatin1String("Zernike")) {
-		s.nollIndexSpec = zernikeGs["noll_index_spec"].toString();
-		s.globalMinCoefficient = zernikeGs["global_min"].toDouble();
-		s.globalMaxCoefficient = zernikeGs["global_max"].toDouble();
+		s.nollIndexSpec = zernikeGs[QLatin1String(ZernikeGenerator::KEY_NOLL_INDEX_SPEC)].toString();
+		s.globalMinCoefficient = zernikeGs[QLatin1String(ZernikeGenerator::KEY_GLOBAL_MIN)].toDouble();
+		s.globalMaxCoefficient = zernikeGs[QLatin1String(ZernikeGenerator::KEY_GLOBAL_MAX)].toDouble();
 		s.coefficientStep = this->initialSettings.coefficientStep;
 	}
 
@@ -213,81 +210,15 @@ void PSFSettingsDialog::setupUI()
 
 	wavefrontLayout->addWidget(this->zernikeGroupBox);
 
-	// DM Simulator GroupBox
-	this->dmGroupBox = new QGroupBox(tr("DM Simulator"), wavefrontTab);
-	QFormLayout* dmLayout = new QFormLayout(this->dmGroupBox);
-
-	this->dmRowsSpin = new QSpinBox(this->dmGroupBox);
-	this->dmRowsSpin->setRange(2, 64);
-	this->dmRowsSpin->setValue(8);
-	this->dmRowsSpin->setToolTip(tr("Number of actuator rows in the grid.\nChanging this resets all actuator coefficients."));
-	dmLayout->addRow(tr("Actuator Rows:"), this->dmRowsSpin);
-
-	this->dmColsSpin = new QSpinBox(this->dmGroupBox);
-	this->dmColsSpin->setRange(2, 64);
-	this->dmColsSpin->setValue(8);
-	this->dmColsSpin->setToolTip(tr("Number of actuator columns in the grid.\nChanging this resets all actuator coefficients."));
-	dmLayout->addRow(tr("Actuator Columns:"), this->dmColsSpin);
-
-	this->dmCouplingSpin = new QDoubleSpinBox(this->dmGroupBox);
-	this->dmCouplingSpin->setRange(0.01, 1.00);
-	this->dmCouplingSpin->setDecimals(3);
-	this->dmCouplingSpin->setSingleStep(0.01);
-	this->dmCouplingSpin->setValue(0.25);
-	this->dmCouplingSpin->setToolTip(tr(
-		"Inter-actuator coupling (typical 0.05-0.30).\n"
-		"Fraction of peak influence reaching the adjacent actuator.\n"
-		"Higher = smoother wavefront, more overlap between actuators.\n"
-		"Lower = sharper, more localized actuator influence."));
-	dmLayout->addRow(tr("Coupling Coefficient:"), this->dmCouplingSpin);
-
-	this->dmGaussianIndexSpin = new QDoubleSpinBox(this->dmGroupBox);
-	this->dmGaussianIndexSpin->setRange(0.01, 10.0);
-	this->dmGaussianIndexSpin->setDecimals(2);
-	this->dmGaussianIndexSpin->setSingleStep(0.1);
-	this->dmGaussianIndexSpin->setValue(1.5);
-	this->dmGaussianIndexSpin->setToolTip(tr(
-		"Shape exponent of the influence function (typical 1.5-2.5).\n"
-		"2.0 = standard Gaussian shape.\n"
-		"< 1.0 = very broad.\n"
-		"Higher = sharper."));
-	dmLayout->addRow(tr("Gaussian Index:"), this->dmGaussianIndexSpin);
-
-	this->dmCommandMinSpin = new QDoubleSpinBox(this->dmGroupBox);
-	this->dmCommandMinSpin->setRange(-100.0, 0.0);
-	this->dmCommandMinSpin->setDecimals(3);
-	this->dmCommandMinSpin->setSingleStep(0.1);
-	this->dmCommandMinSpin->setValue(-1.0);
-	this->dmCommandMinSpin->setToolTip(tr("Minimum actuator command value (slider lower bound)."));
-	dmLayout->addRow(tr("Command Min:"), this->dmCommandMinSpin);
-
-	this->dmCommandMaxSpin = new QDoubleSpinBox(this->dmGroupBox);
-	this->dmCommandMaxSpin->setRange(0.0, 100.0);
-	this->dmCommandMaxSpin->setDecimals(3);
-	this->dmCommandMaxSpin->setSingleStep(0.1);
-	this->dmCommandMaxSpin->setValue(1.0);
-	this->dmCommandMaxSpin->setToolTip(tr("Maximum actuator command value (slider upper bound)."));
-	dmLayout->addRow(tr("Command Max:"), this->dmCommandMaxSpin);
-
-	this->dmCommandStepSpin = new QDoubleSpinBox(this->dmGroupBox);
-	this->dmCommandStepSpin->setRange(0.0001, 1.0);
-	this->dmCommandStepSpin->setDecimals(4);
-	this->dmCommandStepSpin->setSingleStep(0.001);
-	this->dmCommandStepSpin->setValue(0.01);
-	this->dmCommandStepSpin->setToolTip(tr("Actuator command slider step size."));
-	dmLayout->addRow(tr("Command Step:"), this->dmCommandStepSpin);
-
-	// Auto-apply DM settings on any value change for live preview
-	auto emitSettings = [this]() { emit settingsApplied(this->getSettings()); };
-	connect(this->dmRowsSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, emitSettings);
-	connect(this->dmColsSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, emitSettings);
-	connect(this->dmCouplingSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitSettings);
-	connect(this->dmGaussianIndexSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitSettings);
-	connect(this->dmCommandMinSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitSettings);
-	connect(this->dmCommandMaxSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitSettings);
-	connect(this->dmCommandStepSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitSettings);
-
-	wavefrontLayout->addWidget(this->dmGroupBox);
+	// Auto-generate GroupBoxes for all descriptor-based generators
+	for (const QString& typeName : WavefrontGeneratorFactory::availableTypeNames()) {
+		IWavefrontGenerator* gen = WavefrontGeneratorFactory::create(typeName, nullptr);
+		QVector<WavefrontGeneratorSetting> descriptors = gen->getSettingsDescriptors();
+		delete gen;
+		if (descriptors.isEmpty()) continue;
+		this->buildGeneratorSettingsGroup(typeName, descriptors, wavefrontTab);
+		wavefrontLayout->addWidget(this->generatorGroupBoxes.value(typeName));
+	}
 
 	tabWidget->addTab(wavefrontTab, tr("Wavefront Generator"));
 
@@ -379,17 +310,17 @@ void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 
 	// Populate Zernike fields from the Zernike-specific settings map
 	QVariantMap zernikeGs = allGenSettings.value(QStringLiteral("Zernike"));
-	QString nollSpec = zernikeGs.value("noll_index_spec").toString();
+	QString nollSpec = zernikeGs.value(QLatin1String(ZernikeGenerator::KEY_NOLL_INDEX_SPEC)).toString();
 	this->nollIndicesEdit->blockSignals(true);
 	this->nollIndicesEdit->setText(nollSpec);
 	this->nollIndicesEdit->blockSignals(false);
-	this->globalMinSpin->setValue(zernikeGs.value("global_min").toDouble());
-	this->globalMaxSpin->setValue(zernikeGs.value("global_max").toDouble());
+	this->globalMinSpin->setValue(zernikeGs.value(QLatin1String(ZernikeGenerator::KEY_GLOBAL_MIN)).toDouble());
+	this->globalMaxSpin->setValue(zernikeGs.value(QLatin1String(ZernikeGenerator::KEY_GLOBAL_MAX)).toDouble());
 
 	QVector<int> indices = ZernikeGenerator::parseNollIndexSpec(nollSpec);
 	this->rebuildOverrideTable(indices);
 
-	QVariantMap overrides = zernikeGs.value("range_overrides").toMap();
+	QVariantMap overrides = zernikeGs.value(QLatin1String(ZernikeGenerator::KEY_RANGE_OVERRIDES)).toMap();
 	for (int row = 0; row < this->overrideTable->rowCount(); ++row) {
 		int nollIndex = this->overrideTable->item(row, 0)->text().toInt();
 		QString key = QString::number(nollIndex);
@@ -403,23 +334,19 @@ void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 				this->overrideTable->cellWidget(row, 4));
 			if (checkBox && minSpin && maxSpin) {
 				checkBox->setChecked(true);
-				minSpin->setValue(range["min"].toDouble());
-				maxSpin->setValue(range["max"].toDouble());
+				minSpin->setValue(range[QLatin1String(ZernikeGenerator::KEY_RANGE_MIN)].toDouble());
+				maxSpin->setValue(range[QLatin1String(ZernikeGenerator::KEY_RANGE_MAX)].toDouble());
 				minSpin->setEnabled(true);
 				maxSpin->setEnabled(true);
 			}
 		}
 	}
 
-	// Populate DM fields from the DM-specific settings map
-	QVariantMap dmGs = allGenSettings.value(QStringLiteral("Deformable Mirror"));
-	this->dmRowsSpin->setValue(dmGs.value("actuator_rows").toInt());
-	this->dmColsSpin->setValue(dmGs.value("actuator_cols").toInt());
-	this->dmCouplingSpin->setValue(dmGs.value("coupling_coefficient").toDouble());
-	this->dmGaussianIndexSpin->setValue(dmGs.value("gaussian_index").toDouble());
-	this->dmCommandMinSpin->setValue(dmGs.value("command_min").toDouble());
-	this->dmCommandMaxSpin->setValue(dmGs.value("command_max").toDouble());
-	this->dmCommandStepSpin->setValue(dmGs.value("command_step").toDouble());
+	// Populate descriptor-based generator settings from auto-generated widgets
+	for (auto it = this->generatorSettingWidgets.constBegin();
+	     it != this->generatorSettingWidgets.constEnd(); ++it) {
+		this->populateGeneratorSettingsWidgets(it.key(), allGenSettings.value(it.key()));
+	}
 
 	// Common PSF calculation fields
 	int gridIdx = this->gridSizeCombo->findText(QString::number(settings.gridSize));
@@ -512,13 +439,75 @@ void PSFSettingsDialog::rebuildOverrideTable(const QVector<int>& indices)
 	}
 }
 
+void PSFSettingsDialog::buildGeneratorSettingsGroup(const QString& typeName,
+                                                     const QVector<WavefrontGeneratorSetting>& descriptors,
+                                                     QWidget* parent)
+{
+	QGroupBox* group = new QGroupBox(typeName, parent);
+	QFormLayout* layout = new QFormLayout(group);
+
+	auto emitSettings = [this]() { emit settingsApplied(this->getSettings()); };
+	QMap<QString, QWidget*> widgets;
+
+	for (const WavefrontGeneratorSetting& desc : descriptors) {
+		if (desc.decimals == 0) {
+			QSpinBox* spin = new QSpinBox(group);
+			spin->setRange(static_cast<int>(desc.minValue), static_cast<int>(desc.maxValue));
+			spin->setSingleStep(static_cast<int>(desc.step));
+			spin->setValue(static_cast<int>(desc.defaultValue));
+			if (!desc.tooltip.isEmpty()) spin->setToolTip(desc.tooltip);
+			layout->addRow(desc.name + QStringLiteral(":"), spin);
+			connect(spin, QOverload<int>::of(&QSpinBox::valueChanged), this, emitSettings);
+			widgets[desc.key] = spin;
+		} else {
+			QDoubleSpinBox* spin = new QDoubleSpinBox(group);
+			spin->setRange(desc.minValue, desc.maxValue);
+			spin->setDecimals(desc.decimals);
+			spin->setSingleStep(desc.step);
+			spin->setValue(desc.defaultValue);
+			if (!desc.tooltip.isEmpty()) spin->setToolTip(desc.tooltip);
+			layout->addRow(desc.name + QStringLiteral(":"), spin);
+			connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitSettings);
+			widgets[desc.key] = spin;
+		}
+	}
+
+	this->generatorGroupBoxes[typeName] = group;
+	this->generatorSettingWidgets[typeName] = widgets;
+}
+
+QVariantMap PSFSettingsDialog::readGeneratorSettingsWidgets(const QString& typeName) const
+{
+	QVariantMap map;
+	const QMap<QString, QWidget*>& widgets = this->generatorSettingWidgets.value(typeName);
+	for (auto it = widgets.constBegin(); it != widgets.constEnd(); ++it) {
+		QDoubleSpinBox* dSpin = qobject_cast<QDoubleSpinBox*>(it.value());
+		if (dSpin) { map[it.key()] = dSpin->value(); continue; }
+		QSpinBox* iSpin = qobject_cast<QSpinBox*>(it.value());
+		if (iSpin) { map[it.key()] = iSpin->value(); }
+	}
+	return map;
+}
+
+void PSFSettingsDialog::populateGeneratorSettingsWidgets(const QString& typeName, const QVariantMap& gs)
+{
+	const QMap<QString, QWidget*>& widgets = this->generatorSettingWidgets.value(typeName);
+	for (auto it = widgets.constBegin(); it != widgets.constEnd(); ++it) {
+		if (!gs.contains(it.key())) continue;
+		QDoubleSpinBox* dSpin = qobject_cast<QDoubleSpinBox*>(it.value());
+		if (dSpin) { dSpin->setValue(gs[it.key()].toDouble()); continue; }
+		QSpinBox* iSpin = qobject_cast<QSpinBox*>(it.value());
+		if (iSpin) { iSpin->setValue(gs[it.key()].toInt()); }
+	}
+}
+
 bool PSFSettingsDialog::validateSettings() const
 {
 	if (this->currentGeneratorTypeName == QLatin1String("Zernike")) {
 		QVector<int> indices = ZernikeGenerator::parseNollIndexSpec(this->nollIndicesEdit->text());
 		return !indices.isEmpty();
 	}
-	return true; // DM settings always valid (spin boxes enforce ranges)
+	return true; // descriptor-based generators always valid (spin boxes enforce ranges)
 }
 
 void PSFSettingsDialog::updateValidationState()

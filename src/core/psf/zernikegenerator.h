@@ -12,6 +12,16 @@ class ZernikeGenerator : public QObject, public IWavefrontGenerator
 {
 	Q_OBJECT
 public:
+	// Serialization keys — exposed publicly because PSFSettingsDialog builds custom Zernike UI
+	// and must produce QVariantMaps that match serializeSettings()/deserializeSettings().
+	static constexpr const char* KEY_NOLL_INDEX_SPEC = "noll_index_spec";
+	static constexpr const char* KEY_GLOBAL_MIN      = "global_min";
+	static constexpr const char* KEY_GLOBAL_MAX      = "global_max";
+	static constexpr const char* KEY_STEP            = "step";
+	static constexpr const char* KEY_RANGE_OVERRIDES = "range_overrides";
+	static constexpr const char* KEY_RANGE_MIN       = "min";
+	static constexpr const char* KEY_RANGE_MAX       = "max";
+
 	explicit ZernikeGenerator(int minNollIndex = 2, int maxNollIndex = 21, QObject* parent = nullptr);
 	~ZernikeGenerator() override;
 

@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QMap>
 #include "core/psf/psfsettings.h"
+#include "core/psf/iwavefrontgenerator.h"
 
 class QLineEdit;
 class QDoubleSpinBox;
@@ -13,6 +14,7 @@ class QTableWidget;
 class QCheckBox;
 class QPushButton;
 class QGroupBox;
+class QWidget;
 
 class PSFSettingsDialog : public QDialog
 {
@@ -47,24 +49,28 @@ private:
 	bool validateSettings() const;
 	void updateValidationState();
 
-	// Generator GroupBoxes
+	// Builds a QGroupBox with auto-generated spinboxes from generator settings descriptors.
+	// Stores created widgets in generatorSettingWidgets[typeName].
+	void buildGeneratorSettingsGroup(const QString& typeName,
+	                                 const QVector<WavefrontGeneratorSetting>& descriptors,
+	                                 QWidget* parent);
+	QVariantMap readGeneratorSettingsWidgets(const QString& typeName) const;
+	void populateGeneratorSettingsWidgets(const QString& typeName, const QVariantMap& gs);
+
+	// Zernike GroupBox (custom UI)
 	QGroupBox* zernikeGroupBox;
-	QGroupBox* dmGroupBox;
+
+	// Auto-generated GroupBoxes for descriptor-based generators (typeName → GroupBox)
+	QMap<QString, QGroupBox*> generatorGroupBoxes;
+
+	// Auto-generated setting widgets (typeName → key → QSpinBox or QDoubleSpinBox)
+	QMap<QString, QMap<QString, QWidget*>> generatorSettingWidgets;
 
 	// Zernike generator controls
 	QLineEdit* nollIndicesEdit;
 	QDoubleSpinBox* globalMinSpin;
 	QDoubleSpinBox* globalMaxSpin;
 	QTableWidget* overrideTable;
-
-	// DM generator controls
-	QSpinBox* dmRowsSpin;
-	QSpinBox* dmColsSpin;
-	QDoubleSpinBox* dmCouplingSpin;
-	QDoubleSpinBox* dmGaussianIndexSpin;
-	QDoubleSpinBox* dmCommandMinSpin;
-	QDoubleSpinBox* dmCommandMaxSpin;
-	QDoubleSpinBox* dmCommandStepSpin;
 
 	// PSF calculation controls
 	QComboBox* gridSizeCombo;
