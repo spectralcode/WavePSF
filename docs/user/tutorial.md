@@ -15,7 +15,7 @@ Drag and drop the hyperspectral dataset onto the application window, or use **Fi
 
 Use **File → Open Ground Truth** and select the ground truth image.
 
-To verify it loaded correctly: click any patch in the output image, then **hold X** — this temporarily replaces the display with the ground truth image. Release X to return to the normal view. Orient the output image the same way as the input.
+To verify it loaded correctly: click any patch in the output image, then **hold X**-key, this temporarily replaces the display with the ground truth image. Release X-key to return to the normal view. Orient the output image the same way as the input.
 
 ## 3. Orient the image
 
@@ -30,8 +30,8 @@ The image may appear flipped or rotated. Click on the input image to give it key
 
 Open **Extras → Settings**. Under the Zernike generator settings:
 
-- Set **Global min coefficient** to `-0.03` and **Global max coefficient** to `0.03`
-- In the per-coefficient override table, find **Noll index 4** (defocus) and set its maximum to `0` — defocus should only be negative to avoid ambiguity with positive defocus. 
+- Set **Global min coefficient** to `-3.0` and **Global max coefficient** to `3.0`
+- In the per-coefficient override table, find **Noll index 4** (defocus) and set its maximum to `0`; defocus should only be negative to avoid ambiguity with positive defocus. 
 
 Apply and close the dialog.
 
@@ -39,7 +39,7 @@ Apply and close the dialog.
 
 Click on a patch in the output image to select it. For example frame **250**, patch **17**.
 
-In the **PSF Generator** section in the sidebar left, set the **Defocus** coefficient to `-0.03` to provide a reasonable starting value which reduces optimization time.
+In the **PSF Generator** section in the sidebar left, set the **Defocus** coefficient to `-2.0` to provide a reasonable starting value which reduces optimization time.
 
 
 ## 6. Configure the optimizer
@@ -55,8 +55,8 @@ Switch to the **Optimization** tab at the bottom and configure the optimization.
 | Start Temperature | 0.4 |
 | End Temperature | 0.0015 |
 | Cooling Factor | 0.996 |
-| Start Perturbance | 0.002 |
-| End Perturbance | 0.0002 |
+| Start Perturbance | 0.2 |
+| End Perturbance | 0.02 |
 | Iterations/Temperature | 1 |
 
 **Initial Values → Source:** `Current stored`
