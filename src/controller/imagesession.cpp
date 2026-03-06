@@ -355,9 +355,6 @@ void ImageSession::setOutputPatch(int frameNr, int patchX, int patchY, const af:
 
 void ImageSession::flushOutput()
 {
-	if (this->outputAccessor != nullptr) {
-		this->outputAccessor->forceSyncToCPU();
-	}
 }
 
 af::array ImageSession::getCurrentInputFrame()
@@ -451,11 +448,6 @@ void ImageSession::saveOutputToFile(const QString& filePath, int currentFrame)
 	if (this->outputData == nullptr) {
 		LOG_WARNING() << "No output data to save";
 		return;
-	}
-
-	// Flush any cached GPU data to CPU
-	if (this->outputAccessor != nullptr) {
-		this->outputAccessor->forceSyncToCPU();
 	}
 
 	// Detect format from extension

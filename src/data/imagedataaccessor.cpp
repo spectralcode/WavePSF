@@ -7,7 +7,7 @@
 
 ImageDataAccessor::ImageDataAccessor(ImageData* imageData, bool readOnly, QObject* parent)
 	: QObject(parent), imageData(imageData), readOnly(readOnly),
-	  cachedFrameNumber(-1), frameModified(false), syncMode(IMMEDIATE),
+	  cachedFrameNumber(-1), frameModified(false),
 	  patchGridCols(1), patchGridRows(1), patchBorderExtension(0),
 	  tempBuffer(nullptr), tempBufferSize(0)
 {
@@ -148,17 +148,6 @@ ImagePatch ImageDataAccessor::getExtendedPatch(int patchX, int patchY, int frame
 	return result;
 }
 
-af::array ImageDataAccessor::getPatch(int patchX, int patchY, int frameNr)
-{
-	// Legacy method - returns core area only
-	ImagePatch extendedPatch = this->getExtendedPatch(patchX, patchY, frameNr);
-	if (!extendedPatch.isValid()) {
-		return af::array();
-	}
-
-	return extendedPatch.extractCore();
-}
-
 void ImageDataAccessor::writeFrame(int frameNr, const af::array& frameData)
 {
 	if (this->readOnly) {
@@ -187,11 +176,7 @@ void ImageDataAccessor::writeFrame(int frameNr, const af::array& frameData)
 		this->cachedFrame = frameData.copy();
 		this->cachedFrameNumber = frameNr;
 		this->frameModified = true;
-
-		// Sync to CPU based on mode
-		if (this->syncMode == IMMEDIATE) {
-			this->writeFrameFromCache();
-		}
+		this->writeFrameFromCache();
 
 		emit dataWritten(frameNr);
 	} catch (const af::exception& e) {
@@ -237,38 +222,6 @@ void ImageDataAccessor::writePatchResult(const ImagePatch& originalPatch, const 
 	}
 }
 
-void ImageDataAccessor::writeCoreArea(int patchX, int patchY, int frameNr, const af::array& processedPatch)
-{
-	if (!this->isValidPatchCoordinate(patchX, patchY)) {
-		LOG_WARNING() << ": Invalid patch coordinates for core write:" << patchX << "," << patchY;
-		return;
-	}
-
-	if (!this->isValidFrame(frameNr)) {
-		LOG_WARNING() << ": Invalid frame number for core write:" << frameNr;
-		return;
-	}
-
-	// Ensure the correct frame is cached
-	if (this->cachedFrameNumber != frameNr) {
-		af::array frame = this->getFrame(frameNr);
-		if (frame.isempty()) {
-			LOG_WARNING() << ": Failed to load frame" << frameNr << "for core write";
-			return;
-		}
-	}
-
-	// Get core patch bounds
-	QRect coreArea = this->calculateCorePatchBounds(patchX, patchY);
-	this->writePatchAtPosition(coreArea, processedPatch);
-}
-
-void ImageDataAccessor::writePatch(int patchX, int patchY, int frameNr, const af::array& patchData)
-{
-	// Legacy method - writes to core area only
-	this->writeCoreArea(patchX, patchY, frameNr, patchData);
-}
-
 void ImageDataAccessor::writeMultiplePatches(int frameNr, const QList<QPoint>& patchCoords, const QList<af::array>& patchData)
 {
 	if (this->readOnly) {
@@ -311,11 +264,7 @@ void ImageDataAccessor::writeMultiplePatches(int frameNr, const QList<QPoint>& p
 		}
 
 		this->frameModified = true;
-
-		// Sync to CPU based on mode (only for batch operations)
-		if (this->syncMode == IMMEDIATE) {
-			this->writeFrameFromCache();
-		}
+		this->writeFrameFromCache();
 	} catch (const af::exception& e) {
 		LOG_WARNING() << ": ArrayFire exception during multi-patch write:" << e.what();
 	}
@@ -330,44 +279,6 @@ void ImageDataAccessor::flushFrame(int frameNr)
 	if (this->cachedFrameNumber == frameNr && !this->cachedFrame.isempty()) {
 		this->writeFrameFromCache();
 	}
-}
-
-void ImageDataAccessor::setSyncMode(SyncMode mode)
-{
-	this->syncMode = mode;
-	LOG_DEBUG() << ": Sync mode changed to" << static_cast<int>(mode);
-}
-
-ImageDataAccessor::SyncMode ImageDataAccessor::getSyncMode() const
-{
-	return this->syncMode;
-}
-
-void ImageDataAccessor::forceSyncToCPU()
-{
-	if (this->readOnly || !this->frameModified) {
-		return;
-	}
-
-	if (!this->cachedFrame.isempty() && this->cachedFrameNumber >= 0) {
-		this->writeFrameFromCache();
-		LOG_DEBUG() << ": Forced sync to CPU for frame" << this->cachedFrameNumber;
-	}
-}
-
-void ImageDataAccessor::forceSyncToGPU()
-{
-	// Write back any pending changes first
-	if (this->frameModified && !this->readOnly) {
-		this->writeFrameFromCache();
-	}
-
-	// Invalidate cache to force reload from CPU
-	this->cachedFrame = af::array();
-	this->cachedFrameNumber = -1;
-	this->frameModified = false;
-
-	LOG_DEBUG() << ": Forced cache invalidation - next getFrame() will reload from CPU";
 }
 
 void ImageDataAccessor::configurePatchGrid(int cols, int rows, int borderExtension)
@@ -510,11 +421,7 @@ void ImageDataAccessor::writePatchAtPosition(const QRect& imagePos, const af::ar
 						  af::seq(imagePos.y(), imagePos.y() + imagePos.height() - 1)) = patchData;
 
 		this->frameModified = true;
-
-		// Sync based on current mode
-		if (this->syncMode == IMMEDIATE) {
-			this->writeFrameFromCache();
-		}
+		this->writeFrameFromCache();
 
 	} catch (const af::exception& e) {
 		LOG_WARNING() << ": ArrayFire exception during position-based patch write:" << e.what();
@@ -668,12 +575,6 @@ void ImageDataAccessor::convertFromArrayFire(const af::array& afData, void* data
 int ImageDataAccessor::getPatchGridCols() const { return this->patchGridCols; }
 int ImageDataAccessor::getPatchGridRows() const { return this->patchGridRows; }
 int ImageDataAccessor::getPatchBorderExtension() const { return this->patchBorderExtension; }
-
-QRect ImageDataAccessor::getPatchBounds(int patchX, int patchY) const
-{
-	// Legacy method - returns core bounds
-	return this->calculateCorePatchBounds(patchX, patchY);
-}
 
 QRect ImageDataAccessor::getCorePatchBounds(int patchX, int patchY) const
 {

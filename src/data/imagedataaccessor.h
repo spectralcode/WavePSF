@@ -42,13 +42,6 @@ class ImageDataAccessor : public QObject
 	Q_OBJECT
 
 public:
-	// Synchronization modes for CPU↔GPU data transfers
-	enum SyncMode {
-		IMMEDIATE,	// Write to CPU immediately after each GPU update (live viewing)
-		MANUAL,		// Only write to CPU when explicitly requested (optimization)
-		DISABLED	// Never write to CPU automatically (pure GPU workflow)
-	};
-
 	explicit ImageDataAccessor(ImageData* imageData, bool readOnly = true, QObject* parent = nullptr);
 	~ImageDataAccessor();
 
@@ -59,25 +52,12 @@ public:
 	// New patch extraction method that tracks borders
 	ImagePatch getExtendedPatch(int patchX, int patchY, int frameNr);
 
-	// Write back only the core area from processed patch
-	void writeCoreArea(int patchX, int patchY, int frameNr, const af::array& processedPatch);
-
 	// Write back using ImagePatch (handles core extraction automatically)
 	void writePatchResult(const ImagePatch& originalPatch, const af::array& processedData);
-
-	// Legacy patch operations (for backward compatibility - return core area only)
-	af::array getPatch(int patchX, int patchY, int frameNr);
-	void writePatch(int patchX, int patchY, int frameNr, const af::array& patchData);
 
 	// Batch operations for performance
 	void writeMultiplePatches(int frameNr, const QList<QPoint>& patchCoords, const QList<af::array>& patchData);
 	void flushFrame(int frameNr);  // Force write cached frame back to ImageData
-
-	// Synchronization control for optimization workflows
-	void setSyncMode(SyncMode mode);
-	SyncMode getSyncMode() const;
-	void forceSyncToCPU();  // Manual sync for MANUAL/DISABLED modes
-	void forceSyncToGPU();  // Reload from CPU (invalidate cache)
 
 	// Patch grid configuration
 	void configurePatchGrid(int cols, int rows, int borderExtension = 0);
@@ -86,7 +66,6 @@ public:
 	int getPatchGridCols() const;
 	int getPatchGridRows() const;
 	int getPatchBorderExtension() const;
-	QRect getPatchBounds(int patchX, int patchY) const;
 	QRect getCorePatchBounds(int patchX, int patchY) const;
 
 	// Data information
@@ -108,9 +87,6 @@ private:
 	af::array cachedFrame;
 	int cachedFrameNumber;
 	bool frameModified;
-
-	// Synchronization control
-	SyncMode syncMode;
 
 	// Patch grid configuration
 	int patchGridCols;
