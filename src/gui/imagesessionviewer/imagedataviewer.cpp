@@ -67,7 +67,7 @@ void ImageDataViewer::connectImageData(const ImageData* imageData)
 
 	this->imageData = imageData;
 	if (this->imageData != nullptr) {
-		connect(this->imageData, &ImageData::dataChanged, this, &ImageDataViewer::refresh);
+		this->dataChangedConn = connect(this->imageData, &ImageData::dataChanged, this, &ImageDataViewer::refresh);
 		this->currentFrame = 0;
 		this->displayFrame(0);
 		emit imageDataConnected();
@@ -77,7 +77,7 @@ void ImageDataViewer::connectImageData(const ImageData* imageData)
 void ImageDataViewer::disconnectImageData()
 {
 	if (this->imageData != nullptr) {
-		disconnect(this->imageData, nullptr, this, nullptr);
+		QObject::disconnect(this->dataChangedConn);
 		this->imageData = nullptr;
 	}
 

@@ -102,6 +102,7 @@ private:
 
 	const ImageData* imageData;
 	const ImageData* referenceImageData;
+	QMetaObject::Connection dataChangedConn;
 	QString viewerName;
 	QString originalViewerName;
 	int mousePosX;

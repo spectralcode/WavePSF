@@ -119,6 +119,10 @@ private:
 	bool viewSyncEnabled;
 	QMetaObject::Connection viewSyncConn1;
 	QMetaObject::Connection viewSyncConn2;
+
+	// Last-connected data pointers (used for safe comparison in updateDataInViewers)
+	const ImageData* connectedInputData;
+	const ImageData* connectedOutputData;
 };
 
 #endif // IMAGESESSIONVIEWER_H

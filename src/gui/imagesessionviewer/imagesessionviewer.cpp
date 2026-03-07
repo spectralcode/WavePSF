@@ -40,7 +40,8 @@ ImageSessionViewer::ImageSessionViewer(QWidget* parent)
 	  frameControlsGroup(nullptr), frameSlider(nullptr), frameSpinBox(nullptr),
 	  patchSlider(nullptr), patchSpinBox(nullptr),
 	  inputViewer(nullptr), outputViewer(nullptr), updatingControls(false),
-	  viewSyncEnabled(false)
+	  viewSyncEnabled(false),
+	  connectedInputData(nullptr), connectedOutputData(nullptr)
 {
 	this->setupUI();
 	this->connectSignals();
@@ -579,20 +580,24 @@ void ImageSessionViewer::updateDataInViewers()
 		// Connect viewers to data (only reconnect if the data pointer changed,
 		// to avoid resetting frame position when only ground truth was added)
 		if (this->imageSession->hasInputData()) {
-			if (this->inputViewer->getImageData() != this->imageSession->getInputData()) {
-				this->inputViewer->connectImageData(this->imageSession->getInputData());
+			if (this->connectedInputData != this->imageSession->getInputData()) {
+				this->connectedInputData = this->imageSession->getInputData();
+				this->inputViewer->connectImageData(this->connectedInputData);
 			}
 			this->inputViewer->setPatchGridVisible(true);
 		} else {
+			this->connectedInputData = nullptr;
 			this->inputViewer->disconnectImageData();
 		}
 
 		if (this->imageSession->hasOutputData()) {
-			if (this->outputViewer->getImageData() != this->imageSession->getOutputData()) {
-				this->outputViewer->connectImageData(this->imageSession->getOutputData());
+			if (this->connectedOutputData != this->imageSession->getOutputData()) {
+				this->connectedOutputData = this->imageSession->getOutputData();
+				this->outputViewer->connectImageData(this->connectedOutputData);
 			}
 			this->outputViewer->setPatchGridVisible(true);
 		} else {
+			this->connectedOutputData = nullptr;
 			this->outputViewer->disconnectImageData();
 		}
 
