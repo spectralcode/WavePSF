@@ -13,6 +13,7 @@
 #include "gui/aboutdialog.h"
 #include "gui/shortcutsdialog.h"
 #include "gui/recentfilesmenu.h"
+#include "gui/viewertoolbar.h"
 
 
 #include <QFileDialog>
@@ -33,10 +34,6 @@
 #include <QTextEdit>
 #include <QPlainTextEdit>
 #include <QApplication>
-#include <QToolBar>
-#include <QIcon>
-#include <QPainter>
-
 namespace {
 	const QString SETTINGS_GROUP       = QStringLiteral("main_window");
 	const QString KEY_WINDOW_SIZE      = QStringLiteral("window_size");
@@ -50,17 +47,6 @@ namespace {
 	const QString KEY_CONSOLE_VISIBLE     = QStringLiteral("message_console_visible");
 	const bool DEF_WINDOW_MAXIMIZED = false;
 	const bool DEF_CONSOLE_VISIBLE  = false;
-
-static QIcon svgIconColored(const QString& path, const QColor& color, int size = 24)
-{
-	QPixmap pm = QIcon(path).pixmap(QSize(size, size));
-	if (pm.isNull())
-		return QIcon();
-	QPainter painter(&pm);
-	painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-	painter.fillRect(pm.rect(), color);
-	return QIcon(pm);
-}
 }
 
 MainWindow::MainWindow(SettingsFileManager* guiSettings,
@@ -73,8 +59,7 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	  openImageDataAction(nullptr), openGroundTruthAction(nullptr),
 	  saveParametersAction(nullptr), loadParametersAction(nullptr), saveOutputAction(nullptr),
 	  deconvolveAllAction(nullptr),
-	  actionRotate90(nullptr), actionFlipH(nullptr), actionFlipV(nullptr),
-	  actionSyncViews(nullptr), actionShowPatchGrid(nullptr),
+	  viewerToolBar(nullptr),
 	  sessionViewer(nullptr),
 	  psfGenerationWidget(nullptr), processingControlWidget(nullptr),
 	  settingsDialog(nullptr), shortcutsDialog(nullptr), aboutDialog(nullptr) {
@@ -393,7 +378,6 @@ void MainWindow::openSettings() {
 		this->sessionViewer->getAutoRangeEnabled(),
 		this->sessionViewer->getDisplayRangeMin(),
 		this->sessionViewer->getDisplayRangeMax(),
-		this->sessionViewer->isViewSyncEnabled(),
 		this);
 	this->settingsDialog->setAttribute(Qt::WA_DeleteOnClose);
 
@@ -401,13 +385,6 @@ void MainWindow::openSettings() {
 			this->applicationController, &ApplicationController::applyPSFSettings);
 	connect(this->settingsDialog, &PSFSettingsDialog::displaySettingsApplied,
 			this->sessionViewer, &ImageSessionViewer::setDisplaySettings);
-	connect(this->settingsDialog, &PSFSettingsDialog::viewSyncChanged,
-			this->sessionViewer, &ImageSessionViewer::setViewSyncEnabled);
-	connect(this->settingsDialog, &PSFSettingsDialog::viewSyncChanged,
-			this, [this](bool checked) {
-				QSignalBlocker blocker(this->actionSyncViews);
-				this->actionSyncViews->setChecked(checked);
-			});
 	connect(this->settingsDialog, &QDialog::accepted, this, [this]() {
 		this->applicationController->applyPSFSettings(this->settingsDialog->getSettings());
 		this->sessionViewer->setDisplaySettings(
@@ -443,51 +420,16 @@ void MainWindow::setupCentralWidget()
 
 void MainWindow::setupViewerToolBar()
 {
-	QToolBar* tb = new QToolBar(tr("Viewer Controls"), this);
-	tb->setObjectName(QStringLiteral("viewerControlsToolBar"));
-	tb->setIconSize(QSize(20, 20));
-	this->addToolBar(Qt::RightToolBarArea, tb);
+	this->viewerToolBar = new ViewerToolBar(this->styleManager, this);
+	this->addToolBar(Qt::RightToolBarArea, this->viewerToolBar);
 
-	this->actionRotate90 = new QAction(tr("Rotate 90\xC2\xB0"), this);
-	this->actionFlipH    = new QAction(tr("Flip Horizontal"), this);
-	this->actionFlipV    = new QAction(tr("Flip Vertical"), this);
+	connect(this->viewerToolBar, &ViewerToolBar::rotateRequested,      this->sessionViewer, &ImageSessionViewer::rotateViewers90);
+	connect(this->viewerToolBar, &ViewerToolBar::flipHRequested,       this->sessionViewer, &ImageSessionViewer::flipViewersV);
+	connect(this->viewerToolBar, &ViewerToolBar::flipVRequested,       this->sessionViewer, &ImageSessionViewer::flipViewersH);
+	connect(this->viewerToolBar, &ViewerToolBar::syncViewsToggled,     this->sessionViewer, &ImageSessionViewer::setViewSyncEnabled);
+	connect(this->viewerToolBar, &ViewerToolBar::showPatchGridToggled, this->sessionViewer, &ImageSessionViewer::setPatchGridVisible);
 
-	this->actionSyncViews = new QAction(tr("Sync Views"), this);
-	this->actionSyncViews->setCheckable(true);
-	this->actionSyncViews->setChecked(this->sessionViewer->isViewSyncEnabled());
-
-	this->actionShowPatchGrid = new QAction(tr("Show Patch Grid"), this);
-	this->actionShowPatchGrid->setCheckable(true);
-	this->actionShowPatchGrid->setChecked(true);
-
-	tb->addAction(this->actionRotate90);
-	tb->addAction(this->actionFlipV);
-	tb->addAction(this->actionFlipH);
-	tb->addSeparator();
-	tb->addAction(this->actionShowPatchGrid);
-	tb->addAction(this->actionSyncViews);
-
-	connect(this->actionRotate90,      &QAction::triggered, this->sessionViewer, &ImageSessionViewer::rotateViewers90);
-	connect(this->actionFlipH,         &QAction::triggered, this->sessionViewer, &ImageSessionViewer::flipViewersH);
-	connect(this->actionFlipV,         &QAction::triggered, this->sessionViewer, &ImageSessionViewer::flipViewersV);
-	connect(this->actionSyncViews,     &QAction::toggled,   this->sessionViewer, &ImageSessionViewer::setViewSyncEnabled);
-	connect(this->actionShowPatchGrid, &QAction::toggled,   this->sessionViewer, &ImageSessionViewer::setPatchGridVisible);
-
-	this->viewMenu->insertAction(this->toggleMessageConsoleAction, tb->toggleViewAction());
-
-	connect(this->styleManager, &StyleManager::styleChanged,
-	        this, [this](StyleManager::StyleMode) { this->updateToolBarIcons(); });
-	this->updateToolBarIcons();
-}
-
-void MainWindow::updateToolBarIcons()
-{
-	const QColor c = this->palette().windowText().color();
-	this->actionRotate90->setIcon(      svgIconColored(QStringLiteral(":/icons/toolbar/rotate-cw.svg"), c));
-	this->actionFlipH->setIcon(         svgIconColored(QStringLiteral(":/icons/toolbar/flip-h.svg"),    c));
-	this->actionFlipV->setIcon(         svgIconColored(QStringLiteral(":/icons/toolbar/flip-v.svg"),    c));
-	this->actionSyncViews->setIcon(     svgIconColored(QStringLiteral(":/icons/toolbar/link.svg"),      c));
-	this->actionShowPatchGrid->setIcon( svgIconColored(QStringLiteral(":/icons/toolbar/grid.svg"),      c));
+	this->viewMenu->insertAction(this->toggleMessageConsoleAction, this->viewerToolBar->toggleViewAction());
 }
 
 void MainWindow::connectApplicationController() {
@@ -830,6 +772,7 @@ void MainWindow::loadSettings() {
 	// Load widget settings
 	this->consoleWidget()->setSettings(this->guiSettings->getStoredSettings(this->consoleWidget()->getName()));
 	this->sessionViewer->setSettings(this->guiSettings->getStoredSettings(this->sessionViewer->getName()));
+	this->viewerToolBar->setSettings(this->guiSettings->getStoredSettings(this->viewerToolBar->getName()));
 	this->psfGenerationWidget->setSettings(this->guiSettings->getStoredSettings(this->psfGenerationWidget->getName()));
 	this->processingControlWidget->setSettings(this->guiSettings->getStoredSettings(this->processingControlWidget->getName()));
 }
@@ -855,6 +798,7 @@ void MainWindow::saveSettings() {
 
 	this->guiSettings->storeSettings(this->consoleWidget()->getName(), this->consoleWidget()->getSettings());
 	this->guiSettings->storeSettings(this->sessionViewer->getName(), this->sessionViewer->getSettings());
+	this->guiSettings->storeSettings(this->viewerToolBar->getName(), this->viewerToolBar->getSettings());
 	this->guiSettings->storeSettings(this->psfGenerationWidget->getName(), this->psfGenerationWidget->getSettings());
 	this->guiSettings->storeSettings(this->processingControlWidget->getName(), this->processingControlWidget->getSettings());
 	this->guiSettings->storeSettings(this->recentInput->getName(),       this->recentInput->getSettings());

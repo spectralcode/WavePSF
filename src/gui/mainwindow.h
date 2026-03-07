@@ -11,6 +11,7 @@
 #include <QList>
 #include "stylemanager.h"
 #include "gui/messageconsole/messageconsoledock.h"
+#include "gui/viewertoolbar.h"
 #include "core/psf/psfsettings.h"
 
 QT_BEGIN_NAMESPACE
@@ -79,7 +80,6 @@ private:
 	void setupHelpMenu();
 	void setupCentralWidget();
 	void setupViewerToolBar();
-	void updateToolBarIcons();
 	void connectApplicationController();
 	void connectImageSessionViewer();
 	void connectPSFGenerationWidget();
@@ -137,12 +137,8 @@ private:
 	// View actions
 	QAction* toggleMessageConsoleAction;
 
-	// Viewer toolbar actions
-	QAction* actionRotate90;
-	QAction* actionFlipH;
-	QAction* actionFlipV;
-	QAction* actionSyncViews;
-	QAction* actionShowPatchGrid;
+	// Viewer toolbar
+	ViewerToolBar* viewerToolBar;
 
 	// Help actions
 	QAction* shortcutsAction;

@@ -20,7 +20,6 @@
 
 PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
 								   bool autoRange, double displayMin, double displayMax,
-								   bool syncViewsEnabled,
 								   QWidget* parent)
 	: QDialog(parent)
 	, initialSettings(settings)
@@ -36,7 +35,6 @@ PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
 	this->displayMaxSpin->setValue(displayMax);
 	this->displayMinSpin->setEnabled(!autoRange);
 	this->displayMaxSpin->setEnabled(!autoRange);
-	this->syncViewsCheck->setChecked(syncViewsEnabled);
 
 	this->updateValidationState();
 
@@ -284,14 +282,10 @@ void PSFSettingsDialog::setupUI()
 	this->displayMaxSpin->setDecimals(2);
 	displayLayout->addRow(tr("Max:"), this->displayMaxSpin);
 
-	this->syncViewsCheck = new QCheckBox(tr("Synchronize view navigation"), displayTab);
-	displayLayout->addRow(this->syncViewsCheck);
-
 	connect(this->displayAutoRangeCheck, &QCheckBox::toggled, this, [this](bool checked) {
 		this->displayMinSpin->setEnabled(!checked);
 		this->displayMaxSpin->setEnabled(!checked);
 	});
-	connect(this->syncViewsCheck, &QCheckBox::toggled, this, &PSFSettingsDialog::viewSyncChanged);
 
 	tabWidget->addTab(displayTab, tr("Display"));
 

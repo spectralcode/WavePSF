@@ -22,7 +22,6 @@ class PSFSettingsDialog : public QDialog
 public:
 	explicit PSFSettingsDialog(const PSFSettings& settings,
 							   bool autoRange, double displayMin, double displayMax,
-							   bool syncViewsEnabled,
 							   QWidget* parent = nullptr);
 
 	PSFSettings getSettings() const;
@@ -33,7 +32,6 @@ public:
 signals:
 	void settingsApplied(PSFSettings settings);
 	void displaySettingsApplied(bool autoRange, double min, double max);
-	void viewSyncChanged(bool enabled);
 
 public slots:
 	void updateGeneratorType(const QString& typeName);
@@ -84,7 +82,6 @@ private:
 	QCheckBox* displayAutoRangeCheck;
 	QDoubleSpinBox* displayMinSpin;
 	QDoubleSpinBox* displayMaxSpin;
-	QCheckBox* syncViewsCheck;
 
 	// Buttons
 	QPushButton* okButton;

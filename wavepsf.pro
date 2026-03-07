@@ -26,6 +26,7 @@ SOURCES += \
 	$$QCUSTOMPLOTDIR/qcustomplot.cpp \
 	$$SOURCEDIR/main.cpp \
 	$$SOURCEDIR/gui/mainwindow.cpp \
+	$$SOURCEDIR/gui/viewertoolbar.cpp \
 	$$SOURCEDIR/gui/aboutdialog.cpp \
 	$$SOURCEDIR/gui/shortcutsdialog.cpp \
 	$$SOURCEDIR/gui/recentfilesmenu.cpp \
@@ -77,6 +78,7 @@ SOURCES += \
 HEADERS += \
 	$$QCUSTOMPLOTDIR/qcustomplot.h \
 	$$SOURCEDIR/gui/mainwindow.h \
+	$$SOURCEDIR/gui/viewertoolbar.h \
 	$$SOURCEDIR/gui/aboutdialog.h \
 	$$SOURCEDIR/gui/shortcutsdialog.h \
 	$$SOURCEDIR/gui/recentfilesmenu.h \
