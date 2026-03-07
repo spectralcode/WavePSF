@@ -53,6 +53,8 @@ void ImageSession::setInputData(ImageData* inputData)
 		}
 	}
 
+	int previousFrame = this->currentFrame;
+
 	// Delete old input and output data
 	this->deleteInputAndOutputData();
 
@@ -70,8 +72,14 @@ void ImageSession::setInputData(ImageData* inputData)
 	// Apply current patch grid configuration
 	this->updateAccessorConfigurations();
 
-	// Reset current frame to valid value
-	this->currentFrame = (this->inputData->getFrames() > 0) ? 0 : INVALID_FRAME;
+	// Preserve the current frame if the new data has enough frames; otherwise reset to 0.
+	if (this->inputData->getFrames() == 0) {
+		this->currentFrame = INVALID_FRAME;
+	} else if (previousFrame > 0 && previousFrame < this->inputData->getFrames()) {
+		this->currentFrame = previousFrame;
+	} else {
+		this->currentFrame = 0;
+	}
 	this->currentPatch = QPoint(0, 0);
 
 	emit inputDataChanged();

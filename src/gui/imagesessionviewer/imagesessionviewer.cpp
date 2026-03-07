@@ -570,6 +570,12 @@ void ImageSessionViewer::syncViewersToSession()
 void ImageSessionViewer::updateDataInViewers()
 {
 	if (this->imageSession != nullptr) {
+		// Suppress viewer frame-change feedback while reconnecting data sources.
+		// connectImageData() calls displayFrame(0) which emits currentFrameChanged(0),
+		// which would otherwise propagate as frameChangeRequested(0) and reset
+		// imageSession->currentFrame to 0, discarding any preserved frame value.
+		this->updatingControls = true;
+
 		// Connect viewers to data (only reconnect if the data pointer changed,
 		// to avoid resetting frame position when only ground truth was added)
 		if (this->imageSession->hasInputData()) {
@@ -589,6 +595,8 @@ void ImageSessionViewer::updateDataInViewers()
 		} else {
 			this->outputViewer->disconnectImageData();
 		}
+
+		this->updatingControls = false;
 
 		// Connect reference data to both viewers
 		const ImageData* groundTruthData = nullptr;
