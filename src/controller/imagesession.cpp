@@ -80,7 +80,9 @@ void ImageSession::setInputData(ImageData* inputData)
 	} else {
 		this->currentFrame = 0;
 	}
-	this->currentPatch = QPoint(0, 0);
+	if (!this->isValidPatch(this->currentPatch.x(), this->currentPatch.y())) {
+		this->currentPatch = QPoint(0, 0);
+	}
 
 	emit inputDataChanged();
 	emit outputDataChanged();
