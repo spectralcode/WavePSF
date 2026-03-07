@@ -58,7 +58,8 @@ namespace {
 OptimizationWidget::OptimizationWidget(QWidget* parent)
 	: QWidget(parent),
 	  groundTruthAvailable(false),
-	  isRunning(false)
+	  isRunning(false),
+	  currentFrame(0)
 {
 	this->setupUI();
 }
@@ -399,12 +400,21 @@ void OptimizationWidget::onStartCoefficientSourceChanged(int index)
 	if (index == 1) {
 		this->sourceParamLabel->setText(tr("Frame #:"));
 		this->sourceParamSpinBox->setMinimum(0);
+		this->sourceParamSpinBox->setValue(this->currentFrame);
 	} else if (index == 2) {
 		this->sourceParamLabel->setText(tr("Offset:"));
 		this->sourceParamSpinBox->setMinimum(-100000);
 	} else if (index == 6) {
 		this->sourceParamLabel->setText(tr("Patch #:"));
 		this->sourceParamSpinBox->setMinimum(0);
+	}
+}
+
+void OptimizationWidget::setCurrentFrame(int frame)
+{
+	this->currentFrame = frame;
+	if (this->startCoeffSourceComboBox->currentIndex() == 1) {
+		this->sourceParamSpinBox->setValue(frame);
 	}
 }
 

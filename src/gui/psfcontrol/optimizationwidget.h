@@ -36,6 +36,7 @@ public:
 public slots:
 	void setParameterDescriptors(const QVector<WavefrontParameter>& descriptors);
 	void setGroundTruthAvailable(bool available);
+	void setCurrentFrame(int frame);
 	void updateProgress(const OptimizationProgress& progress);
 	void onOptimizationFinished(const OptimizationResult& result);
 	void onOptimizationStarted();
@@ -86,6 +87,7 @@ private:
 	QVector<WavefrontParameter> parameterDescriptors;
 	bool groundTruthAvailable;
 	bool isRunning;
+	int currentFrame;
 
 	// Mode
 	QComboBox* modeComboBox;

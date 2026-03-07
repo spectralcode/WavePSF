@@ -29,6 +29,7 @@ public:
 public slots:
 	void setParameterDescriptors(QVector<WavefrontParameter> descriptors);
 	void setGroundTruthAvailable(bool available);
+	void setCurrentFrame(int frame);
 	void updateOptimizationProgress(const OptimizationProgress& progress);
 	void onOptimizationFinished(const OptimizationResult& result);
 	void onOptimizationStarted();

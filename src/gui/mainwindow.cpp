@@ -527,6 +527,8 @@ void MainWindow::connectProcessingControlWidget() {
 	// Parameter descriptors → ProcessingControlWidget (for optimization widget)
 	connect(this->applicationController, &ApplicationController::psfParameterDescriptorsChanged,
 			ctrl, &ProcessingControlWidget::setParameterDescriptors);
+	connect(this->applicationController, &ApplicationController::frameChanged,
+			ctrl, &ProcessingControlWidget::setCurrentFrame);
 
 	// --- Deconvolution signals ---
 	connect(ctrl, &ProcessingControlWidget::deconvAlgorithmChanged,

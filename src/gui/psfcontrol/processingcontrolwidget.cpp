@@ -155,6 +155,11 @@ void ProcessingControlWidget::setGroundTruthAvailable(bool available)
 	this->optimizationWidget->setGroundTruthAvailable(available);
 }
 
+void ProcessingControlWidget::setCurrentFrame(int frame)
+{
+	this->optimizationWidget->setCurrentFrame(frame);
+}
+
 void ProcessingControlWidget::updateOptimizationProgress(const OptimizationProgress& progress)
 {
 	this->optimizationWidget->updateProgress(progress);
