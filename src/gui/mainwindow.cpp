@@ -12,6 +12,7 @@
 #include "gui/messageconsole/messageconsoledock.h"
 #include "gui/aboutdialog.h"
 #include "gui/shortcutsdialog.h"
+#include "gui/recentfilesmenu.h"
 
 
 #include <QFileDialog>
@@ -44,7 +45,6 @@ namespace {
 	const QString KEY_LAST_FILTER_GT      = QStringLiteral("last_name_filter_ground_truth");
 	const QString KEY_DOCK_STATE          = QStringLiteral("dock_state_v1");
 	const QString KEY_CONSOLE_VISIBLE     = QStringLiteral("message_console_visible");
-
 	const bool DEF_WINDOW_MAXIMIZED = false;
 	const bool DEF_CONSOLE_VISIBLE  = false;
 }
@@ -53,7 +53,8 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 					   StyleManager* styleManager, ApplicationController* applicationController, QWidget *parent)
 	: QMainWindow(parent), ui(new Ui::MainWindow),
 	  guiSettings(guiSettings), styleManager(styleManager), applicationController(applicationController),
-	  fileMenu(nullptr), psfMenu(nullptr), processingMenu(nullptr),
+	  fileMenu(nullptr), recentInput(nullptr), recentGroundTruth(nullptr),
+	  psfMenu(nullptr), processingMenu(nullptr),
 	  viewMenu(nullptr), extrasMenu(nullptr), styleMenu(nullptr),
 	  openImageDataAction(nullptr), openGroundTruthAction(nullptr),
 	  saveParametersAction(nullptr), loadParametersAction(nullptr), saveOutputAction(nullptr),
@@ -149,6 +150,11 @@ void MainWindow::setupFileMenu() {
 	this->openGroundTruthAction->setStatusTip("Open ground truth image for quality metrics");
 	connect(this->openGroundTruthAction, &QAction::triggered, this, &MainWindow::openGroundTruth);
 	this->fileMenu->addAction(this->openGroundTruthAction);
+
+	this->recentInput       = new RecentFilesMenu(tr("Recent Input Files"),       "recent_input_files",       this);
+	this->recentGroundTruth = new RecentFilesMenu(tr("Recent Ground Truth Files"), "recent_ground_truth_files", this);
+	this->fileMenu->addMenu(this->recentInput->menu());
+	this->fileMenu->addMenu(this->recentGroundTruth->menu());
 
 	this->fileMenu->addSeparator();
 
@@ -418,6 +424,14 @@ void MainWindow::connectApplicationController() {
 		// Connect file loading responses
 		connect(this->applicationController, &ApplicationController::inputFileLoaded,
 				this, &MainWindow::onInputFileLoaded);
+		connect(this->applicationController, &ApplicationController::inputFileLoaded,
+				this->recentInput, &RecentFilesMenu::addFile);
+		connect(this->applicationController, &ApplicationController::groundTruthFileLoaded,
+				this->recentGroundTruth, &RecentFilesMenu::addFile);
+		connect(this->recentInput, &RecentFilesMenu::fileRequested,
+				this->applicationController, &ApplicationController::requestOpenInputFile);
+		connect(this->recentGroundTruth, &RecentFilesMenu::fileRequested,
+				this->applicationController, &ApplicationController::requestOpenGroundTruthFile);
 		connect(this->applicationController, &ApplicationController::fileLoadError,
 				this, &MainWindow::onFileLoadError);
 
@@ -723,6 +737,8 @@ void MainWindow::loadSettings() {
 	this->lastOpenDirGroundTruth    = settings.value(KEY_LAST_OPEN_DIR_GT,   QString()).toString();
 	this->lastNameFilterInput       = settings.value(KEY_LAST_FILTER_INPUT,  QString()).toString();
 	this->lastNameFilterGroundTruth = settings.value(KEY_LAST_FILTER_GT,     QString()).toString();
+	this->recentInput->setSettings(this->guiSettings->getStoredSettings(this->recentInput->getName()));
+	this->recentGroundTruth->setSettings(this->guiSettings->getStoredSettings(this->recentGroundTruth->getName()));
 
 	if (settings.contains(KEY_DOCK_STATE)) {
 		this->restoreState(settings.value(KEY_DOCK_STATE).toByteArray());
@@ -768,6 +784,8 @@ void MainWindow::saveSettings() {
 	this->guiSettings->storeSettings(this->sessionViewer->getName(), this->sessionViewer->getSettings());
 	this->guiSettings->storeSettings(this->psfGenerationWidget->getName(), this->psfGenerationWidget->getSettings());
 	this->guiSettings->storeSettings(this->processingControlWidget->getName(), this->processingControlWidget->getSettings());
+	this->guiSettings->storeSettings(this->recentInput->getName(),       this->recentInput->getSettings());
+	this->guiSettings->storeSettings(this->recentGroundTruth->getName(), this->recentGroundTruth->getSettings());
 }
 
 MessageConsoleWidget *MainWindow::consoleWidget() const

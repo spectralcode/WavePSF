@@ -25,6 +25,7 @@ class ProcessingControlWidget;
 class PSFSettingsDialog;
 class AboutDialog;
 class ShortcutsDialog;
+class RecentFilesMenu;
 
 class MainWindow : public QMainWindow {
 	Q_OBJECT
@@ -50,6 +51,7 @@ private slots:
 	void saveParameters();
 	void loadParameters();
 	void saveOutputData();
+
 
 	// Settings
 	void openSettings();
@@ -97,8 +99,11 @@ private:
 	QString lastNameFilterInput;
 	QString lastNameFilterGroundTruth;
 
+
 	// Menus
 	QMenu* fileMenu;
+	RecentFilesMenu* recentInput;
+	RecentFilesMenu* recentGroundTruth;
 	QMenu* psfMenu;
 	QMenu* processingMenu;
 	QMenu* viewMenu;

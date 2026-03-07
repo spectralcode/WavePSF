@@ -28,6 +28,7 @@ SOURCES += \
 	$$SOURCEDIR/gui/mainwindow.cpp \
 	$$SOURCEDIR/gui/aboutdialog.cpp \
 	$$SOURCEDIR/gui/shortcutsdialog.cpp \
+	$$SOURCEDIR/gui/recentfilesmenu.cpp \
 	$$SOURCEDIR/utils/settingsfilemanager.cpp \
 	$$SOURCEDIR/gui/stylemanager.cpp \
 	$$SOURCEDIR/data/imagedata.cpp \
@@ -78,6 +79,7 @@ HEADERS += \
 	$$SOURCEDIR/gui/mainwindow.h \
 	$$SOURCEDIR/gui/aboutdialog.h \
 	$$SOURCEDIR/gui/shortcutsdialog.h \
+	$$SOURCEDIR/gui/recentfilesmenu.h \
 	$$SOURCEDIR/utils/settingsfilemanager.h \
 	$$SOURCEDIR/gui/stylemanager.h \
 	$$SOURCEDIR/data/imagedata.h \
