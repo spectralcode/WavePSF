@@ -52,6 +52,9 @@ protected:
 public slots:
 	void zoomIn();
 	void zoomOut();
+	void rotate90();
+	void flipH();
+	void flipV();
 	void emitViewTransform();
 	void displayFullScene();
 	void displayFrame(uchar* frame, int width, int height);
@@ -75,6 +78,7 @@ signals:
 	void pastePressed();
 	void togglePressed();
 	void toggleReleased();
+	void pressed();
 	void fileDropRequested(const QString& filePath);
 	void viewTransformChanged(QTransform transform, QPointF centerInScene);
 	void navigatePatch(int dx, int dy);

@@ -106,6 +106,7 @@ void GraphicsView::mouseDoubleClickEvent(QMouseEvent* event) {
 }
 
 void GraphicsView::mousePressEvent(QMouseEvent* event) {
+	emit pressed();
 	if (event->button() == Qt::MiddleButton) {
 		this->mousePosX = event->x();
 		this->mousePosY = event->y();
@@ -166,8 +167,7 @@ void GraphicsView::keyPressEvent(QKeyEvent* event) {
 			break;
 
 		case Qt::Key_R:
-			this->rotate(90);
-			emitViewTransform();
+			this->rotate90();
 			break;
 
 		case Qt::Key_V:
@@ -175,17 +175,11 @@ void GraphicsView::keyPressEvent(QKeyEvent* event) {
 				emit pastePressed();
 				break;
 			}
-			// Mirror horizontal axis
-			this->scale(-1, 1);
-			this->vflipped = !this->vflipped;
-			emitViewTransform();
+			this->flipV();
 			break;
 
 		case Qt::Key_H:
-			// Mirror on vertical axis
-			this->scale(1, -1);
-			this->hflipped = !this->hflipped;
-			emitViewTransform();
+			this->flipH();
 			break;
 
 		case Qt::Key_Left:
@@ -273,26 +267,15 @@ void GraphicsView::contextMenuEvent(QContextMenuEvent* event) {
 	// View transform operations
 	QAction* rotateAction = menu.addAction(tr("Rotate 90%1").arg(QChar(0x00B0)));
 	rotateAction->setShortcut(QKeySequence(Qt::Key_R));
-	connect(rotateAction, &QAction::triggered, this, [this]() {
-		this->rotate(90);
-		emitViewTransform();
-	});
+	connect(rotateAction, &QAction::triggered, this, &GraphicsView::rotate90);
 
 	QAction* flipHAction = menu.addAction(tr("Flip Horizontal"));
 	flipHAction->setShortcut(QKeySequence(Qt::Key_H));
-	connect(flipHAction, &QAction::triggered, this, [this]() {
-		this->scale(1, -1);
-		this->hflipped = !this->hflipped;
-		emitViewTransform();
-	});
+	connect(flipHAction, &QAction::triggered, this, &GraphicsView::flipH);
 
 	QAction* flipVAction = menu.addAction(tr("Flip Vertical"));
 	flipVAction->setShortcut(QKeySequence(Qt::Key_V));
-	connect(flipVAction, &QAction::triggered, this, [this]() {
-		this->scale(-1, 1);
-		this->vflipped = !this->vflipped;
-		emitViewTransform();
-	});
+	connect(flipVAction, &QAction::triggered, this, &GraphicsView::flipV);
 
 	menu.addSeparator();
 
@@ -408,6 +391,23 @@ void GraphicsView::zoomIn() {
 
 void GraphicsView::zoomOut() {
 	this->scaleView(1/qreal(1.2));
+}
+
+void GraphicsView::rotate90() {
+	this->rotate(90);
+	this->emitViewTransform();
+}
+
+void GraphicsView::flipH() {
+	this->scale(1, -1);
+	this->hflipped = !this->hflipped;
+	this->emitViewTransform();
+}
+
+void GraphicsView::flipV() {
+	this->scale(-1, 1);
+	this->vflipped = !this->vflipped;
+	this->emitViewTransform();
 }
 
 void GraphicsView::displayFullScene() {

@@ -45,6 +45,10 @@ public slots:
 	void refreshOutputViewer();
 	void setDisplaySettings(bool autoRange, double min, double max);
 	void setViewSyncEnabled(bool enabled);
+	void rotateViewers90();
+	void flipViewersH();
+	void flipViewersV();
+	void setPatchGridVisible(bool visible);
 
 	bool isViewSyncEnabled() const;
 
@@ -85,6 +89,7 @@ private:
 	void updateFrameControls();
 	void syncViewersToSession();
 	void updateDataInViewers();
+	ImageDataViewer* otherViewer() const;
 
 	// Current session reference (not owned)
 	ImageSession* imageSession;
@@ -113,6 +118,7 @@ private:
 	// Image viewers
 	ImageDataViewer* inputViewer;
 	ImageDataViewer* outputViewer;
+	ImageDataViewer* activeViewer;
 
 	// State tracking
 	bool updatingControls;

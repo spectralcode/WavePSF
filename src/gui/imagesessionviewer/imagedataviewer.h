@@ -77,6 +77,9 @@ private slots:
 
 public slots:
 	void showReference(bool show);
+	void rotate90();
+	void flipH();
+	void flipV();
 
 private:
 	void setupUI();
@@ -136,6 +139,7 @@ signals:
 
 	void inputFileDropRequested(const QString& filePath);
 
+	void viewActivated();
 	void viewTransformChanged(QTransform transform, QPointF centerInScene);
 	void navigatePatch(int dx, int dy);
 };

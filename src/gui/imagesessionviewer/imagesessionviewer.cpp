@@ -39,7 +39,7 @@ ImageSessionViewer::ImageSessionViewer(QWidget* parent)
 	  mainSplitter(nullptr), controlsWidget(nullptr), sidebarLayout(nullptr), rightSplitter(nullptr), viewersWidget(nullptr),
 	  frameControlsGroup(nullptr), frameSlider(nullptr), frameSpinBox(nullptr),
 	  patchSlider(nullptr), patchSpinBox(nullptr),
-	  inputViewer(nullptr), outputViewer(nullptr), updatingControls(false),
+	  inputViewer(nullptr), outputViewer(nullptr), activeViewer(nullptr), updatingControls(false),
 	  viewSyncEnabled(false),
 	  connectedInputData(nullptr), connectedOutputData(nullptr)
 {
@@ -293,6 +293,33 @@ bool ImageSessionViewer::isViewSyncEnabled() const
 	return this->viewSyncEnabled;
 }
 
+ImageDataViewer* ImageSessionViewer::otherViewer() const
+{
+	return (this->activeViewer == this->inputViewer) ? this->outputViewer : this->inputViewer;
+}
+
+void ImageSessionViewer::rotateViewers90()
+{
+	this->activeViewer->rotate90();
+}
+
+void ImageSessionViewer::flipViewersH()
+{
+	this->activeViewer->flipH();
+}
+
+void ImageSessionViewer::flipViewersV()
+{
+	this->activeViewer->flipV();
+}
+
+void ImageSessionViewer::setPatchGridVisible(bool visible)
+{
+	this->activeViewer->setPatchGridVisible(visible);
+	if (this->viewSyncEnabled)
+		this->otherViewer()->setPatchGridVisible(visible);
+}
+
 bool ImageSessionViewer::getAutoRangeEnabled() const
 {
 	return this->autoRangeEnabled;
@@ -442,8 +469,9 @@ void ImageSessionViewer::setupImageViewers()
 	this->viewersWidget = new QWidget();
 
 	// Create input and output viewers
-	this->inputViewer = new ImageDataViewer("Input", this->viewersWidget);
+	this->inputViewer  = new ImageDataViewer("Input",  this->viewersWidget);
 	this->outputViewer = new ImageDataViewer("Output", this->viewersWidget);
+	this->activeViewer = this->inputViewer;
 
 	// Enable drag and drop on input viewer only
 	this->inputViewer->enableInputDataDrops(true);
@@ -486,6 +514,10 @@ void ImageSessionViewer::connectSignals()
 	// Forward patch navigation from both viewers
 	connect(this->inputViewer,  &ImageDataViewer::navigatePatch, this, &ImageSessionViewer::navigatePatch);
 	connect(this->outputViewer, &ImageDataViewer::navigatePatch, this, &ImageSessionViewer::navigatePatch);
+
+	// Track active viewer (last clicked)
+	connect(this->inputViewer,  &ImageDataViewer::viewActivated, this, [this]() { this->activeViewer = this->inputViewer; });
+	connect(this->outputViewer, &ImageDataViewer::viewActivated, this, [this]() { this->activeViewer = this->outputViewer; });
 }
 
 void ImageSessionViewer::updateFrameControls()

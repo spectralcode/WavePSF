@@ -205,6 +205,12 @@ QList<ComponentInfo> AboutDialog::getThirdPartyComponents()
 	qt.licensePath = ":/aboutdata/thirdparty_licenses/qt_license.txt";
 	components.append(qt);
 
+	ComponentInfo lucide;
+	lucide.name = "Lucide Icons";
+	lucide.url = "https://lucide.dev";
+	lucide.licensePath = ":/aboutdata/thirdparty_licenses/lucide_license.txt";
+	components.append(lucide);
+
 	return components;
 }
 

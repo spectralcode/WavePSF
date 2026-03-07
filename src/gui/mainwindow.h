@@ -78,6 +78,8 @@ private:
 	void setupExtrasMenu();
 	void setupHelpMenu();
 	void setupCentralWidget();
+	void setupViewerToolBar();
+	void updateToolBarIcons();
 	void connectApplicationController();
 	void connectImageSessionViewer();
 	void connectPSFGenerationWidget();
@@ -134,6 +136,13 @@ private:
 
 	// View actions
 	QAction* toggleMessageConsoleAction;
+
+	// Viewer toolbar actions
+	QAction* actionRotate90;
+	QAction* actionFlipH;
+	QAction* actionFlipV;
+	QAction* actionSyncViews;
+	QAction* actionShowPatchGrid;
 
 	// Help actions
 	QAction* shortcutsAction;
