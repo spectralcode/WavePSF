@@ -539,6 +539,11 @@ void ApplicationController::handleInputDataChanged()
 
 	// Resize parameter table to match new data dimensions
 	this->resizeParameterTable();
+
+	// Reset psfModule and UI sliders to the new dataset's patch (0,0) values,
+	// preventing stale coefficients from the previous file's active patch from
+	// being written back on the next storeCurrentCoefficients() call.
+	this->loadCoefficientsForCurrentPatch();
 }
 
 void ApplicationController::handleOutputDataChanged()
