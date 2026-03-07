@@ -422,8 +422,8 @@ void MainWindow::setupViewerToolBar()
 	this->addToolBar(Qt::RightToolBarArea, this->viewerToolBar);
 
 	connect(this->viewerToolBar, &ViewerToolBar::rotateRequested,      this->sessionViewer, &ImageSessionViewer::rotateViewers90);
-	connect(this->viewerToolBar, &ViewerToolBar::flipHRequested,       this->sessionViewer, &ImageSessionViewer::flipViewersV);
-	connect(this->viewerToolBar, &ViewerToolBar::flipVRequested,       this->sessionViewer, &ImageSessionViewer::flipViewersH);
+	connect(this->viewerToolBar, &ViewerToolBar::flipHRequested,       this->sessionViewer, &ImageSessionViewer::flipViewersH);
+	connect(this->viewerToolBar, &ViewerToolBar::flipVRequested,       this->sessionViewer, &ImageSessionViewer::flipViewersV);
 	connect(this->viewerToolBar, &ViewerToolBar::syncViewsToggled,     this->sessionViewer, &ImageSessionViewer::setViewSyncEnabled);
 	connect(this->viewerToolBar, &ViewerToolBar::showPatchGridToggled, this->sessionViewer, &ImageSessionViewer::setPatchGridVisible);
 

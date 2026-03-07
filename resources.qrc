@@ -6,7 +6,7 @@
     <qresource prefix="/icons">
         <file alias="wavepsf.ico">icon/wavepsf.ico</file>
         <file alias="wavepsf_psf_icon.png">icon/wavepsf_psf_icon.png</file>
-        <file alias="toolbar/rotate-cw.svg">icon/toolbar/rotate-cw.svg</file>
+        <file alias="toolbar/rotate-ccw.svg">icon/toolbar/rotate-ccw.svg</file>
         <file alias="toolbar/flip-h.svg">icon/toolbar/flip-h.svg</file>
         <file alias="toolbar/flip-v.svg">icon/toolbar/flip-v.svg</file>
         <file alias="toolbar/link.svg">icon/toolbar/link.svg</file>

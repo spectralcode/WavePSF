@@ -73,7 +73,7 @@ void ViewerToolBar::setSettings(const QVariantMap& settings)
 void ViewerToolBar::updateIcons()
 {
 	const QColor c = this->palette().windowText().color();
-	this->actionRotate90->setIcon(      svgIconColored(QStringLiteral(":/icons/toolbar/rotate-cw.svg"), c));
+	this->actionRotate90->setIcon(      svgIconColored(QStringLiteral(":/icons/toolbar/rotate-ccw.svg"), c));
 	this->actionFlipH->setIcon(         svgIconColored(QStringLiteral(":/icons/toolbar/flip-h.svg"),    c));
 	this->actionFlipV->setIcon(         svgIconColored(QStringLiteral(":/icons/toolbar/flip-v.svg"),    c));
 	this->actionSyncViews->setIcon(     svgIconColored(QStringLiteral(":/icons/toolbar/link.svg"),      c));

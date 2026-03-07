@@ -38,6 +38,8 @@
 
 	win32 {
 		SOURCES += $${LIBTIFF_DIR}/tif_win32.c
+		# Suppress C4996 (deprecated CRT functions) in bundled libtiff code
+		QMAKE_CFLAGS += /wd4996
 	} else {
 		SOURCES += $${LIBTIFF_DIR}/tif_unix.c
 		# Hide bundled libtiff symbols from the dynamic linker so they cannot

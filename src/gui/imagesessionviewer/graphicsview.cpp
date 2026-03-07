@@ -394,18 +394,21 @@ void GraphicsView::zoomOut() {
 }
 
 void GraphicsView::rotate90() {
-	this->rotate(90);
+	// Post-multiply so rotation always appears CW on screen (view-space, flip-independent)
+	this->setTransform(this->transform() * QTransform().rotate(-90));
 	this->emitViewTransform();
 }
 
 void GraphicsView::flipH() {
-	this->scale(1, -1);
+	// Post-multiply so the flip always operates in view space (rotation-independent)
+	this->setTransform(this->transform() * QTransform(-1, 0, 0, 1, 0, 0));
 	this->hflipped = !this->hflipped;
 	this->emitViewTransform();
 }
 
 void GraphicsView::flipV() {
-	this->scale(-1, 1);
+	// Post-multiply so the flip always operates in view space (rotation-independent)
+	this->setTransform(this->transform() * QTransform(1, 0, 0, -1, 0, 0));
 	this->vflipped = !this->vflipped;
 	this->emitViewTransform();
 }
