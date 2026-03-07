@@ -117,31 +117,6 @@ void Deconvolver::setNoiseToSignalFactor(float factor)
 	}
 }
 
-Deconvolver::Algorithm Deconvolver::getAlgorithm() const
-{
-	return this->algorithm;
-}
-
-int Deconvolver::getIterations() const
-{
-	return this->iterations;
-}
-
-float Deconvolver::getRelaxationFactor() const
-{
-	return this->landweberRelaxationFactor;
-}
-
-float Deconvolver::getRegularizationFactor() const
-{
-	return this->tikhonovRegularizationFactor;
-}
-
-float Deconvolver::getNoiseToSignalFactor() const
-{
-	return this->wienerNoiseToSignalFactor;
-}
-
 QStringList Deconvolver::getAlgorithmNames()
 {
 	return QStringList {

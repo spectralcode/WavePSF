@@ -50,8 +50,6 @@ public slots:
 	void flipViewersV();
 	void setPatchGridVisible(bool visible);
 
-	bool isViewSyncEnabled() const;
-
 private slots:
 	// Internal UI interactions
 	void setFrameFromSlider(int frame);

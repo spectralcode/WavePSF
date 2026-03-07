@@ -288,10 +288,6 @@ void ImageSessionViewer::setViewSyncEnabled(bool enabled)
 	}
 }
 
-bool ImageSessionViewer::isViewSyncEnabled() const
-{
-	return this->viewSyncEnabled;
-}
 
 ImageDataViewer* ImageSessionViewer::otherViewer() const
 {

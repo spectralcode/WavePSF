@@ -28,12 +28,6 @@ public:
 	void setRegularizationFactor(float factor);
 	void setNoiseToSignalFactor(float factor);
 
-	Algorithm getAlgorithm() const;
-	int getIterations() const;
-	float getRelaxationFactor() const;
-	float getRegularizationFactor() const;
-	float getNoiseToSignalFactor() const;
-
 	static QStringList getAlgorithmNames();
 
 signals:

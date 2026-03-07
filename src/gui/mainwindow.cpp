@@ -18,8 +18,6 @@
 
 #include <QFileDialog>
 #include <QMessageBox>
-#include <QImage>
-#include <QPixmap>
 #include <QCloseEvent>
 #include <QMenuBar>
 #include <QMenu>
