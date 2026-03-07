@@ -10,6 +10,7 @@
 
 namespace {
 	const char* SETTINGS_GROUP = "psf_control";
+	const QString KEY_ACTIVE_TAB = QStringLiteral("active_tab");
 	const int DEFAULT_PATCH_COLS = 4;
 	const int DEFAULT_PATCH_ROWS = 4;
 	const int DEFAULT_BORDER_EXTENSION = 10;
@@ -134,6 +135,7 @@ QString ProcessingControlWidget::getName() const
 QVariantMap ProcessingControlWidget::getSettings() const
 {
 	QVariantMap settings;
+	settings.insert(KEY_ACTIVE_TAB, this->tabWidget->currentIndex());
 	settings.insert("deconvolution", this->deconvSettings->getSettings());
 	settings.insert("optimization", this->optimizationWidget->getSettings());
 	return settings;
@@ -141,6 +143,7 @@ QVariantMap ProcessingControlWidget::getSettings() const
 
 void ProcessingControlWidget::setSettings(const QVariantMap& settings)
 {
+	this->tabWidget->setCurrentIndex(settings.value(KEY_ACTIVE_TAB, 0).toInt());
 	this->deconvSettings->setSettings(settings.value("deconvolution").toMap());
 	this->optimizationWidget->setSettings(settings.value("optimization").toMap());
 }
