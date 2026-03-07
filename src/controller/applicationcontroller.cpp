@@ -1021,6 +1021,9 @@ void ApplicationController::handleOptimizationProgress(const OptimizationProgres
 				this->psfModule->setAllCoefficients(progress.currentCoefficients);
 				emit coefficientsLoaded(progress.currentCoefficients);
 				this->suppressLiveDeconv = false;
+				// Navigate viewer to current job's patch so the live preview reflects it
+				this->imageSession->setCurrentFrame(progress.currentFrameNr);
+				this->imageSession->setCurrentPatch(progress.currentPatchX, progress.currentPatchY);
 				this->runDeconvolutionOnCurrentPatch();
 			}
 		}
@@ -1033,20 +1036,23 @@ void ApplicationController::handleOptimizationFinished(const OptimizationResult&
 			   << "jobs," << result.totalOuterIterations << "iterations"
 			   << (result.wasCancelled ? "(cancelled)" : "");
 
-	// Store all job results into parameter table
+	// Store coefficients and write deconvolved output for every job
 	for (const OptimizationJobResult& jobResult : result.jobResults) {
 		int patchIdx = this->parameterTable->patchIndex(jobResult.patchX, jobResult.patchY);
 		this->parameterTable->setCoefficients(jobResult.frameNr, patchIdx, jobResult.bestCoefficients);
+
+		this->suppressLiveDeconv = true;
+		this->psfModule->setAllCoefficients(jobResult.bestCoefficients);
+		this->suppressLiveDeconv = false;
+		this->imageSession->setCurrentFrame(jobResult.frameNr);
+		this->imageSession->setCurrentPatch(jobResult.patchX, jobResult.patchY);
+		this->runDeconvolutionOnCurrentPatch();
 	}
 
-	// Apply the last job's coefficients to PSFModule for display
+	// Emit the last job's coefficients so the UI reflects the final state
 	if (!result.jobResults.isEmpty()) {
 		const OptimizationJobResult& lastJob = result.jobResults.last();
-		this->psfModule->setAllCoefficients(lastJob.bestCoefficients);
 		emit coefficientsLoaded(lastJob.bestCoefficients);
-
-		// Run deconvolution on current patch to show result
-		this->runDeconvolutionOnCurrentPatch();
 	}
 
 	emit optimizationFinished(result);
