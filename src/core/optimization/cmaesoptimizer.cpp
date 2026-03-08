@@ -3,11 +3,31 @@
 #include <QtMath>
 #include <limits>
 #include <algorithm>
+#include <cmath>
 
 namespace {
 	const QString KEY_INITIAL_SIGMA    = QStringLiteral("initial_sigma");
 	const QString KEY_POPULATION_SIZE  = QStringLiteral("population_size");
 	const QString KEY_MAX_GENERATIONS  = QStringLiteral("max_generations");
+
+	static double mirrorIntoUnitInterval(double value)
+	{
+		// Robust mirrored reflection into [0, 1].
+		// This is the same idea as the boundary handling in the simulated annealing implementation,
+		// but generalized so large overshoots do not fall back to clamping.
+		if (!qIsFinite(value)) {
+			return 0.5;
+		}
+
+		double t = std::fmod(value, 2.0);
+		if (t < 0.0) {
+			t += 2.0;
+		}
+		if (t > 1.0) {
+			t = 2.0 - t;
+		}
+		return t;
+	}
 }
 
 
@@ -155,7 +175,11 @@ OptimizerResult CMAESOptimizer::run(
 
 	// Global best tracking (stored in actual coefficient space)
 	QVector<double> globalBestCoeffs = initialCoefficients;
-	double globalBestMetric = (std::numeric_limits<double>::max)();
+	for (int i = 0; i < N; ++i) {
+		const int idx = selectedIndices[i];
+		globalBestCoeffs[idx] = qBound(lo[i], initialCoefficients[idx], hi[i]);
+	}
+	double globalBestMetric = objective(globalBestCoeffs);
 
 	// Population storage (x and y in normalized [0,1] space)
 	struct Individual {
@@ -166,7 +190,6 @@ OptimizerResult CMAESOptimizer::run(
 	QVector<Individual> population(lambda);
 
 	QVector<double> fullCoeffs = initialCoefficients;
-	const int maxResampleAttempts = 10;
 
 	int gen = 0;
 	for (gen = 0; gen < this->maxGenerations; ++gen) {
@@ -179,42 +202,28 @@ OptimizerResult CMAESOptimizer::run(
 			population[k].x.resize(N);
 			population[k].y.resize(N);
 
-			// Resample until feasible (within [0,1]^N) to avoid
-			// covariance distortion from boundary clamping.
-			bool feasible = false;
-			for (int attempt = 0; attempt <= maxResampleAttempts; ++attempt) {
-				QVector<double> z(N);
-				for (int i = 0; i < N; ++i) {
-					z[i] = randomGaussian();
-				}
-
-				// y = B * D * z,  x = mean + sigma * y
-				bool inBounds = true;
-				for (int i = 0; i < N; ++i) {
-					double sum = 0.0;
-					for (int j = 0; j < N; ++j) {
-						sum += B[i * N + j] * D[j] * z[j];
-					}
-					population[k].y[i] = sum;
-					population[k].x[i] = mean[i] + sigma * sum;
-					if (population[k].x[i] < 0.0 || population[k].x[i] > 1.0) {
-						inBounds = false;
-					}
-				}
-
-				if (inBounds || attempt == maxResampleAttempts) {
-					feasible = inBounds;
-					break;
-				}
+			QVector<double> z(N);
+			for (int i = 0; i < N; ++i) {
+				z[i] = randomGaussian();
 			}
 
-			// Fallback: clamp and recompute y
-			if (!feasible) {
-				for (int i = 0; i < N; ++i) {
-					population[k].x[i] = qBound(0.0, population[k].x[i], 1.0);
-					population[k].y[i] = (sigma > 1e-20)
-						? (population[k].x[i] - mean[i]) / sigma : 0.0;
+			// y = B * D * z, x = mean + sigma * y
+			for (int i = 0; i < N; ++i) {
+				double step = 0.0;
+				for (int j = 0; j < N; ++j) {
+					step += B[i * N + j] * D[j] * z[j];
 				}
+
+				double x = mean[i] + sigma * step;
+
+				// Mirror at the boundaries instead of clamping.
+				// This matches the SA-style boundary handling.
+				x = mirrorIntoUnitInterval(x);
+
+				population[k].x[i] = x;
+				population[k].y[i] = (sigma > 1e-20)
+					? (population[k].x[i] - mean[i]) / sigma
+					: 0.0;
 			}
 
 			// Convert normalized x to actual space for objective evaluation
