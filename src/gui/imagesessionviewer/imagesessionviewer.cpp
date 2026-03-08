@@ -400,8 +400,8 @@ void ImageSessionViewer::setupUI()
 	// Add to main horizontal splitter
 	this->mainSplitter->addWidget(controlsScrollArea);
 	this->mainSplitter->addWidget(this->rightSplitter);
-	this->mainSplitter->setStretchFactor(0, 1); // Sidebar
-	this->mainSplitter->setStretchFactor(1, 2); // Viewers + bottom panel
+	this->mainSplitter->setStretchFactor(0, 0); // Sidebar: don't grow on resize
+	this->mainSplitter->setStretchFactor(1, 1); // Viewers + bottom panel: take all extra space
 
 	mainLayout->addWidget(this->mainSplitter);
 	this->setLayout(mainLayout);

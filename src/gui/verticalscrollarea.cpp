@@ -9,7 +9,7 @@ VerticalScrollArea::VerticalScrollArea(QWidget* parent)
 	this->setWidgetResizable(true);
 	this->setFrameShape(QFrame::NoFrame);
 	this->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	this->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+	this->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 	this->viewport()->installEventFilter(this);
 }
 
