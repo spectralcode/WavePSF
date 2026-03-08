@@ -8,7 +8,7 @@
 #include "wavefrontparameter.h"
 
 // Descriptor for a single numeric generator configuration setting.
-// Used by PSFSettingsDialog to auto-build UI for generator-specific settings.
+// Used by SettingsDialog to auto-build UI for generator-specific settings.
 // Mirrors the OptimizerParameter pattern used in IOptimizer.
 struct WavefrontGeneratorSetting {
 	QString key;          // serialization key (must match serializeSettings/deserializeSettings)
@@ -32,7 +32,7 @@ public:
 	virtual void deserializeSettings(const QVariantMap& settings) = 0;
 
 	// Returns descriptors for simple numeric generator settings.
-	// PSFSettingsDialog auto-builds UI from these — no dialog changes needed for new generators.
+	// SettingsDialog auto-builds UI from these — no dialog changes needed for new generators.
 	// Default: empty list (used by generators with fully custom UI, e.g. ZernikeGenerator).
 	virtual QVector<WavefrontGeneratorSetting> getSettingsDescriptors() const { return {}; }
 

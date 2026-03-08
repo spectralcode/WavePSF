@@ -15,7 +15,7 @@ PSFModule::PSFModule(AFDeviceManager* afDeviceManager, QObject* parent)
 	connect(afDeviceManager, &AFDeviceManager::aboutToChangeDevice,
 			this, &PSFModule::clearCachedArrays);
 	// Pre-populate allGeneratorSettings with defaults from every known generator type.
-	// This ensures PSFSettingsDialog always finds a non-empty map for any type,
+	// This ensures SettingsDialog always finds a non-empty map for any type,
 	// even before it has been used or saved to INI.
 	for (const QString& typeName : WavefrontGeneratorFactory::availableTypeNames()) {
 		IWavefrontGenerator* gen = WavefrontGeneratorFactory::create(typeName, nullptr);

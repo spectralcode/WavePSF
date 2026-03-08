@@ -12,7 +12,7 @@ class ZernikeGenerator : public QObject, public IWavefrontGenerator
 {
 	Q_OBJECT
 public:
-	// Serialization keys — exposed publicly because PSFSettingsDialog builds custom Zernike UI
+	// Serialization keys — exposed publicly because SettingsDialog builds custom Zernike UI
 	// and must produce QVariantMaps that match serializeSettings()/deserializeSettings().
 	static constexpr const char* KEY_NOLL_INDEX_SPEC = "noll_index_spec";
 	static constexpr const char* KEY_GLOBAL_MIN      = "global_min";

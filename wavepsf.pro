@@ -59,7 +59,7 @@ SOURCES += \
 	$$SOURCEDIR/gui/psfcontrol/psfgenerationwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/processingcontrolwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/deconvolutionsettingswidget.cpp \
-	$$SOURCEDIR/gui/psfcontrol/psfsettingsdialog.cpp \
+	$$SOURCEDIR/gui/psfcontrol/settingsdialog.cpp \
 	$$SOURCEDIR/core/psf/psfsettings.cpp \
 	$$SOURCEDIR/data/wavefrontparametertable.cpp \
 	$$SOURCEDIR/core/optimization/imagemetriccalculator.cpp \
@@ -117,7 +117,7 @@ HEADERS += \
 	$$SOURCEDIR/gui/psfcontrol/psfgenerationwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/processingcontrolwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/deconvolutionsettingswidget.h \
-	$$SOURCEDIR/gui/psfcontrol/psfsettingsdialog.h \
+	$$SOURCEDIR/gui/psfcontrol/settingsdialog.h \
 	$$SOURCEDIR/core/psf/psfsettings.h \
 	$$SOURCEDIR/data/wavefrontparametertable.h \
 	$$SOURCEDIR/core/optimization/ioptimizer.h \

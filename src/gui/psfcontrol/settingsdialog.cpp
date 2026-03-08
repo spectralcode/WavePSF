@@ -1,4 +1,4 @@
-#include "psfsettingsdialog.h"
+#include "settingsdialog.h"
 #include "core/psf/zernikegenerator.h"
 #include "core/psf/wavefrontgeneratorfactory.h"
 #include <QVBoxLayout>
@@ -18,7 +18,7 @@
 #include <QLabel>
 
 
-PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
+SettingsDialog::SettingsDialog(const PSFSettings& settings,
 								   bool autoRange, double displayMin, double displayMax,
 								   const QVector<AFBackendInfo>& backends,
 								   int activeBackend, int activeDevice,
@@ -61,7 +61,7 @@ PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
 	});
 }
 
-PSFSettings PSFSettingsDialog::getSettings() const
+PSFSettings SettingsDialog::getSettings() const
 {
 	PSFSettings s;
 	s.generatorTypeName = this->currentGeneratorTypeName;
@@ -122,7 +122,7 @@ PSFSettings PSFSettingsDialog::getSettings() const
 	return s;
 }
 
-void PSFSettingsDialog::onNollIndicesChanged()
+void SettingsDialog::onNollIndicesChanged()
 {
 	this->updateValidationState();
 
@@ -132,38 +132,38 @@ void PSFSettingsDialog::onNollIndicesChanged()
 	}
 }
 
-bool PSFSettingsDialog::getAutoRange() const
+bool SettingsDialog::getAutoRange() const
 {
 	return this->displayAutoRangeCheck->isChecked();
 }
 
-double PSFSettingsDialog::getDisplayMin() const
+double SettingsDialog::getDisplayMin() const
 {
 	return this->displayMinSpin->value();
 }
 
-double PSFSettingsDialog::getDisplayMax() const
+double SettingsDialog::getDisplayMax() const
 {
 	return this->displayMaxSpin->value();
 }
 
-int PSFSettingsDialog::getSelectedBackend() const
+int SettingsDialog::getSelectedBackend() const
 {
 	return this->backendCombo->currentData().toInt();
 }
 
-int PSFSettingsDialog::getSelectedDeviceId() const
+int SettingsDialog::getSelectedDeviceId() const
 {
 	return this->deviceCombo->currentData().toInt();
 }
 
-void PSFSettingsDialog::updateGeneratorType(const QString& typeName)
+void SettingsDialog::updateGeneratorType(const QString& typeName)
 {
 	this->currentGeneratorTypeName = typeName;
 	this->updateValidationState();
 }
 
-void PSFSettingsDialog::onApplyClicked()
+void SettingsDialog::onApplyClicked()
 {
 	if (this->validateSettings()) {
 		emit settingsApplied(this->getSettings());
@@ -173,7 +173,7 @@ void PSFSettingsDialog::onApplyClicked()
 	}
 }
 
-void PSFSettingsDialog::setupUI()
+void SettingsDialog::setupUI()
 {
 	QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
@@ -192,7 +192,7 @@ void PSFSettingsDialog::setupUI()
 	this->nollIndicesEdit = new QLineEdit(this->zernikeGroupBox);
 	this->nollIndicesEdit->setPlaceholderText(tr("e.g. 2-21 or 1-5, 7, 11"));
 	this->nollIndicesEdit->setToolTip(tr("Comma-separated Noll indices and ranges.\nExamples: \"2-21\", \"1-5, 7, 11\", \"4, 11, 15-21\""));
-	connect(this->nollIndicesEdit, &QLineEdit::textChanged, this, &PSFSettingsDialog::onNollIndicesChanged);
+	connect(this->nollIndicesEdit, &QLineEdit::textChanged, this, &SettingsDialog::onNollIndicesChanged);
 	nollRow->addWidget(this->nollIndicesEdit);
 	zernikeLayout->addLayout(nollRow);
 
@@ -399,14 +399,14 @@ void PSFSettingsDialog::setupUI()
 
 	connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
 	connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
-	connect(this->applyButton, &QPushButton::clicked, this, &PSFSettingsDialog::onApplyClicked);
+	connect(this->applyButton, &QPushButton::clicked, this, &SettingsDialog::onApplyClicked);
 
 	mainLayout->addWidget(buttonBox);
 
 	this->resize(500, 600);
 }
 
-void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
+void SettingsDialog::populateFromSettings(const PSFSettings& settings)
 {
 	// Use allGeneratorSettings from PSFSettings; fall back to active generatorSettings for backward compat
 	QMap<QString, QVariantMap> allGenSettings = settings.allGeneratorSettings;
@@ -475,7 +475,7 @@ void PSFSettingsDialog::populateFromSettings(const PSFSettings& settings)
 	}
 }
 
-void PSFSettingsDialog::rebuildOverrideTable(const QVector<int>& indices)
+void SettingsDialog::rebuildOverrideTable(const QVector<int>& indices)
 {
 	// Save existing overrides before rebuild
 	QMap<int, QPair<double,double>> existingOverrides;
@@ -546,7 +546,7 @@ void PSFSettingsDialog::rebuildOverrideTable(const QVector<int>& indices)
 	}
 }
 
-void PSFSettingsDialog::buildGeneratorSettingsGroup(const QString& typeName,
+void SettingsDialog::buildGeneratorSettingsGroup(const QString& typeName,
                                                      const QVector<WavefrontGeneratorSetting>& descriptors,
                                                      QWidget* parent)
 {
@@ -583,7 +583,7 @@ void PSFSettingsDialog::buildGeneratorSettingsGroup(const QString& typeName,
 	this->generatorSettingWidgets[typeName] = widgets;
 }
 
-QVariantMap PSFSettingsDialog::readGeneratorSettingsWidgets(const QString& typeName) const
+QVariantMap SettingsDialog::readGeneratorSettingsWidgets(const QString& typeName) const
 {
 	QVariantMap map;
 	const QMap<QString, QWidget*>& widgets = this->generatorSettingWidgets.value(typeName);
@@ -596,7 +596,7 @@ QVariantMap PSFSettingsDialog::readGeneratorSettingsWidgets(const QString& typeN
 	return map;
 }
 
-void PSFSettingsDialog::populateGeneratorSettingsWidgets(const QString& typeName, const QVariantMap& gs)
+void SettingsDialog::populateGeneratorSettingsWidgets(const QString& typeName, const QVariantMap& gs)
 {
 	const QMap<QString, QWidget*>& widgets = this->generatorSettingWidgets.value(typeName);
 	for (auto it = widgets.constBegin(); it != widgets.constEnd(); ++it) {
@@ -608,7 +608,7 @@ void PSFSettingsDialog::populateGeneratorSettingsWidgets(const QString& typeName
 	}
 }
 
-bool PSFSettingsDialog::validateSettings() const
+bool SettingsDialog::validateSettings() const
 {
 	if (this->currentGeneratorTypeName == QLatin1String("Zernike")) {
 		QVector<int> indices = ZernikeGenerator::parseNollIndexSpec(this->nollIndicesEdit->text());
@@ -617,7 +617,7 @@ bool PSFSettingsDialog::validateSettings() const
 	return true; // descriptor-based generators always valid (spin boxes enforce ranges)
 }
 
-void PSFSettingsDialog::updateValidationState()
+void SettingsDialog::updateValidationState()
 {
 	bool valid = this->validateSettings();
 

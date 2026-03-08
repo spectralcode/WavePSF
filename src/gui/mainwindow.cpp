@@ -5,7 +5,7 @@
 #include "gui/imagesessionviewer/imagesessionviewer.h"
 #include "gui/psfcontrol/psfgenerationwidget.h"
 #include "gui/psfcontrol/processingcontrolwidget.h"
-#include "gui/psfcontrol/psfsettingsdialog.h"
+#include "gui/psfcontrol/settingsdialog.h"
 #include "utils/afdevicemanager.h"
 #include "utils/logging.h"
 #include "utils/supportedfilechecker.h"
@@ -374,7 +374,7 @@ void MainWindow::openSettings() {
 		return;
 	}
 
-	this->settingsDialog = new PSFSettingsDialog(
+	this->settingsDialog = new SettingsDialog(
 		this->currentPSFSettings,
 		this->sessionViewer->getAutoRangeEnabled(),
 		this->sessionViewer->getDisplayRangeMin(),
@@ -385,11 +385,11 @@ void MainWindow::openSettings() {
 		this);
 	this->settingsDialog->setAttribute(Qt::WA_DeleteOnClose);
 
-	connect(this->settingsDialog, &PSFSettingsDialog::settingsApplied,
+	connect(this->settingsDialog, &SettingsDialog::settingsApplied,
 			this->applicationController, &ApplicationController::applyPSFSettings);
-	connect(this->settingsDialog, &PSFSettingsDialog::displaySettingsApplied,
+	connect(this->settingsDialog, &SettingsDialog::displaySettingsApplied,
 			this->sessionViewer, &ImageSessionViewer::setDisplaySettings);
-	connect(this->settingsDialog, &PSFSettingsDialog::deviceSettingsApplied,
+	connect(this->settingsDialog, &SettingsDialog::deviceSettingsApplied,
 			this->afDeviceManager, &AFDeviceManager::setDevice);
 	connect(this->settingsDialog, &QDialog::accepted, this, [this]() {
 		this->applicationController->applyPSFSettings(this->settingsDialog->getSettings());
@@ -409,7 +409,7 @@ void MainWindow::openSettings() {
 
 	// Keep dialog in sync when generator type changes externally
 	connect(this->applicationController, &ApplicationController::generatorTypeChanged,
-		this->settingsDialog, &PSFSettingsDialog::updateGeneratorType);
+		this->settingsDialog, &SettingsDialog::updateGeneratorType);
 
 	this->settingsDialog->show();
 }

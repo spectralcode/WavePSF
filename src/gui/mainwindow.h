@@ -24,7 +24,7 @@ class AFDeviceManager;
 class ImageSessionViewer;
 class PSFGenerationWidget;
 class ProcessingControlWidget;
-class PSFSettingsDialog;
+class SettingsDialog;
 class AboutDialog;
 class ShortcutsDialog;
 class RecentFilesMenu;
@@ -154,7 +154,7 @@ private:
 	ImageSessionViewer* sessionViewer;
 	PSFGenerationWidget* psfGenerationWidget;
 	ProcessingControlWidget* processingControlWidget;
-	PSFSettingsDialog* settingsDialog;
+	SettingsDialog* settingsDialog;
 	ShortcutsDialog* shortcutsDialog;
 	AboutDialog* aboutDialog;
 

@@ -1,5 +1,5 @@
-#ifndef PSFSETTINGSDIALOG_H
-#define PSFSETTINGSDIALOG_H
+#ifndef SETTINGSDIALOG_H
+#define SETTINGSDIALOG_H
 
 #include <QDialog>
 #include <QMap>
@@ -19,11 +19,11 @@ class QGroupBox;
 class QWidget;
 class QLabel;
 
-class PSFSettingsDialog : public QDialog
+class SettingsDialog : public QDialog
 {
 	Q_OBJECT
 public:
-	explicit PSFSettingsDialog(const PSFSettings& settings,
+	explicit SettingsDialog(const PSFSettings& settings,
 							   bool autoRange, double displayMin, double displayMax,
 							   const QVector<AFBackendInfo>& backends,
 							   int activeBackend, int activeDevice,
@@ -108,4 +108,4 @@ private:
 	int initialActiveDevice;
 };
 
-#endif // PSFSETTINGSDIALOG_H
+#endif // SETTINGSDIALOG_H
