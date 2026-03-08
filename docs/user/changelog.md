@@ -11,6 +11,7 @@
 - ArrayFire device selection: Choose the compute backend (CPU, CUDA, OpenCL) and device directly from the settings dialog
 - Interpolation plot controls: Zoom, pan, and reset the view in the interpolation plot. This now matches the optimization plot controls.
 - The last selected tab (Deconvolution, Optimization, etc.) is now restored on restart
+- Range fit in wavefront plot: double-click on color bar or right-click "Fit Range to Data" to adjust the color scale to the current value range
 
 ### Changed
 
