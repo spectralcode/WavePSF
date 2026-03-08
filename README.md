@@ -27,7 +27,7 @@ The estimated PSFs can also be used for optical characterization of your system.
 ## How to Use
 - You can download pre-built Windows binaries from the [releases page](https://github.com/spectralcode/WavePSF/releases)
 - Basic tutorial: [docs/user/tutorial.md](docs/user/tutorial.md)
-- Example datasets: [data.uni-hannover.de]( https://doi.org/10.25835/yu47lho4) -> download `data_tobacco_leaf.zip` for a purposely defocused dataset with ground truth, which produces particularly impressive deconvolution results
+- Example datasets: [data.uni-hannover.de](https://doi.org/10.25835/yu47lho4) -> download `data_tobacco_leaf.zip` for a purposely defocused dataset with ground truth, which produces particularly impressive deconvolution results
 
 ## Build
 
