@@ -7,8 +7,10 @@ namespace {
 	const QString SETTINGS_GROUP         = QStringLiteral("viewer_toolbar");
 	const QString KEY_SYNC_VIEWS         = QStringLiteral("sync_views");
 	const QString KEY_SHOW_PATCH_GRID    = QStringLiteral("show_patch_grid");
+	const QString KEY_SHOW_AXIS          = QStringLiteral("show_axis");
 	const bool    DEF_SYNC_VIEWS         = false;
 	const bool    DEF_SHOW_PATCH_GRID    = true;
+	const bool    DEF_SHOW_AXIS          = false;
 }
 
 ViewerToolBar::ViewerToolBar(StyleManager* styleManager, QWidget* parent)
@@ -29,11 +31,16 @@ ViewerToolBar::ViewerToolBar(StyleManager* styleManager, QWidget* parent)
 	this->actionShowPatchGrid->setCheckable(true);
 	this->actionShowPatchGrid->setChecked(DEF_SHOW_PATCH_GRID);
 
+	this->actionShowAxis = new QAction(tr("Show Axis Indicator"), this);
+	this->actionShowAxis->setCheckable(true);
+	this->actionShowAxis->setChecked(DEF_SHOW_AXIS);
+
 	this->addAction(this->actionRotate90);
 	this->addAction(this->actionFlipV);
 	this->addAction(this->actionFlipH);
 	this->addSeparator();
 	this->addAction(this->actionShowPatchGrid);
+	this->addAction(this->actionShowAxis);
 	this->addAction(this->actionSyncViews);
 
 	connect(this->actionRotate90,      &QAction::triggered, this, &ViewerToolBar::rotateRequested);
@@ -41,6 +48,7 @@ ViewerToolBar::ViewerToolBar(StyleManager* styleManager, QWidget* parent)
 	connect(this->actionFlipV,         &QAction::triggered, this, &ViewerToolBar::flipVRequested);
 	connect(this->actionSyncViews,     &QAction::toggled,   this, &ViewerToolBar::syncViewsToggled);
 	connect(this->actionShowPatchGrid, &QAction::toggled,   this, &ViewerToolBar::showPatchGridToggled);
+	connect(this->actionShowAxis,      &QAction::toggled,   this, &ViewerToolBar::showAxisToggled);
 
 	connect(styleManager, &StyleManager::styleChanged,
 	        this, [this](StyleManager::StyleMode) { this->updateIcons(); });
@@ -57,6 +65,7 @@ QVariantMap ViewerToolBar::getSettings() const
 	QVariantMap m;
 	m.insert(KEY_SYNC_VIEWS,      this->actionSyncViews->isChecked());
 	m.insert(KEY_SHOW_PATCH_GRID, this->actionShowPatchGrid->isChecked());
+	m.insert(KEY_SHOW_AXIS,       this->actionShowAxis->isChecked());
 	return m;
 }
 
@@ -64,10 +73,12 @@ void ViewerToolBar::setSettings(const QVariantMap& settings)
 {
 	const bool syncViews   = settings.value(KEY_SYNC_VIEWS,      DEF_SYNC_VIEWS).toBool();
 	const bool showGrid    = settings.value(KEY_SHOW_PATCH_GRID, DEF_SHOW_PATCH_GRID).toBool();
+	const bool showAxis    = settings.value(KEY_SHOW_AXIS,       DEF_SHOW_AXIS).toBool();
 
 	// setChecked emits toggled → connected slots on ImageSessionViewer fire
 	this->actionSyncViews->setChecked(syncViews);
 	this->actionShowPatchGrid->setChecked(showGrid);
+	this->actionShowAxis->setChecked(showAxis);
 }
 
 void ViewerToolBar::updateIcons()
@@ -78,6 +89,7 @@ void ViewerToolBar::updateIcons()
 	this->actionFlipV->setIcon(         svgIconColored(QStringLiteral(":/icons/toolbar/flip-v.svg"),    c));
 	this->actionSyncViews->setIcon(     svgIconColored(QStringLiteral(":/icons/toolbar/link.svg"),      c));
 	this->actionShowPatchGrid->setIcon( svgIconColored(QStringLiteral(":/icons/toolbar/grid.svg"),      c));
+	this->actionShowAxis->setIcon(      svgIconColored(QStringLiteral(":/icons/toolbar/axis.svg"),      c));
 }
 
 QIcon ViewerToolBar::svgIconColored(const QString& path, const QColor& color, int size)

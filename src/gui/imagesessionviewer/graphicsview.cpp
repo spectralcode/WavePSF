@@ -9,6 +9,7 @@
 #include <QMimeData>
 #include <QApplication>
 #include <QScrollBar>
+#include <QPainter>
 #include "utils/supportedfilechecker.h"
 
 GraphicsView::GraphicsView(QWidget* parent) : QGraphicsView(parent)
@@ -42,6 +43,7 @@ GraphicsView::GraphicsView(QWidget* parent) : QGraphicsView(parent)
 	this->isHighlightedForDrop = false;
 	this->syncInProgress = false;
 	this->syncActive = false;
+	this->axisOverlayVisible = false;
 	this->setAcceptDrops(false);
 }
 
@@ -97,6 +99,7 @@ void GraphicsView::applyViewTransform(QTransform t, QPointF center) {
 
 void GraphicsView::scrollContentsBy(int dx, int dy) {
 	QGraphicsView::scrollContentsBy(dx, dy);
+	if (this->axisOverlayVisible) this->viewport()->update();
 	emitViewTransform();
 }
 
@@ -458,4 +461,83 @@ void GraphicsView::highlightSingleRect(int rectId) {
 
 void GraphicsView::highlightMultipleRects(const QVector<int>& rectIds) {
 	this->grid->highlightMultipleRects(rectIds);
+}
+
+void GraphicsView::setAxisOverlayVisible(bool visible) {
+	this->axisOverlayVisible = visible;
+	this->viewport()->update();
+}
+
+void GraphicsView::paintEvent(QPaintEvent* event) {
+	QGraphicsView::paintEvent(event);
+
+	if (!this->axisOverlayVisible) return;
+
+	// Extract axis directions from the view transform (rotation + flip, ignoring scale)
+	QTransform t = this->transform();
+	QPointF xDir(t.m11(), t.m12());
+	QPointF yDir(t.m21(), t.m22());
+	qreal xLen = qSqrt(xDir.x() * xDir.x() + xDir.y() * xDir.y());
+	qreal yLen = qSqrt(yDir.x() * yDir.x() + yDir.y() * yDir.y());
+	if (xLen > 0) xDir /= xLen;
+	if (yLen > 0) yDir /= yLen;
+
+	const int axisLength = 30;
+	const int margin = 20;
+	const int arrowSize = 6;
+
+	// Origin in bottom-left corner of viewport
+	QPointF origin(margin + axisLength, this->viewport()->height() - margin - axisLength);
+	QPointF xEnd = origin + xDir * axisLength;
+	QPointF yEnd = origin + yDir * axisLength;
+
+	QPainter painter(this->viewport());
+	painter.setRenderHint(QPainter::Antialiasing);
+
+	// Semi-transparent background circle for readability
+	painter.setPen(Qt::NoPen);
+	painter.setBrush(QColor(0, 0, 0, 100));
+	painter.drawEllipse(origin, axisLength + margin, axisLength + margin);
+
+	const QColor xColor(180, 100, 100);
+	const QColor yColor(100, 160, 100);
+
+	// X axis
+	QPen xPen(xColor, 2);
+	painter.setPen(xPen);
+	painter.drawLine(origin, xEnd);
+	// Arrowhead
+	QPointF xPerp(-xDir.y(), xDir.x());
+	QPolygonF xArrow;
+	xArrow << xEnd << (xEnd - xDir * arrowSize + xPerp * arrowSize * 0.5)
+		   << (xEnd - xDir * arrowSize - xPerp * arrowSize * 0.5);
+	painter.setBrush(xColor);
+	painter.drawPolygon(xArrow);
+
+	// Y axis
+	QPen yPen(yColor, 2);
+	painter.setPen(yPen);
+	painter.drawLine(origin, yEnd);
+	// Arrowhead
+	QPointF yPerp(-yDir.y(), yDir.x());
+	QPolygonF yArrow;
+	yArrow << yEnd << (yEnd - yDir * arrowSize + yPerp * arrowSize * 0.5)
+		   << (yEnd - yDir * arrowSize - yPerp * arrowSize * 0.5);
+	painter.setBrush(yColor);
+	painter.drawPolygon(yArrow);
+
+	// Labels (always upright)
+	QFont font = painter.font();
+	font.setBold(true);
+	font.setPointSize(9);
+	painter.setFont(font);
+	QPointF xLabel = xEnd + xDir * 8;
+	QPointF yLabel = yEnd + yDir * 8;
+
+	painter.setPen(xColor);
+	painter.drawText(QRectF(xLabel.x() - 8, xLabel.y() - 8, 16, 16),
+					 Qt::AlignCenter, QStringLiteral("X"));
+	painter.setPen(yColor);
+	painter.drawText(QRectF(yLabel.x() - 8, yLabel.y() - 8, 16, 16),
+					 Qt::AlignCenter, QStringLiteral("Y"));
 }

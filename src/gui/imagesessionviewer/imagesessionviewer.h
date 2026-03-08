@@ -49,6 +49,7 @@ public slots:
 	void flipViewersH();
 	void flipViewersV();
 	void setPatchGridVisible(bool visible);
+	void setAxisOverlayVisible(bool visible);
 
 private slots:
 	// Internal UI interactions

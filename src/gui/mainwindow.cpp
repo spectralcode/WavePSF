@@ -439,6 +439,7 @@ void MainWindow::setupViewerToolBar()
 	connect(this->viewerToolBar, &ViewerToolBar::flipVRequested,       this->sessionViewer, &ImageSessionViewer::flipViewersV);
 	connect(this->viewerToolBar, &ViewerToolBar::syncViewsToggled,     this->sessionViewer, &ImageSessionViewer::setViewSyncEnabled);
 	connect(this->viewerToolBar, &ViewerToolBar::showPatchGridToggled, this->sessionViewer, &ImageSessionViewer::setPatchGridVisible);
+	connect(this->viewerToolBar, &ViewerToolBar::showAxisToggled,     this->sessionViewer, &ImageSessionViewer::setAxisOverlayVisible);
 
 	this->viewMenu->insertAction(this->toggleMessageConsoleAction, this->viewerToolBar->toggleViewAction());
 }

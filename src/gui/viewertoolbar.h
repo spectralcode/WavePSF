@@ -23,6 +23,7 @@ signals:
 	void flipVRequested();
 	void syncViewsToggled(bool enabled);
 	void showPatchGridToggled(bool visible);
+	void showAxisToggled(bool visible);
 
 private:
 	QAction* actionRotate90;
@@ -30,6 +31,7 @@ private:
 	QAction* actionFlipV;
 	QAction* actionSyncViews;
 	QAction* actionShowPatchGrid;
+	QAction* actionShowAxis;
 
 	void updateIcons();
 	static QIcon svgIconColored(const QString& path, const QColor& color, int size = 24);

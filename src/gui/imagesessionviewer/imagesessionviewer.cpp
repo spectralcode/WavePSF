@@ -316,6 +316,12 @@ void ImageSessionViewer::setPatchGridVisible(bool visible)
 		this->otherViewer()->setPatchGridVisible(visible);
 }
 
+void ImageSessionViewer::setAxisOverlayVisible(bool visible)
+{
+	this->inputViewer->setAxisOverlayVisible(visible);
+	this->outputViewer->setAxisOverlayVisible(visible);
+}
+
 bool ImageSessionViewer::getAutoRangeEnabled() const
 {
 	return this->autoRangeEnabled;

@@ -11,6 +11,7 @@
         <file alias="toolbar/flip-v.svg">icon/toolbar/flip-v.svg</file>
         <file alias="toolbar/link.svg">icon/toolbar/link.svg</file>
         <file alias="toolbar/grid.svg">icon/toolbar/grid.svg</file>
+        <file alias="toolbar/axis.svg">icon/toolbar/axis.svg</file>
     </qresource>
     <qresource prefix="/">
         <file alias="LICENSE">LICENSE</file>

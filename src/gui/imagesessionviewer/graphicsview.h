@@ -30,6 +30,7 @@ private:
 	bool isHighlightedForDrop;
 	bool syncInProgress;
 	bool syncActive;
+	bool axisOverlayVisible;
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
 	void mousePressEvent(QMouseEvent* event) override;
 	void mouseMoveEvent(QMouseEvent* event) override;
@@ -43,6 +44,7 @@ private:
 	void setDropHighlight(bool highlight);
 
 protected:
+	void paintEvent(QPaintEvent* event) override;
 	void scrollContentsBy(int dx, int dy) override;
 	void dragEnterEvent(QDragEnterEvent* event) override;
 	void dragMoveEvent(QDragMoveEvent* event) override;
@@ -65,6 +67,7 @@ public slots:
 	void highlightMultipleRects(const QVector<int>& rectIds);
 	void applyViewTransform(QTransform transform, QPointF centerInScene);
 	void setSyncActive(bool active);
+	void setAxisOverlayVisible(bool visible);
 
 signals:
 	void info(QString);

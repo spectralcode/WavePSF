@@ -159,6 +159,11 @@ void ImageDataViewer::setPatchGridVisible(bool visible)
 	this->frameView->setRectsVisible(visible);
 }
 
+void ImageDataViewer::setAxisOverlayVisible(bool visible)
+{
+	this->frameView->setAxisOverlayVisible(visible);
+}
+
 void ImageDataViewer::highlightPatch(int patchId)
 {
 	this->frameView->highlightSingleRect(patchId);
