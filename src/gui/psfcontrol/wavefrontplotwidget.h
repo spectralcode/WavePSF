@@ -42,6 +42,7 @@ private:
 	void applyWavefrontGradient();
 	void applySeismicGradient();
 	void applyDataRange();
+	void fitRangeToData();
 
 	QCustomPlot* plot;
 	QCPColorMap* colorMap;

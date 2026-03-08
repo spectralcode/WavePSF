@@ -60,9 +60,15 @@ WavefrontPlotWidget::WavefrontPlotWidget(QWidget* parent)
 	// Enable drag and zoom interactions
 	this->plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
 
-	// Double-click to reset view
-	connect(this->plot, &QCustomPlot::mouseDoubleClick,
-			this, &WavefrontPlotWidget::resetView);
+	// Double-click: on color scale → fit range to data, elsewhere → reset view
+	connect(this->plot, &QCustomPlot::mouseDoubleClick, this, [this](QMouseEvent* event) {
+		if (this->colorScale->visible() &&
+			this->colorScale->axis()->axisRect()->rect().contains(event->pos())) {
+			this->fitRangeToData();
+		} else {
+			this->resetView();
+		}
+	});
 
 	// Maintain 1:1 aspect ratio on every replot (zoom, pan, resize)
 	connect(this->plot, &QCustomPlot::beforeReplot,
@@ -337,6 +343,10 @@ void WavefrontPlotWidget::setupContextMenu()
 	});
 	this->contextMenu->addAction(this->symmetricZeroAction);
 
+	QAction* fitRangeAction = new QAction(tr("Fit Range to Data"), this);
+	connect(fitRangeAction, &QAction::triggered, this, &WavefrontPlotWidget::fitRangeToData);
+	this->contextMenu->addAction(fitRangeAction);
+
 	this->contextMenu->addSeparator();
 
 	this->showGridAction = new QAction(tr("Show Grid"), this);
@@ -424,4 +434,17 @@ void WavefrontPlotWidget::applyDataRange()
 			this->colorMap->setDataRange(QCPRange(-maxAbs, maxAbs));
 		}
 	}
+}
+
+void WavefrontPlotWidget::fitRangeToData()
+{
+	this->colorMap->rescaleDataRange(true);
+	if (this->symmetricZeroAction->isChecked()) {
+		QCPRange dataRange = this->colorMap->dataRange();
+		double maxAbs = qMax(qAbs(dataRange.lower), qAbs(dataRange.upper));
+		if (maxAbs > 0.0) {
+			this->colorMap->setDataRange(QCPRange(-maxAbs, maxAbs));
+		}
+	}
+	this->plot->replot();
 }
