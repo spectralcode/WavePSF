@@ -46,6 +46,7 @@ ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, Q
 ApplicationController::~ApplicationController()
 {
 	if (this->optimizationThread) {
+		this->optimizationWorker->requestCancel();
 		this->optimizationThread->quit();
 		this->optimizationThread->wait();
 		this->optimizationThread = nullptr;
