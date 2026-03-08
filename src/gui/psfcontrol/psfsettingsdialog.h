@@ -3,8 +3,10 @@
 
 #include <QDialog>
 #include <QMap>
+#include <QVector>
 #include "core/psf/psfsettings.h"
 #include "core/psf/iwavefrontgenerator.h"
+#include "utils/afdevicemanager.h"
 
 class QLineEdit;
 class QDoubleSpinBox;
@@ -15,6 +17,7 @@ class QCheckBox;
 class QPushButton;
 class QGroupBox;
 class QWidget;
+class QLabel;
 
 class PSFSettingsDialog : public QDialog
 {
@@ -22,16 +25,21 @@ class PSFSettingsDialog : public QDialog
 public:
 	explicit PSFSettingsDialog(const PSFSettings& settings,
 							   bool autoRange, double displayMin, double displayMax,
+							   const QVector<AFBackendInfo>& backends,
+							   int activeBackend, int activeDevice,
 							   QWidget* parent = nullptr);
 
 	PSFSettings getSettings() const;
 	bool getAutoRange() const;
 	double getDisplayMin() const;
 	double getDisplayMax() const;
+	int getSelectedBackend() const;
+	int getSelectedDeviceId() const;
 
 signals:
 	void settingsApplied(PSFSettings settings);
 	void displaySettingsApplied(bool autoRange, double min, double max);
+	void deviceSettingsApplied(int backendId, int deviceId);
 
 public slots:
 	void updateGeneratorType(const QString& typeName);
@@ -83,6 +91,12 @@ private:
 	QDoubleSpinBox* displayMinSpin;
 	QDoubleSpinBox* displayMaxSpin;
 
+	// Misc controls
+	QComboBox* backendCombo;
+	QComboBox* deviceCombo;
+	QLabel* deviceInfoLabel;
+	QVector<AFBackendInfo> cachedBackends;
+
 	// Buttons
 	QPushButton* okButton;
 	QPushButton* applyButton;
@@ -90,6 +104,8 @@ private:
 	// State
 	PSFSettings initialSettings;
 	QString currentGeneratorTypeName;
+	int initialActiveBackend;
+	int initialActiveDevice;
 };
 
 #endif // PSFSETTINGSDIALOG_H

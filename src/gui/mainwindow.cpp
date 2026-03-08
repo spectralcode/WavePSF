@@ -6,6 +6,7 @@
 #include "gui/psfcontrol/psfgenerationwidget.h"
 #include "gui/psfcontrol/processingcontrolwidget.h"
 #include "gui/psfcontrol/psfsettingsdialog.h"
+#include "utils/afdevicemanager.h"
 #include "utils/logging.h"
 #include "utils/supportedfilechecker.h"
 #include "gui/messageconsole/messagerouter.h"
@@ -48,9 +49,11 @@ namespace {
 }
 
 MainWindow::MainWindow(SettingsFileManager* guiSettings,
-					   StyleManager* styleManager, ApplicationController* applicationController, QWidget *parent)
+					   StyleManager* styleManager, AFDeviceManager* afDeviceManager,
+					   ApplicationController* applicationController, QWidget *parent)
 	: QMainWindow(parent), ui(new Ui::MainWindow),
-	  guiSettings(guiSettings), styleManager(styleManager), applicationController(applicationController),
+	  guiSettings(guiSettings), styleManager(styleManager), afDeviceManager(afDeviceManager),
+	  applicationController(applicationController),
 	  fileMenu(nullptr), recentInput(nullptr), recentGroundTruth(nullptr),
 	  psfMenu(nullptr), processingMenu(nullptr),
 	  viewMenu(nullptr), extrasMenu(nullptr), styleMenu(nullptr),
@@ -376,6 +379,9 @@ void MainWindow::openSettings() {
 		this->sessionViewer->getAutoRangeEnabled(),
 		this->sessionViewer->getDisplayRangeMin(),
 		this->sessionViewer->getDisplayRangeMax(),
+		this->afDeviceManager->getAvailableBackends(),
+		this->afDeviceManager->getActiveBackendId(),
+		this->afDeviceManager->getActiveDeviceId(),
 		this);
 	this->settingsDialog->setAttribute(Qt::WA_DeleteOnClose);
 
@@ -383,12 +389,19 @@ void MainWindow::openSettings() {
 			this->applicationController, &ApplicationController::applyPSFSettings);
 	connect(this->settingsDialog, &PSFSettingsDialog::displaySettingsApplied,
 			this->sessionViewer, &ImageSessionViewer::setDisplaySettings);
+	connect(this->settingsDialog, &PSFSettingsDialog::deviceSettingsApplied,
+			this->afDeviceManager, &AFDeviceManager::setDevice);
 	connect(this->settingsDialog, &QDialog::accepted, this, [this]() {
 		this->applicationController->applyPSFSettings(this->settingsDialog->getSettings());
 		this->sessionViewer->setDisplaySettings(
 			this->settingsDialog->getAutoRange(),
 			this->settingsDialog->getDisplayMin(),
 			this->settingsDialog->getDisplayMax());
+
+		// Apply device selection
+		this->afDeviceManager->setDevice(
+			this->settingsDialog->getSelectedBackend(),
+			this->settingsDialog->getSelectedDeviceId());
 	});
 	connect(this->settingsDialog, &QDialog::destroyed, this, [this]() {
 		this->settingsDialog = nullptr;

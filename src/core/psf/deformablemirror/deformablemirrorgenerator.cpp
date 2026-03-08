@@ -296,3 +296,9 @@ void DeformableMirrorGenerator::buildInfluenceCache(int gridSize)
 		this->cachedInfluenceFunctions.append(influence);
 	}
 }
+
+void DeformableMirrorGenerator::invalidateCache()
+{
+	this->cachedGridSize = 0;
+	this->cachedInfluenceFunctions.clear();
+}

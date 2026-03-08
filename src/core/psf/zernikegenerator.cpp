@@ -397,3 +397,9 @@ QString ZernikeGenerator::formatNollIndexSpec(const QVector<int>& indices)
 
 	return parts.join(", ");
 }
+
+void ZernikeGenerator::invalidateCache()
+{
+	this->cachedGridSize = 0;
+	this->cachedBasisArrays.clear();
+}

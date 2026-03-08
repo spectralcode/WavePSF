@@ -20,10 +20,15 @@
 
 PSFSettingsDialog::PSFSettingsDialog(const PSFSettings& settings,
 								   bool autoRange, double displayMin, double displayMax,
+								   const QVector<AFBackendInfo>& backends,
+								   int activeBackend, int activeDevice,
 								   QWidget* parent)
 	: QDialog(parent)
 	, initialSettings(settings)
 	, currentGeneratorTypeName(settings.generatorTypeName)
+	, initialActiveBackend(activeBackend)
+	, initialActiveDevice(activeDevice)
+	, cachedBackends(backends)
 {
 	this->setWindowTitle(tr("Settings"));
 	this->setupUI();
@@ -142,6 +147,16 @@ double PSFSettingsDialog::getDisplayMax() const
 	return this->displayMaxSpin->value();
 }
 
+int PSFSettingsDialog::getSelectedBackend() const
+{
+	return this->backendCombo->currentData().toInt();
+}
+
+int PSFSettingsDialog::getSelectedDeviceId() const
+{
+	return this->deviceCombo->currentData().toInt();
+}
+
 void PSFSettingsDialog::updateGeneratorType(const QString& typeName)
 {
 	this->currentGeneratorTypeName = typeName;
@@ -153,6 +168,7 @@ void PSFSettingsDialog::onApplyClicked()
 	if (this->validateSettings()) {
 		emit settingsApplied(this->getSettings());
 		emit displaySettingsApplied(this->getAutoRange(), this->getDisplayMin(), this->getDisplayMax());
+		emit deviceSettingsApplied(this->getSelectedBackend(), this->getSelectedDeviceId());
 		this->initialSettings = this->getSettings();
 	}
 }
@@ -288,6 +304,90 @@ void PSFSettingsDialog::setupUI()
 	});
 
 	tabWidget->addTab(displayTab, tr("Display"));
+
+	// --- Misc tab ---
+	QWidget* miscTab = new QWidget(tabWidget);
+	QVBoxLayout* miscLayout = new QVBoxLayout(miscTab);
+
+	QFormLayout* deviceForm = new QFormLayout();
+	this->backendCombo = new QComboBox(miscTab);
+	this->deviceCombo = new QComboBox(miscTab);
+
+	// Populate backend combo from cached data (no AF calls)
+	for (const AFBackendInfo& bi : this->cachedBackends) {
+		this->backendCombo->addItem(bi.name, bi.backendId);
+	}
+
+	deviceForm->addRow(tr("Backend:"), this->backendCombo);
+	deviceForm->addRow(tr("Compute Device:"), this->deviceCombo);
+	miscLayout->addLayout(deviceForm);
+
+	this->deviceInfoLabel = new QLabel(miscTab);
+	this->deviceInfoLabel->setWordWrap(true);
+	this->deviceInfoLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+	this->deviceInfoLabel->setFrameShape(QFrame::StyledPanel);
+	this->deviceInfoLabel->setStyleSheet(QStringLiteral("QLabel { padding: 8px; }"));
+	miscLayout->addWidget(this->deviceInfoLabel);
+	miscLayout->addStretch();
+
+	// Repopulate device combo from cached data when backend changes
+	auto repopulateDevices = [this]() {
+		this->deviceCombo->blockSignals(true);
+		this->deviceCombo->clear();
+		int backendId = this->backendCombo->currentData().toInt();
+		for (const AFBackendInfo& bi : this->cachedBackends) {
+			if (bi.backendId != backendId) continue;
+			for (const AFDeviceInfo& di : bi.devices) {
+				QString displayName = QStringLiteral("[%1] %2").arg(di.deviceId).arg(di.name);
+				this->deviceCombo->addItem(displayName);
+				int idx = this->deviceCombo->count() - 1;
+				this->deviceCombo->setItemData(idx, di.deviceId, Qt::UserRole);
+				// AF_BACKEND_CPU=1: toolkit reports compiler; CUDA/OpenCL: reports driver/SDK
+			QString toolkitLabel = (backendId == 1) ? tr("Compiler") : tr("Driver");
+			QString info = QStringLiteral("Name: %1\nPlatform: %2\nCompute: %3\n%4: %5")
+					.arg(di.name, di.platform, di.compute, toolkitLabel, di.toolkit);
+				this->deviceCombo->setItemData(idx, info, Qt::UserRole + 1);
+			}
+			break;
+		}
+		this->deviceCombo->blockSignals(false);
+		if (this->deviceCombo->count() > 0) {
+			this->deviceCombo->setCurrentIndex(0);
+			this->deviceInfoLabel->setText(
+				this->deviceCombo->itemData(0, Qt::UserRole + 1).toString());
+		} else {
+			this->deviceInfoLabel->setText(tr("No devices available for this backend."));
+		}
+	};
+
+	connect(this->backendCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, repopulateDevices);
+	connect(this->deviceCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, [this](int index) {
+		if (index >= 0) {
+			this->deviceInfoLabel->setText(
+				this->deviceCombo->itemData(index, Qt::UserRole + 1).toString());
+		}
+	});
+
+	// Set active backend
+	for (int i = 0; i < this->backendCombo->count(); ++i) {
+		if (this->backendCombo->itemData(i).toInt() == this->initialActiveBackend) {
+			this->backendCombo->setCurrentIndex(i);
+			break;
+		}
+	}
+	// Explicitly populate devices (setCurrentIndex is a no-op if already at index 0)
+	repopulateDevices();
+	// Pre-select the currently active device
+	for (int i = 0; i < this->deviceCombo->count(); ++i) {
+		if (this->deviceCombo->itemData(i).toInt() == this->initialActiveDevice) {
+			this->deviceCombo->setCurrentIndex(i);
+			break;
+		}
+	}
+
+	tabWidget->addTab(miscTab, tr("Device"));
 
 	mainLayout->addWidget(tabWidget);
 

@@ -37,6 +37,12 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 {
 	this->cancelRequested.storeRelease(0);
 
+	// Set ArrayFire backend + device for this worker thread (both are per-thread)
+	af::setBackend(static_cast<af_backend>(config.afBackend));
+	if (config.afDeviceId >= 0 && config.afDeviceId < static_cast<int>(af::getDeviceCount())) {
+		af::setDevice(config.afDeviceId);
+	}
+
 	if (config.jobs.isEmpty()) {
 		emit error(QStringLiteral("No optimization jobs specified."));
 		OptimizationResult result;

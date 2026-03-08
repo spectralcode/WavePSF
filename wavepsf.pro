@@ -73,7 +73,8 @@ SOURCES += \
 	$$SOURCEDIR/core/interpolation/tableinterpolator.cpp \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.cpp \
 	$$SOURCEDIR/gui/verticalscrollarea.cpp \
-	$$SOURCEDIR/gui/plotutils.cpp
+	$$SOURCEDIR/gui/plotutils.cpp \
+	$$SOURCEDIR/utils/afdevicemanager.cpp
 
 HEADERS += \
 	$$QCUSTOMPLOTDIR/qcustomplot.h \
@@ -132,7 +133,8 @@ HEADERS += \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.h \
 	$$SOURCEDIR/gui/qcppaletteobserver.h \
 	$$SOURCEDIR/gui/verticalscrollarea.h \
-	$$SOURCEDIR/gui/plotutils.h
+	$$SOURCEDIR/gui/plotutils.h \
+	$$SOURCEDIR/utils/afdevicemanager.h
 
 FORMS += \
 	$$SOURCEDIR/gui/mainwindow.ui

@@ -7,14 +7,14 @@
 #include "data/imagedataaccessor.h"
 
 // Forward declarations
-class SettingsFileManager;
+class AFDeviceManager;
 
 class ImageSession : public QObject
 {
 	Q_OBJECT
 
 public:
-	explicit ImageSession(QObject* parent = nullptr);
+	explicit ImageSession(AFDeviceManager* afDeviceManager, QObject* parent = nullptr);
 	~ImageSession();
 
 	// Data management
@@ -77,6 +77,9 @@ public:
 	// File output
 	void saveOutputToFile(const QString& filePath, int currentFrame);
 
+	// Cache management
+	void clearAFCaches();
+
 	// Validation
 	bool isValidFrame(int frame) const;
 	bool isValidPatch(int x, int y) const;
@@ -87,13 +90,6 @@ private:
 	void validateDataCompatibility(ImageData* newData, const QString& dataType) const;
 	void updateAccessorConfigurations();
 	int getGroundTruthFrameForCurrentFrame() const;
-
-	// Settings management
-	void loadSettings();
-	void saveSettings();
-
-	// Settings manager
-	SettingsFileManager* parameterSettings;
 
 	// Data objects
 	ImageData* inputData;

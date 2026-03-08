@@ -43,6 +43,7 @@ public:
 	virtual void setAllCoefficients(const QVector<double>& coefficients) = 0;
 	virtual void resetCoefficients() = 0;
 	virtual af::array generateWavefront(int gridSize) = 0;
+	virtual void invalidateCache() {};
 };
 
 #endif // IWAVEFRONTGENERATOR_H

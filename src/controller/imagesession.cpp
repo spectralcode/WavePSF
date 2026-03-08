@@ -1,6 +1,6 @@
 #include "imagesession.h"
+#include "utils/afdevicemanager.h"
 #include "utils/logging.h"
-#include "utils/settingsfilemanager.h"
 #include <QFileInfo>
 
 namespace {
@@ -9,15 +9,9 @@ namespace {
 	const int DEFAULT_BORDER_EXTENSION = 10;
 	const int INVALID_FRAME = -1;
 	const int INVALID_PATCH_COORD = -1;
-
-	// Settings constants
-	const char* SETTINGS_GROUP = "ImageSession";
-	const char* PATCH_GRID_COLS_KEY = "patchGridCols";
-	const char* PATCH_GRID_ROWS_KEY = "patchGridRows";
-	const char* PATCH_BORDER_EXTENSION_KEY = "patchBorderExtension";
 }
 
-ImageSession::ImageSession(QObject* parent)
+ImageSession::ImageSession(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent),
 	  inputData(nullptr), outputData(nullptr), groundTruthData(nullptr),
 	  inputAccessor(nullptr), outputAccessor(nullptr), groundTruthAccessor(nullptr),
@@ -25,12 +19,12 @@ ImageSession::ImageSession(QObject* parent)
 	  patchGridCols(DEFAULT_PATCH_GRID_COLS), patchGridRows(DEFAULT_PATCH_GRID_ROWS),
 	  patchBorderExtension(DEFAULT_BORDER_EXTENSION)
 {
-	this->loadSettings();
+	connect(afDeviceManager, &AFDeviceManager::aboutToChangeDevice,
+			this, &ImageSession::clearAFCaches);
 }
 
 ImageSession::~ImageSession()
 {
-	this->saveSettings();
 	this->clearAllData();
 }
 
@@ -224,9 +218,6 @@ void ImageSession::configurePatchGrid(int cols, int rows, int borderExtension)
 	this->patchGridCols = cols;
 	this->patchGridRows = rows;
 	this->patchBorderExtension = borderExtension;
-
-	// Save settings immediately when changed
-	this->saveSettings();
 
 	// Update accessor configurations
 	this->updateAccessorConfigurations();
@@ -474,6 +465,13 @@ void ImageSession::saveOutputToFile(const QString& filePath, int currentFrame)
 	}
 }
 
+void ImageSession::clearAFCaches()
+{
+	if (this->inputAccessor) this->inputAccessor->clearCache();
+	if (this->outputAccessor) this->outputAccessor->clearCache();
+	if (this->groundTruthAccessor) this->groundTruthAccessor->clearCache();
+}
+
 bool ImageSession::isValidFrame(int frame) const
 {
 	return this->hasInputData() && frame >= 0 && frame < this->inputData->getFrames();
@@ -600,27 +598,4 @@ int ImageSession::getGroundTruthFrameForCurrentFrame() const
 
 	// Default to frame 0
 	return 0;
-}
-
-void ImageSession::loadSettings()
-{
-//	if (this->parameterSettings != nullptr) {
-//		QVariantMap settings = this->parameterSettings->getStoredSettings(SETTINGS_GROUP);
-
-//		this->patchGridCols = settings.value(PATCH_GRID_COLS_KEY, DEFAULT_PATCH_GRID_COLS).toInt();
-//		this->patchGridRows = settings.value(PATCH_GRID_ROWS_KEY, DEFAULT_PATCH_GRID_ROWS).toInt();
-//		this->patchBorderExtension = settings.value(PATCH_BORDER_EXTENSION_KEY, DEFAULT_BORDER_EXTENSION).toInt();
-//	}
-}
-
-void ImageSession::saveSettings()
-{
-//	if (this->parameterSettings != nullptr) {
-//		QVariantMap settings;
-//		settings[PATCH_GRID_COLS_KEY] = this->patchGridCols;
-//		settings[PATCH_GRID_ROWS_KEY] = this->patchGridRows;
-//		settings[PATCH_BORDER_EXTENSION_KEY] = this->patchBorderExtension;
-
-//		this->parameterSettings->storeSettings(SETTINGS_GROUP, settings);
-//	}
 }

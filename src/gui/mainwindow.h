@@ -20,6 +20,7 @@ QT_END_NAMESPACE
 
 class SettingsFileManager;
 class ApplicationController;
+class AFDeviceManager;
 class ImageSessionViewer;
 class PSFGenerationWidget;
 class ProcessingControlWidget;
@@ -33,7 +34,8 @@ class MainWindow : public QMainWindow {
 
 public:
 	explicit MainWindow(SettingsFileManager* guiSettings,
-						StyleManager* styleManager, ApplicationController* applicationController,
+						StyleManager* styleManager, AFDeviceManager* afDeviceManager,
+						ApplicationController* applicationController,
 						QWidget *parent = nullptr);
 	~MainWindow();
 
@@ -90,6 +92,7 @@ private:
 	Ui::MainWindow *ui;
 	SettingsFileManager* guiSettings;
 	StyleManager* styleManager;
+	AFDeviceManager* afDeviceManager;
 	ApplicationController* applicationController;
 	MessageConsoleDock* messageConsoleDock;
 	MessageConsoleWidget* consoleWidget() const;

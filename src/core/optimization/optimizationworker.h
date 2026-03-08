@@ -61,6 +61,10 @@ struct OptimizationConfig {
 	bool livePreview = false;
 	int livePreviewInterval = 10;  // update every N outer iterations
 
+	// ArrayFire backend + device ID (set by controller so worker thread uses the correct device)
+	int afBackend = 0;
+	int afDeviceId = 0;
+
 	// Jobs to process (built by controller; single-patch: 1 job; batch: many jobs)
 	QVector<OptimizationJob> jobs;
 };

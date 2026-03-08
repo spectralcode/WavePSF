@@ -10,12 +10,13 @@
 class IWavefrontGenerator;
 class PSFCalculator;
 class Deconvolver;
+class AFDeviceManager;
 
 class PSFModule : public QObject
 {
 	Q_OBJECT
 public:
-	explicit PSFModule(QObject* parent = nullptr);
+	explicit PSFModule(AFDeviceManager* afDeviceManager, QObject* parent = nullptr);
 	~PSFModule() override;
 
 	QVector<WavefrontParameter> getParameterDescriptors() const;
@@ -46,6 +47,8 @@ public slots:
 	void setDeconvolutionRelaxationFactor(float factor);
 	void setDeconvolutionRegularizationFactor(float factor);
 	void setDeconvolutionNoiseToSignalFactor(float factor);
+
+	void clearCachedArrays();
 
 signals:
 	void wavefrontUpdated(af::array wavefront);

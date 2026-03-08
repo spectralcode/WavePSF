@@ -6,6 +6,7 @@
 #include "core/psf/psfmodule.h"
 #include "utils/logging.h"
 #include "utils/settingsfilemanager.h"
+#include "utils/afdevicemanager.h"
 #include <QFileInfo>
 #include <QDir>
 #include <QRandomGenerator>
@@ -13,8 +14,8 @@
 #include <QProgressDialog>
 #include <QApplication>
 
-ApplicationController::ApplicationController(QObject* parent)
-	: QObject(parent), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
+ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, QObject* parent)
+	: QObject(parent), afDeviceManager(afDeviceManager), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
 	, parameterTable(nullptr), deconvolutionLiveMode(false)
 	, optimizationThread(nullptr), optimizationWorker(nullptr)
 	, optimizationLivePreview(false), optimizationLivePreviewInterval(10), optimizationProgressCounter(0)
@@ -26,6 +27,15 @@ ApplicationController::ApplicationController(QObject* parent)
 	this->connectPSFModuleSignals();
 	this->connectDeconvolutionSignals();
 	this->initializeOptimizationThread();
+
+	// React to device changes from AFDeviceManager (each component clears its own caches via self-connection)
+	connect(this->afDeviceManager, &AFDeviceManager::aboutToChangeDevice, this, [this]() {
+		this->externalPSFOverrides.clear();
+	});
+	connect(this->afDeviceManager, &AFDeviceManager::deviceChanged, this, [this]() {
+		if (this->hasInputData())
+			this->psfModule->applyPSFSettings(this->psfModule->getPSFSettings());
+	});
 
 	qRegisterMetaType<OptimizationConfig>("OptimizationConfig");
 	qRegisterMetaType<OptimizationProgress>("OptimizationProgress");
@@ -267,6 +277,7 @@ void ApplicationController::requestDeconvolution()
 {
 	this->runDeconvolutionOnCurrentPatch();
 }
+
 
 void ApplicationController::requestBatchDeconvolution()
 {
@@ -561,9 +572,9 @@ void ApplicationController::handleGroundTruthDataChanged()
 void ApplicationController::initializeComponents()
 {
 	// Create core components with Qt ownership
-	this->imageSession = new ImageSession(this);
+	this->imageSession = new ImageSession(this->afDeviceManager, this);
 	this->inputDataReader = new InputDataReader(this);
-	this->psfModule = new PSFModule(this);
+	this->psfModule = new PSFModule(this->afDeviceManager, this);
 	this->parameterTable = new WavefrontParameterTable(this);
 	this->tableInterpolator = new TableInterpolator(this);
 }
@@ -790,6 +801,10 @@ void ApplicationController::startOptimization(const OptimizationConfig& uiConfig
 
 	// Copy UI config and fill in controller-owned data
 	OptimizationConfig config = uiConfig;
+
+	// ArrayFire backend + device (worker thread needs explicit selection; both are per-thread)
+	config.afBackend = this->afDeviceManager->getActiveBackendId();
+	config.afDeviceId = this->afDeviceManager->getActiveDeviceId();
 
 	// PSF settings
 	config.psfSettings = this->psfModule->getPSFSettings();

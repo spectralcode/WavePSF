@@ -36,6 +36,7 @@ public:
 	void setAllCoefficients(const QVector<double>& coefficients) override;
 	void resetCoefficients() override;
 	af::array generateWavefront(int gridSize) override;
+	void invalidateCache() override;
 
 	// Noll index control
 	void setNollIndices(const QVector<int>& indices);

@@ -26,6 +26,7 @@ public:
 	void setAllCoefficients(const QVector<double>& coefficients) override;
 	void resetCoefficients() override;
 	af::array generateWavefront(int gridSize) override;
+	void invalidateCache() override;
 
 	// DM configuration
 	void setActuatorGrid(int rows, int cols);

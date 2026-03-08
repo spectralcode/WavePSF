@@ -22,13 +22,14 @@ class SettingsFileManager;
 class PSFModule;
 class WavefrontParameterTable;
 class TableInterpolator;
+class AFDeviceManager;
 
 class ApplicationController : public QObject
 {
 	Q_OBJECT
 
 public:
-	explicit ApplicationController(QObject* parent = nullptr);
+	explicit ApplicationController(AFDeviceManager* afDeviceManager, QObject* parent = nullptr);
 	~ApplicationController();
 
 	// Direct session access for modules
@@ -157,6 +158,7 @@ private:
 	void resizeParameterTable();
 
 	// Core components
+	AFDeviceManager* afDeviceManager;
 	ImageSession* imageSession;
 	InputDataReader* inputDataReader;
 	PSFModule* psfModule;

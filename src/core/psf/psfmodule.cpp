@@ -3,14 +3,17 @@
 #include "wavefrontgeneratorfactory.h"
 #include "psfcalculator.h"
 #include "deconvolver.h"
+#include "utils/afdevicemanager.h"
 #include "utils/logging.h"
 
 
-PSFModule::PSFModule(QObject* parent)
+PSFModule::PSFModule(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent)
 	, gridSize(128)
 	, usingExternalPSF(false)
 {
+	connect(afDeviceManager, &AFDeviceManager::aboutToChangeDevice,
+			this, &PSFModule::clearCachedArrays);
 	// Pre-populate allGeneratorSettings with defaults from every known generator type.
 	// This ensures PSFSettingsDialog always finds a non-empty map for any type,
 	// even before it has been used or saved to INI.
@@ -257,6 +260,15 @@ void PSFModule::setDeconvolutionNoiseToSignalFactor(float factor)
 {
 	this->deconvolver->setNoiseToSignalFactor(factor);
 	emit deconvolutionSettingsChanged();
+}
+
+void PSFModule::clearCachedArrays()
+{
+	this->currentWavefront = af::array();
+	this->currentPSF = af::array();
+	this->externalPSF = af::array();
+	this->calculator->setApertureRadius(this->calculator->getApertureRadius()); // resets cachedGridSize
+	this->generator->invalidateCache();
 }
 
 void PSFModule::regeneratePipeline()
