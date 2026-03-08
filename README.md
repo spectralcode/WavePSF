@@ -5,7 +5,7 @@
 WavePSF is a tool for estimating the spatially and spectrally varying point spread function (PSF) of an imaging system and using it directly for deconvolution. 
 It was developed to be used with imaging spectrometers / hyperspectral imaging systems, but the basic idea should also work with other imaging systems.
 
-![WavePSF screenshot](images/wavepsf_screenshot2_win10.png)
+![WavePSF screenshot](images/wavepsf_V1.1.0_sreenshot_win11.png)
 
 ## Method
 
@@ -13,14 +13,21 @@ WavePSF implements the method described in:
 
 [Zabic, Miroslav, et al. "Point spread function estimation with computed wavefronts for deconvolution of hyperspectral imaging data." *Scientific Reports* 15.1 (2025): 673.](https://doi.org/10.1038/s41598-024-84790-6)
 
-PSFs are generated from wavefronts calculated using Zernike polynomials or a deformable mirror simulation. Coefficients of the wavefronts are optimized patch-by-patch using simulated annealing (or other optimization algorithms) to minimize a image quality metric. 
+The core idea is to estimate PSFs by deconvolving the input image with varying PSFs and checking whether image quality improves.
+
+PSFs are computed from wavefronts modeled with either Zernike polynomials or a deformable mirror simulation. Starting from an initial guess, the wavefront coefficients are iteratively adjusted by an optimization algorithm until an image quality metric improves. Currently the best metric is the normalized cross-correlation with a known ground truth image.
+
+This means a calibration measurement of a known target is required (e.g. a printed page with text), along with a digital reference of that target (e.g. the same page as an image with matching area and orientation) to serve as ground truth.
+
+Once the PSFs are estimated, they can be used to deconvolve actual measurements of unknown targets. The estimated PSFs remain valid as long as the imaging setup (focus, aperture, sample distance, ...) stays unchanged.
+
+The estimated PSFs can also be used for optical characterization of your system. The size tells you the spatial resolution and the shape can indicate what optical aberrations are present.
 
 
 ## How to Use
-- You can downlaod pre-built Windows binaries from the [releases page](https://github.com/spectralcode/WavePSF/releases)
+- You can download pre-built Windows binaries from the [releases page](https://github.com/spectralcode/WavePSF/releases)
 - Basic tutorial: [docs/user/tutorial.md](docs/user/tutorial.md)
 - Example datasets: [data.uni-hannover.de]( https://doi.org/10.25835/yu47lho4) -> download `data_tobacco_leaf.zip` for a purposely defocused dataset with ground truth, which produces particularly impressive deconvolution results
-
 
 ## Build
 
