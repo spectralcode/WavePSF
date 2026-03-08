@@ -5,7 +5,7 @@
 WavePSF is a tool for estimating the spatially and spectrally varying point spread function (PSF) of an imaging system and using it directly for deconvolution. 
 It was developed to be used with imaging spectrometers / hyperspectral imaging systems, but the basic idea should also work with other imaging systems.
 
-![WavePSF screenshot](images/wavepsf_V1.1.0_sreenshot_win11.png)
+![WavePSF screenshot](images/wavepsf_V1.1.0_screenshot_win11.png)
 
 ## Method
 
