@@ -19,7 +19,7 @@ To verify it loaded correctly: click any patch in the output image, then **hold 
 
 ## 3. Orient the image
 
-The image may appear flipped or rotated. Click on the input image to give it keyboard focus, then press **V** and then **R**. You may want to rotate/flip the images differntly for different datasets::
+The image may appear flipped or rotated. Click on the input image to give it keyboard focus, then press **H** and then **R**. You may want to rotate/flip the images differntly for different datasets::
 
 - **R** — rotate 90°
 - **V** — flip vertically
@@ -70,4 +70,5 @@ Switch to the **Optimization** tab at the bottom and configure the optimization.
 
 ## 7. Run the optimizer
 
-Press **Start Optimization**. The optimizer runs simulated annealing and the metric plot updates live. When finished, the selected patch in the output image should appear noticeably sharper. Hold **X** over the output image to compare directly against the ground truth.
+Press **Start Optimization**. The optimizer runs simulated annealing and the metric plot updates live. When finished, the selected patch in the output image should appear noticeably sharper. It may be that the optimizer gets stuck in a local minimum, in which case you can try resetting the Zernike coefficients and simply run it again.
+
