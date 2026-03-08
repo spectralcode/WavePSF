@@ -38,7 +38,7 @@
 
 [done] add icon in shape of coma 45° zernike
 
-- add readme.md
+[done] add readme.md
 
 [done] psf generation and optimization tabs need both be visible at same time. maybe next to each other
 
@@ -59,3 +59,35 @@
 [done] all actuators should be visible in dm simulator
 
 [done] maximized full screen state not restored on startup
+
+- maybe rename psfsettings. it contains various settings, not just psf related
+
+[done] rename psfsettingsdialog to settingsdialog
+
+[done] rename load parameters to load wavefront coefficients and add autosave for last selected folder
+
+[done] check if psfsettingsdialog uses correct settings names
+
+[done] remove lambda 0.55 or make it user changeable. this is only a legacy thing to match with old experiments. DEF_WAVELENGTH_NM is not even used
+
+[done] add zooming etc to interpolation plot
+
+[done] set deformable mirror min max default to 10
+
+[done] fix issue where patch grid is not updating when input data with different dimensions is loaded
+
+- test/compare CPU based processing vs GPU
+
+- maybe move input data loading into thread
+
+[done] add frame nr to "specific frame" option for initial optimization values
+
+[done] add option to make patch grid invisible
+
+[done] add a sidebar with nice icons for input/output data viewer control: rotate, v-flip, h-flip, sync, show patch grid
+
+[done] fix bug with vertical horizontal fliping when image is rotated
+
+[done] add coordinate system x y marker in the intput/output viewers to indicate x and y directions for inerpolation
+
+[done] stop optimization when app is about to close
