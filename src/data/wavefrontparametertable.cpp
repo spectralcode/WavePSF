@@ -20,19 +20,32 @@ void WavefrontParameterTable::resize(int frames, int patchesInX, int patchesInY,
 		return;
 	}
 
-	this->numberOfFrames = frames;
-	this->numberOfPatchesInX = patchesInX;
-	this->numberOfPatchesInY = patchesInY;
-	this->patchesPerFrame = patchesInX * patchesInY;
-	this->coefficientsPerPatch = coeffsPerPatch;
+	int newPatchesPerFrame = patchesInX * patchesInY;
 
 	this->table.resize(frames);
 	for (int f = 0; f < frames; f++) {
-		this->table[f].resize(this->patchesPerFrame);
-		for (int p = 0; p < this->patchesPerFrame; p++) {
-			this->table[f][p].fill(0.0, coeffsPerPatch);
+		int oldPatchCount = this->table[f].size();
+		this->table[f].resize(newPatchesPerFrame);
+		for (int p = 0; p < newPatchesPerFrame; p++) {
+			int oldCoeffCount = this->table[f][p].size();
+			if (p >= oldPatchCount || oldCoeffCount == 0) {
+				// New patch: zero-fill entirely
+				this->table[f][p].fill(0.0, coeffsPerPatch);
+			} else if (oldCoeffCount != coeffsPerPatch) {
+				// Existing patch with different coeff count: preserve for switching back
+				this->table[f][p].resize(coeffsPerPatch);
+				for (int c = oldCoeffCount; c < coeffsPerPatch; c++) {
+					this->table[f][p][c] = 0.0;
+				}
+			}
 		}
 	}
+
+	this->numberOfFrames = frames;
+	this->numberOfPatchesInX = patchesInX;
+	this->numberOfPatchesInY = patchesInY;
+	this->patchesPerFrame = newPatchesPerFrame;
+	this->coefficientsPerPatch = coeffsPerPatch;
 }
 
 void WavefrontParameterTable::clear()
