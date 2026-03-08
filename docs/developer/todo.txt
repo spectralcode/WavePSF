@@ -92,4 +92,20 @@
 
 [done] stop optimization when app is about to close
 
-- add PSF viewer that shows all already estimated PSFs of a given frame at once
+- add PSF viewer that shows all already estimated PSFs of a given frame at once. maybe also add 3D PSF viewer or some way to see how the PSF changes in z-Direction
+
+- investigate if PSF is rotated 90 degree before deconvolution. tip/tilt moves PSF but the deconvolved images moves 90 degree to that. this seems wrong. maybe convertToArrayFire ImageDataAccessor has swapped width and height and then downstream everything else also needs to be fixed
+
+- move settingsdialog.cpp/h out of psfcontrol folder
+
+- add clear plot option or something like that for optimization plot. when batch optimization is used for several hunderet of patches this plot gets quite full and might slow down everything
+
+- there is a bug in batch optimization: when setting initial values source to "Offset from current" (btw this should be renamed to Offset from currenf frame or something like that) with value -1 and the optimization is going to the next frame the patches on this next frame do not get the initial values from the previous frame
+
+- remember save output data location
+
+- add ctrl + z to undo pasting coeffs to patch
+
+- remember save/load location wavefront coeff csv
+
+- add some kind of "loading" indicator when loading/saving wavefront coeff csv files
