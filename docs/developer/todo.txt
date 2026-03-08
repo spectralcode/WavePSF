@@ -91,3 +91,5 @@
 [done] add coordinate system x y marker in the intput/output viewers to indicate x and y directions for inerpolation
 
 [done] stop optimization when app is about to close
+
+- add PSF viewer that shows all already estimated PSFs of a given frame at once
