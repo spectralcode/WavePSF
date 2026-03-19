@@ -71,6 +71,10 @@ SOURCES += \
 	$$SOURCEDIR/core/optimization/optimizerfactory.cpp \
 	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.cpp \
 	$$SOURCEDIR/core/interpolation/tableinterpolator.cpp \
+	$$SOURCEDIR/core/interpolation/interpolationorchestrator.cpp \
+	$$SOURCEDIR/core/optimization/optimizationjobbuilder.cpp \
+	$$SOURCEDIR/core/psf/psffilemanager.cpp \
+	$$SOURCEDIR/core/processing/batchprocessor.cpp \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.cpp \
 	$$SOURCEDIR/gui/verticalscrollarea.cpp \
 	$$SOURCEDIR/gui/plotutils.cpp \
@@ -130,6 +134,10 @@ HEADERS += \
 	$$SOURCEDIR/core/optimization/optimizerfactory.h \
 	$$SOURCEDIR/gui/psfcontrol/optimizationwidget.h \
 	$$SOURCEDIR/core/interpolation/tableinterpolator.h \
+	$$SOURCEDIR/core/interpolation/interpolationorchestrator.h \
+	$$SOURCEDIR/core/optimization/optimizationjobbuilder.h \
+	$$SOURCEDIR/core/psf/psffilemanager.h \
+	$$SOURCEDIR/core/processing/batchprocessor.h \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.h \
 	$$SOURCEDIR/gui/qcppaletteobserver.h \
 	$$SOURCEDIR/gui/verticalscrollarea.h \

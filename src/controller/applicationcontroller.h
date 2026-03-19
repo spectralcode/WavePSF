@@ -7,7 +7,6 @@
 #include <QThread>
 #include <QElapsedTimer>
 #include <QMap>
-#include <QPair>
 #include <arrayfire.h>
 #include "core/psf/wavefrontparameter.h"
 #include "core/psf/psfsettings.h"
@@ -17,12 +16,12 @@
 // Forward declarations
 class ImageSession;
 class InputDataReader;
-class ImageData;
-class SettingsFileManager;
 class PSFModule;
 class WavefrontParameterTable;
-class TableInterpolator;
 class AFDeviceManager;
+class PSFFileManager;
+class BatchProcessor;
+class InterpolationOrchestrator;
 
 class ApplicationController : public QObject
 {
@@ -32,20 +31,15 @@ public:
 	explicit ApplicationController(AFDeviceManager* afDeviceManager, QObject* parent = nullptr);
 	~ApplicationController();
 
-	// Direct session access for modules
-	ImageSession* getImageSession() const;
-
-	// Session information access (for compatibility)
+	// Session information access
 	bool hasInputData() const;
 	bool hasOutputData() const;
-	bool hasGroundTruthData() const;
 
 	int getCurrentFrame() const;
 	int getCurrentPatchX() const;
 	int getCurrentPatchY() const;
 	int getPatchGridCols() const;
 	int getPatchGridRows() const;
-	int getPatchBorderExtension() const;
 
 	// Data dimensions
 	int getInputWidth() const;
@@ -150,7 +144,6 @@ private:
 
 	// Optimization orchestration
 	void initializeOptimizationThread();
-	bool buildOptimizationJobs(OptimizationConfig& config);
 
 	// Parameter table orchestration
 	void storeCurrentCoefficients();
@@ -182,14 +175,13 @@ private:
 	QVector<double> coefficientClipboard;
 
 	// Interpolation
-	TableInterpolator* tableInterpolator;
+	InterpolationOrchestrator* interpolationOrchestrator;
 
 	// PSF file management
-	bool autoSavePSFEnabled;
-	QString psfSaveFolder;
-	bool useCustomPSFFolder;
-	QString customPSFFolder;
-	QMap<QPair<int,int>, af::array> externalPSFOverrides;  // (frame, patchIdx) → loaded PSF
+	PSFFileManager* psfFileManager;
+
+	// Batch processing
+	BatchProcessor* batchProcessor;
 
 	// Parameter table cache: preserves per-patch coefficients when switching between generator types
 	QMap<QString, WavefrontParameterTable*> cachedParameterTables;
