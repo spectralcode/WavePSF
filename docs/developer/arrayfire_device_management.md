@@ -26,12 +26,12 @@ AFDeviceManager::setDevice(backendId, deviceId)
 | Thread | AF usage | How it gets backend/device |
 |--------|----------|--------------------------|
 | Main thread | PSFModule, ImageSession, ImageDataAccessor, PSFCalculator, generators | `AFDeviceManager::setDevice()` calls `af::setBackend()`/`af::setDevice()` on this thread |
-| OptimizationWorker thread | Local PSFCalculator, generator, Deconvolver | Receives `afBackend`/`afDeviceId` in `OptimizationConfig` struct, calls `af::setBackend()`/`af::setDevice()` at the start of each run |
+| OptimizationWorker thread | Local PSFCalculator, generator, Deconvolver | Receives `afBackend`/`afDeviceId` in `OptimizationConfig` struct, calls `AFDeviceManager::setDeviceForCurrentThread()` at the start of each run |
 | ImageRenderWorker thread | Does not use ArrayFire | N/A |
 
 Main-thread components do **not** need to call `af::setBackend()`/`af::setDevice()` themselves — the manager does it for the entire thread. They only need to release their cached arrays before the switch.
 
-Worker threads must set their own AF context because AF state is per-thread. The `OptimizationWorker` does this by reading from the config struct passed via queued signal connection.
+Worker threads must set their own AF context because AF state is per-thread. The `OptimizationWorker` does this via `AFDeviceManager::setDeviceForCurrentThread()`, reading backend/device IDs from the config struct passed via queued signal connection.
 
 ## Signal Flow
 
@@ -107,7 +107,7 @@ If your module runs on a **separate QThread** and uses ArrayFire:
 
 - Do **not** connect to `aboutToChangeDevice` (the signal runs on the main thread, not yours)
 - Instead, receive `afBackend`/`afDeviceId` in your work config struct
-- Call `af::setBackend()` and `af::setDevice()` at the start of your worker method
+- Call `AFDeviceManager::setDeviceForCurrentThread(backendId, deviceId)` at the start of your worker method
 - Create all AF objects locally within the worker method and clean up when done
 - See `OptimizationWorker::runOptimization()` for the reference pattern
 

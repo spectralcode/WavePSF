@@ -48,16 +48,21 @@ bool AFDeviceManager::setDevice(int backendId, int deviceId)
 
 	emit aboutToChangeDevice(backendId, deviceId);
 
-	af::setBackend(static_cast<af_backend>(backendId));
-	if (deviceId >= 0 && deviceId < static_cast<int>(af::getDeviceCount())) {
-		af::setDevice(deviceId);
-	}
+	AFDeviceManager::setDeviceForCurrentThread(backendId, deviceId);
 
 	this->activeBackendId = backendId;
 	this->activeDeviceId = deviceId;
 	this->saveSettings();
 	emit deviceChanged(backendId, deviceId);
 	return true;
+}
+
+void AFDeviceManager::setDeviceForCurrentThread(int backendId, int deviceId)
+{
+	af::setBackend(static_cast<af_backend>(backendId));
+	if (deviceId >= 0 && deviceId < static_cast<int>(af::getDeviceCount())) {
+		af::setDevice(deviceId);
+	}
 }
 
 void AFDeviceManager::enumerateDevices()
@@ -146,11 +151,7 @@ void AFDeviceManager::restoreDevice()
 {
 	if (this->activeBackendId > 0 &&
 		(af::getAvailableBackends() & this->activeBackendId)) {
-		af::setBackend(static_cast<af_backend>(this->activeBackendId));
-		if (this->activeDeviceId >= 0 &&
-			this->activeDeviceId < static_cast<int>(af::getDeviceCount())) {
-			af::setDevice(this->activeDeviceId);
-		}
+		AFDeviceManager::setDeviceForCurrentThread(this->activeBackendId, this->activeDeviceId);
 	}
 
 	// Sync internal state with what AF actually set

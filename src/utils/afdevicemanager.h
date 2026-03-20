@@ -38,6 +38,11 @@ public:
 	// Emits aboutToChangeDevice before switching, deviceChanged after.
 	bool setDevice(int backendId, int deviceId);
 
+	// Set AF backend + device for the calling thread.
+	// Worker threads must call this at the start of their work function
+	// because AF backend and device state are per-thread.
+	static void setDeviceForCurrentThread(int backendId, int deviceId);
+
 signals:
 	void aboutToChangeDevice(int backendId, int deviceId);
 	void deviceChanged(int backendId, int deviceId);

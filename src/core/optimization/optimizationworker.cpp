@@ -6,6 +6,7 @@
 #include "core/psf/wavefrontgeneratorfactory.h"
 #include "core/psf/psfcalculator.h"
 #include "core/psf/deconvolver.h"
+#include "utils/afdevicemanager.h"
 #include <limits>
 
 
@@ -38,10 +39,7 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 	this->cancelRequested.storeRelease(0);
 
 	// Set ArrayFire backend + device for this worker thread (both are per-thread)
-	af::setBackend(static_cast<af_backend>(config.afBackend));
-	if (config.afDeviceId >= 0 && config.afDeviceId < static_cast<int>(af::getDeviceCount())) {
-		af::setDevice(config.afDeviceId);
-	}
+	AFDeviceManager::setDeviceForCurrentThread(config.afBackend, config.afDeviceId);
 
 	if (config.jobs.isEmpty()) {
 		emit error(QStringLiteral("No optimization jobs specified."));
