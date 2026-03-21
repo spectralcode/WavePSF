@@ -33,6 +33,7 @@
 #include <QTextEdit>
 #include <QPlainTextEdit>
 #include <QApplication>
+#include <QMessageBox>
 namespace {
 	const QString SETTINGS_GROUP       = QStringLiteral("main_window");
 	const QString KEY_WINDOW_SIZE      = QStringLiteral("window_size");
@@ -677,26 +678,36 @@ void MainWindow::openGroundTruth() {
 void MainWindow::saveParameters() {
 	const QString filePath = QFileDialog::getSaveFileName(
 		this,
-		"Save Parameters",
+		tr("Save Wavefront Coefficients"),
 		QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
 		"CSV Files (*.csv)"
 	);
 	if (!filePath.isEmpty()) {
+		QMessageBox busyMsg(QMessageBox::NoIcon, tr("Saving"), tr("Saving wavefront coefficients..."), QMessageBox::NoButton, this);
+		busyMsg.setStandardButtons(QMessageBox::NoButton);
+		busyMsg.show();
+		QApplication::processEvents();
+
 		this->applicationController->saveParametersToFile(filePath);
-		this->statusBar()->showMessage("Parameters saved", 3000);
+		this->statusBar()->showMessage(tr("Wavefront coefficients saved"), 3000);
 	}
 }
 
 void MainWindow::loadParameters() {
 	const QString filePath = QFileDialog::getOpenFileName(
 		this,
-		"Load Parameters",
+		tr("Load Wavefront Coefficients"),
 		QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
 		"CSV Files (*.csv)"
 	);
 	if (!filePath.isEmpty()) {
+		QMessageBox busyMsg(QMessageBox::NoIcon, tr("Loading"), tr("Loading wavefront coefficients..."), QMessageBox::NoButton, this);
+		busyMsg.setStandardButtons(QMessageBox::NoButton);
+		busyMsg.show();
+		QApplication::processEvents();
+
 		this->applicationController->loadParametersFromFile(filePath);
-		this->statusBar()->showMessage("Parameters loaded", 3000);
+		this->statusBar()->showMessage(tr("Wavefront coefficients loaded"), 3000);
 	}
 }
 

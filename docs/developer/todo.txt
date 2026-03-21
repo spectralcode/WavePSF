@@ -108,4 +108,4 @@
 
 - remember save/load location wavefront coeff csv
 
-- add some kind of "loading" indicator when loading/saving wavefront coeff csv files
+- [done] add some kind of "loading" indicator when loading/saving wavefront coeff csv files
