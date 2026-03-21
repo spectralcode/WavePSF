@@ -41,6 +41,8 @@ namespace {
 	const QString KEY_WINDOW_MAXIMIZED = QStringLiteral("window_maximized");
 	const QString KEY_LAST_OPEN_DIR_INPUT = QStringLiteral("last_open_dir_input");
 	const QString KEY_LAST_OPEN_DIR_GT    = QStringLiteral("last_open_dir_ground_truth");
+	const QString KEY_LAST_OPEN_DIR_COEFF  = QStringLiteral("last_open_dir_coefficients");
+	const QString KEY_LAST_OPEN_DIR_OUTPUT = QStringLiteral("last_open_dir_output");
 	const QString KEY_LAST_FILTER_INPUT   = QStringLiteral("last_name_filter_input");
 	const QString KEY_LAST_FILTER_GT      = QStringLiteral("last_name_filter_ground_truth");
 	const QString KEY_DOCK_STATE          = QStringLiteral("dock_state_v1");
@@ -676,13 +678,17 @@ void MainWindow::openGroundTruth() {
 }
 
 void MainWindow::saveParameters() {
+	const QString initialDir = this->lastOpenDirCoefficients.isEmpty()
+		? QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+		: this->lastOpenDirCoefficients;
 	const QString filePath = QFileDialog::getSaveFileName(
 		this,
 		tr("Save Wavefront Coefficients"),
-		QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+		initialDir,
 		"CSV Files (*.csv)"
 	);
 	if (!filePath.isEmpty()) {
+		this->lastOpenDirCoefficients = QFileInfo(filePath).absolutePath();
 		QMessageBox busyMsg(QMessageBox::NoIcon, tr("Saving"), tr("Saving wavefront coefficients..."), QMessageBox::NoButton, this);
 		busyMsg.setStandardButtons(QMessageBox::NoButton);
 		busyMsg.show();
@@ -694,13 +700,17 @@ void MainWindow::saveParameters() {
 }
 
 void MainWindow::loadParameters() {
+	const QString initialDir = this->lastOpenDirCoefficients.isEmpty()
+		? QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+		: this->lastOpenDirCoefficients;
 	const QString filePath = QFileDialog::getOpenFileName(
 		this,
 		tr("Load Wavefront Coefficients"),
-		QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+		initialDir,
 		"CSV Files (*.csv)"
 	);
 	if (!filePath.isEmpty()) {
+		this->lastOpenDirCoefficients = QFileInfo(filePath).absolutePath();
 		QMessageBox busyMsg(QMessageBox::NoIcon, tr("Loading"), tr("Loading wavefront coefficients..."), QMessageBox::NoButton, this);
 		busyMsg.setStandardButtons(QMessageBox::NoButton);
 		busyMsg.show();
@@ -716,13 +726,17 @@ void MainWindow::saveOutputData() {
 		this->statusBar()->showMessage("No output data to save", 3000);
 		return;
 	}
+	const QString initialDir = this->lastOpenDirOutput.isEmpty()
+		? QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+		: this->lastOpenDirOutput;
 	const QString filePath = QFileDialog::getSaveFileName(
 		this,
 		"Save Output Data",
-		QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+		initialDir,
 		"ENVI Files (*.img);;TIFF Image (*.tif);;PNG Image (current frame only) (*.png)"
 	);
 	if (!filePath.isEmpty()) {
+		this->lastOpenDirOutput = QFileInfo(filePath).absolutePath();
 		this->applicationController->saveOutputToFile(filePath);
 		this->statusBar()->showMessage("Output data saved", 3000);
 	}
@@ -775,6 +789,8 @@ void MainWindow::loadSettings() {
 	this->lastOpenDirGroundTruth    = settings.value(KEY_LAST_OPEN_DIR_GT,   QString()).toString();
 	this->lastNameFilterInput       = settings.value(KEY_LAST_FILTER_INPUT,  QString()).toString();
 	this->lastNameFilterGroundTruth = settings.value(KEY_LAST_FILTER_GT,     QString()).toString();
+	this->lastOpenDirCoefficients  = settings.value(KEY_LAST_OPEN_DIR_COEFF, QString()).toString();
+	this->lastOpenDirOutput        = settings.value(KEY_LAST_OPEN_DIR_OUTPUT, QString()).toString();
 	this->recentInput->setSettings(this->guiSettings->getStoredSettings(this->recentInput->getName()));
 	this->recentGroundTruth->setSettings(this->guiSettings->getStoredSettings(this->recentGroundTruth->getName()));
 
@@ -815,6 +831,8 @@ void MainWindow::saveSettings() {
 	settings[KEY_LAST_OPEN_DIR_GT]    = this->lastOpenDirGroundTruth;
 	settings[KEY_LAST_FILTER_INPUT]   = this->lastNameFilterInput;
 	settings[KEY_LAST_FILTER_GT]      = this->lastNameFilterGroundTruth;
+	settings[KEY_LAST_OPEN_DIR_COEFF]  = this->lastOpenDirCoefficients;
+	settings[KEY_LAST_OPEN_DIR_OUTPUT] = this->lastOpenDirOutput;
 	settings[KEY_DOCK_STATE]       = this->saveState();
 	settings[KEY_CONSOLE_VISIBLE]  = (this->messageConsoleDock && this->messageConsoleDock->isVisible());
 	this->guiSettings->storeSettings(SETTINGS_GROUP, settings);

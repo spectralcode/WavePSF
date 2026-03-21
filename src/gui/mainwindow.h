@@ -103,6 +103,8 @@ private:
 	QString lastOpenDirGroundTruth;
 	QString lastNameFilterInput;
 	QString lastNameFilterGroundTruth;
+	QString lastOpenDirCoefficients;
+	QString lastOpenDirOutput;
 
 
 	// Menus
