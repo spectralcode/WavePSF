@@ -18,6 +18,7 @@
 #include <QMenu>
 #include <QFileDialog>
 #include <QFile>
+#include <QTimer>
 #include <QDataStream>
 
 namespace {
@@ -184,6 +185,12 @@ void PSFGridWidget::setPatchGridDimensions(int cols, int rows, int borderExtensi
 	Q_UNUSED(borderExtension);
 	this->patchCols = cols;
 	this->patchRows = rows;
+	if (this->liveUpdateCheckBox->isChecked() && !this->lastResult.mosaicImage.isNull()) {
+		// Defer to next event loop iteration so parameter table is resized first
+		QTimer::singleShot(0, this, [this]() {
+			emit generateRequested(this->currentFrame, this->cropSizeSpinBox->value());
+		});
+	}
 }
 
 void PSFGridWidget::setCurrentFrame(int frame)
