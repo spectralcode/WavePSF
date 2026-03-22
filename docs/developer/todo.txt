@@ -92,7 +92,9 @@
 
 [done] stop optimization when app is about to close
 
-- add PSF viewer that shows all already estimated PSFs of a given frame at once. maybe also add 3D PSF viewer or some way to see how the PSF changes in z-Direction
+[done] add PSF viewer that shows all already estimated PSFs of a given frame at once. 
+
+- maybe also add 3D PSF viewer or some way to see how the PSF changes in z-Direction
 
 - investigate if PSF is rotated 90 degree before deconvolution. tip/tilt moves PSF but the deconvolved images moves 90 degree to that. this seems wrong. maybe convertToArrayFire ImageDataAccessor has swapped width and height and then downstream everything else also needs to be fixed
 
@@ -108,4 +110,6 @@
 
 [done] - remember save/load location wavefront coeff csv
 
-- [done] add some kind of "loading" indicator when loading/saving wavefront coeff csv files
+[done] add some kind of "loading" indicator when loading/saving wavefront coeff csv files
+
+- change the mouse interaction (zoom, translation, etc) for input/output viewer or for psf grid viewer such that all viewers use same control (i think the control of psf grid viewer is more intuitive and this should be used)
