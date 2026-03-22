@@ -1,4 +1,3 @@
-#define NOMINMAX
 #include "psfgridwidget.h"
 #include "utils/logging.h"
 
@@ -24,7 +23,7 @@ namespace {
 	const QString SETTINGS_GROUP    = QStringLiteral("psf_grid_widget");
 	const QString KEY_CROP_SIZE     = QStringLiteral("crop_size");
 	const QString KEY_SPLITTER_STATE = QStringLiteral("splitter_state");
-	const int     DEF_CROP_SIZE     = 64;
+	const int     DEF_CROP_SIZE     = 32;
 }
 
 PSFGridWidget::PSFGridWidget(QWidget* parent)
