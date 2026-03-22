@@ -259,6 +259,9 @@ void PSFGridWidget::updateSinglePSF(af::array psf, int patchX, int patchY)
 	if (!this->liveUpdateCheckBox->isChecked()) {
 		return;
 	}
+	if (!this->isVisible()) {
+		return;
+	}
 	if (this->lastResult.mosaicImage.isNull() || this->mosaicItem == nullptr) {
 		// No mosaic yet — trigger full generation
 		emit generateRequested(this->currentFrame, this->cropSizeSpinBox->value());
