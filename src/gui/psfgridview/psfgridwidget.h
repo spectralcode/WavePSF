@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QVariantMap>
+#include <QTransform>
 #include "core/psf/psfgridgenerator.h"
 
 class QPushButton;
@@ -29,6 +30,11 @@ public slots:
 	void setCurrentPatch(int x, int y);
 	void setPatchGridDimensions(int cols, int rows, int borderExtension);
 	void setCurrentFrame(int frame);
+	void rotate90();
+	void flipH();
+	void flipV();
+	void applyViewTransform(QTransform transform, QPointF center);
+	void setSyncActive(bool active);
 
 signals:
 	void generateRequested(int frame, int cropSize);
@@ -67,6 +73,8 @@ private:
 	int currentFrame;
 	int patchCols;
 	int patchRows;
+	bool syncActive;
+	QTransform viewOrientation;
 	PSFGridResult lastResult;
 };
 

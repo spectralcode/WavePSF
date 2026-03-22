@@ -80,6 +80,9 @@ signals:
 	// Settings propagation
 	void patchGridConfigurationRequested(int cols, int rows, int borderExtension);
 
+	// View transform forwarding (for PSF grid orientation sync)
+	void viewerTransformChanged(QTransform transform, QPointF centerInScene);
+
 private:
 	void setupUI();
 	void setupFrameControls();

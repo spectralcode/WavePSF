@@ -672,6 +672,19 @@ void MainWindow::connectPSFGridWidget() {
 	connect(this->applicationController, &ApplicationController::frameChanged,
 	        gridWidget, &PSFGridWidget::setCurrentFrame);
 
+	// Auto-sync orientation with viewers (when sync is on)
+	connect(this->sessionViewer, &ImageSessionViewer::viewerTransformChanged,
+	        gridWidget, &PSFGridWidget::applyViewTransform);
+
+	// Sync toggle — reorder so PSFGridWidget knows sync state before
+	// ImageSessionViewer broadcasts the current transform
+	disconnect(this->viewerToolBar, &ViewerToolBar::syncViewsToggled,
+	           this->sessionViewer, &ImageSessionViewer::setViewSyncEnabled);
+	connect(this->viewerToolBar, &ViewerToolBar::syncViewsToggled,
+	        gridWidget, &PSFGridWidget::setSyncActive);
+	connect(this->viewerToolBar, &ViewerToolBar::syncViewsToggled,
+	        this->sessionViewer, &ImageSessionViewer::setViewSyncEnabled);
+
 	LOG_DEBUG() << "PSFGridWidget signal connections established";
 }
 

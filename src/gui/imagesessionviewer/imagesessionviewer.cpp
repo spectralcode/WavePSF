@@ -520,6 +520,12 @@ void ImageSessionViewer::connectSignals()
 	// Track active viewer (last clicked)
 	connect(this->inputViewer,  &ImageDataViewer::viewActivated, this, [this]() { this->activeViewer = this->inputViewer; });
 	connect(this->outputViewer, &ImageDataViewer::viewActivated, this, [this]() { this->activeViewer = this->outputViewer; });
+
+	// Forward view transform changes (for PSF grid orientation sync)
+	connect(this->inputViewer, &ImageDataViewer::viewTransformChanged,
+	        this, &ImageSessionViewer::viewerTransformChanged);
+	connect(this->outputViewer, &ImageDataViewer::viewTransformChanged,
+	        this, &ImageSessionViewer::viewerTransformChanged);
 }
 
 void ImageSessionViewer::updateFrameControls()

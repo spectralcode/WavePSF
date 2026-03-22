@@ -2,6 +2,7 @@
 #include "psfgridwidget.h"
 #include "utils/logging.h"
 
+#include <cmath>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QSplitter>
@@ -12,6 +13,7 @@
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem>
 #include <QGraphicsRectItem>
+#include <QKeyEvent>
 #include <QWheelEvent>
 #include <QMenu>
 #include <QFileDialog>
@@ -34,6 +36,7 @@ PSFGridWidget::PSFGridWidget(QWidget* parent)
 	, currentFrame(0)
 	, patchCols(1)
 	, patchRows(1)
+	, syncActive(false)
 {
 	this->setupUI();
 }
@@ -74,6 +77,7 @@ void PSFGridWidget::setupUI()
 	this->graphicsView->setBackgroundBrush(QBrush(QColor(30, 30, 30)));
 	this->graphicsView->setContextMenuPolicy(Qt::CustomContextMenu);
 	this->graphicsView->viewport()->installEventFilter(this);
+	this->graphicsView->installEventFilter(this);
 	this->splitter->addWidget(this->graphicsView);
 
 	// Controls (bottom)
@@ -145,8 +149,13 @@ void PSFGridWidget::displayPSFGrid(const PSFGridResult& result)
 	this->infoLabel->setText(QString("%1x%2 patches, %3 px crop")
 		.arg(result.cols).arg(result.rows).arg(result.cellSize));
 
-	// Fit view to scene
+	// Fit view to scene, preserving current orientation
+	this->graphicsView->resetTransform();
 	this->graphicsView->fitInView(this->graphicsScene->sceneRect(), Qt::KeepAspectRatio);
+	if (!this->viewOrientation.isIdentity()) {
+		this->graphicsView->setTransform(
+			this->graphicsView->transform() * this->viewOrientation);
+	}
 }
 
 void PSFGridWidget::setCurrentPatch(int x, int y)
@@ -166,6 +175,69 @@ void PSFGridWidget::setPatchGridDimensions(int cols, int rows, int borderExtensi
 void PSFGridWidget::setCurrentFrame(int frame)
 {
 	this->currentFrame = frame;
+}
+
+void PSFGridWidget::rotate90()
+{
+	if (this->syncActive) return;
+	this->viewOrientation = this->viewOrientation * QTransform().rotate(-90);
+	QTransform current = this->graphicsView->transform();
+	double myScale = std::sqrt(current.m11() * current.m11()
+	                         + current.m21() * current.m21());
+	this->graphicsView->setTransform(
+		QTransform::fromScale(myScale, myScale) * this->viewOrientation);
+}
+
+void PSFGridWidget::flipH()
+{
+	if (this->syncActive) return;
+	this->viewOrientation = this->viewOrientation * QTransform(-1, 0, 0, 1, 0, 0);
+	QTransform current = this->graphicsView->transform();
+	double myScale = std::sqrt(current.m11() * current.m11()
+	                         + current.m21() * current.m21());
+	this->graphicsView->setTransform(
+		QTransform::fromScale(myScale, myScale) * this->viewOrientation);
+}
+
+void PSFGridWidget::flipV()
+{
+	if (this->syncActive) return;
+	this->viewOrientation = this->viewOrientation * QTransform(1, 0, 0, -1, 0, 0);
+	QTransform current = this->graphicsView->transform();
+	double myScale = std::sqrt(current.m11() * current.m11()
+	                         + current.m21() * current.m21());
+	this->graphicsView->setTransform(
+		QTransform::fromScale(myScale, myScale) * this->viewOrientation);
+}
+
+void PSFGridWidget::applyViewTransform(QTransform viewTransform, QPointF)
+{
+	if (!this->syncActive) return;
+
+	// Extract rotation/flip by normalizing out the scale component
+	double scale = std::sqrt(viewTransform.m11() * viewTransform.m11()
+	                       + viewTransform.m21() * viewTransform.m21());
+	if (scale < 1e-10) return;
+
+	QTransform newOrientation(
+		viewTransform.m11() / scale, viewTransform.m12() / scale,
+		viewTransform.m21() / scale, viewTransform.m22() / scale, 0, 0);
+
+	// Only update if orientation actually changed (ignore zoom/pan changes)
+	if (newOrientation == this->viewOrientation) return;
+	this->viewOrientation = newOrientation;
+
+	// Preserve PSF grid's own zoom, apply new orientation
+	QTransform current = this->graphicsView->transform();
+	double myScale = std::sqrt(current.m11() * current.m11()
+	                         + current.m21() * current.m21());
+	this->graphicsView->setTransform(
+		QTransform::fromScale(myScale, myScale) * this->viewOrientation);
+}
+
+void PSFGridWidget::setSyncActive(bool active)
+{
+	this->syncActive = active;
 }
 
 void PSFGridWidget::updateHighlight()
@@ -206,11 +278,41 @@ QPair<int, int> PSFGridWidget::cellAtScenePos(QPointF scenePos) const
 
 bool PSFGridWidget::eventFilter(QObject* obj, QEvent* event)
 {
+	if (obj == this->graphicsView && event->type() == QEvent::KeyPress) {
+		QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
+		switch (keyEvent->key()) {
+		case Qt::Key_R:
+			this->rotate90();
+			return true;
+		case Qt::Key_H:
+			this->flipH();
+			return true;
+		case Qt::Key_V:
+			if (!(keyEvent->modifiers() & Qt::ControlModifier)) {
+				this->flipV();
+				return true;
+			}
+			break;
+		}
+	}
+
 	if (obj == this->graphicsView->viewport()) {
 		if (event->type() == QEvent::Wheel) {
 			QWheelEvent* wheelEvent = static_cast<QWheelEvent*>(event);
 			double factor = (wheelEvent->angleDelta().y() > 0) ? 1.15 : (1.0 / 1.15);
 			this->graphicsView->scale(factor, factor);
+			return true;
+		}
+
+		if (event->type() == QEvent::MouseButtonDblClick) {
+			if (!this->lastResult.mosaicImage.isNull()) {
+				this->graphicsView->resetTransform();
+				this->graphicsView->fitInView(this->graphicsScene->sceneRect(), Qt::KeepAspectRatio);
+				if (!this->viewOrientation.isIdentity()) {
+					this->graphicsView->setTransform(
+						this->graphicsView->transform() * this->viewOrientation);
+				}
+			}
 			return true;
 		}
 
@@ -250,7 +352,12 @@ void PSFGridWidget::showContextMenu(const QPoint& pos)
 		this->saveMosaicAs("png");
 	} else if (chosen == resetViewAction) {
 		if (!this->lastResult.mosaicImage.isNull()) {
+			this->graphicsView->resetTransform();
 			this->graphicsView->fitInView(this->graphicsScene->sceneRect(), Qt::KeepAspectRatio);
+			if (!this->viewOrientation.isIdentity()) {
+				this->graphicsView->setTransform(
+					this->graphicsView->transform() * this->viewOrientation);
+			}
 		}
 	}
 }
