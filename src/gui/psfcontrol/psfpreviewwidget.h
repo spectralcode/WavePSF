@@ -35,8 +35,6 @@ private:
 	QImage currentImage;
 	int lastWidth;
 	int lastHeight;
-	int mousePosX;
-	int mousePosY;
 };
 
 #endif // PSFPREVIEWWIDGET_H

@@ -4,7 +4,6 @@
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem>
 #include <QWheelEvent>
-#include <QMouseEvent>
 #include <QMenu>
 #include <QAction>
 #include <QFileDialog>
@@ -16,8 +15,6 @@ PSFPreviewWidget::PSFPreviewWidget(QWidget* parent)
 	: QWidget(parent)
 	, lastWidth(0)
 	, lastHeight(0)
-	, mousePosX(0)
-	, mousePosY(0)
 {
 	QVBoxLayout* layout = new QVBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
@@ -30,6 +27,7 @@ PSFPreviewWidget::PSFPreviewWidget(QWidget* parent)
 	this->view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
 	this->view->setRenderHint(QPainter::Antialiasing);
 	this->view->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+	this->view->setDragMode(QGraphicsView::ScrollHandDrag);
 	this->view->setMinimumSize(64, 64);
 
 	this->pixmapItem = new QGraphicsPixmapItem();
@@ -113,30 +111,6 @@ bool PSFPreviewWidget::eventFilter(QObject* obj, QEvent* event)
 			this->view->centerOn(this->view->mapToScene(viewportCenter.toPoint()));
 
 			return true;
-		}
-
-		case QEvent::MouseButtonPress: {
-			QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-			if (mouseEvent->button() == Qt::LeftButton) {
-				this->mousePosX = mouseEvent->x();
-				this->mousePosY = mouseEvent->y();
-				return true;
-			}
-			break;
-		}
-
-		case QEvent::MouseMove: {
-			QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-			if (mouseEvent->buttons() & Qt::LeftButton) {
-				QPointF oldPos = this->view->mapToScene(this->mousePosX, this->mousePosY);
-				QPointF newPos = this->view->mapToScene(mouseEvent->pos());
-				QPointF delta = newPos - oldPos;
-				this->view->translate(delta.x(), delta.y());
-				this->mousePosX = mouseEvent->x();
-				this->mousePosY = mouseEvent->y();
-				return true;
-			}
-			break;
 		}
 
 		case QEvent::MouseButtonDblClick: {
