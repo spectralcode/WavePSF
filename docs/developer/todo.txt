@@ -100,9 +100,9 @@
 
 - move settingsdialog.cpp/h out of psfcontrol folder
 
-- add clear plot option or something like that for optimization plot. when batch optimization is used for several hunderet of patches this plot gets quite full and might slow down everything
+[done] add clear plot option or something like that for optimization plot. when batch optimization is used for several hunderet of patches this plot gets quite full and might slow down everything
 
-- there is a bug in batch optimization: when setting initial values source to "Offset from current" (btw this should be renamed to Offset from currenf frame or something like that) with value -1 and the optimization is going to the next frame the patches on this next frame do not get the initial values from the previous frame
+- there is a bug in batch optimization: when setting initial values source to "Offset from current" (btw this should be renamed to Offset from current frame or something like that) with value -1 and the optimization is going to the next frame the patches on this next frame do not get the initial values from the previous frame
 
 [done] remember save output data location
 
