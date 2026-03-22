@@ -151,7 +151,7 @@ void OptimizationWidget::setupInitialValuesSection(QVBoxLayout* layout)
 	this->startCoeffSourceComboBox = new QComboBox(this->initialValuesGroup);
 	this->startCoeffSourceComboBox->addItem(tr("Current stored"));
 	this->startCoeffSourceComboBox->addItem(tr("From specific frame"));
-	this->startCoeffSourceComboBox->addItem(tr("Offset from current"));
+	this->startCoeffSourceComboBox->addItem(tr("From relative frame"));
 	this->startCoeffSourceComboBox->addItem(tr("Random"));
 	this->startCoeffSourceComboBox->addItem(tr("Zero"));
 	this->startCoeffSourceComboBox->addItem(tr("From previous patch result"));

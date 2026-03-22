@@ -132,6 +132,19 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 			!finalResult.jobResults.isEmpty()) {
 			startCoeffs = finalResult.jobResults.last().bestCoefficients;
 		}
+		// "From relative frame": if the source frame was optimized
+		// earlier in this batch, use those results instead of the stale
+		// pre-built values from the job builder
+		if (config.startCoefficientSource == 2 && !finalResult.jobResults.isEmpty()) {
+			int sourceFrame = qBound(0, job.frameNr + config.sourceParam, config.jobs.last().frameNr);
+			for (int i = finalResult.jobResults.size() - 1; i >= 0; --i) {
+				const OptimizationJobResult& prev = finalResult.jobResults[i];
+				if (prev.frameNr == sourceFrame && prev.patchX == job.patchX && prev.patchY == job.patchY) {
+					startCoeffs = prev.bestCoefficients;
+					break;
+				}
+			}
+		}
 		if (startCoeffs.isEmpty()) {
 			int coeffCount = generator->getAllCoefficients().size();
 			startCoeffs.fill(0.0, coeffCount);
