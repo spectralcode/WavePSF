@@ -47,8 +47,10 @@ namespace {
 	const QString KEY_LAST_FILTER_GT      = QStringLiteral("last_name_filter_ground_truth");
 	const QString KEY_DOCK_STATE          = QStringLiteral("dock_state_v1");
 	const QString KEY_CONSOLE_VISIBLE     = QStringLiteral("message_console_visible");
+	const QString KEY_PSF_GRID_VISIBLE    = QStringLiteral("psf_grid_visible");
 	const bool DEF_WINDOW_MAXIMIZED = false;
 	const bool DEF_CONSOLE_VISIBLE  = false;
+	const bool DEF_PSF_GRID_VISIBLE = false;
 }
 
 MainWindow::MainWindow(SettingsFileManager* guiSettings,
@@ -76,6 +78,7 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	this->connectImageSessionViewer();
 	this->connectPSFGenerationWidget();
 	this->connectProcessingControlWidget();
+	this->connectPSFGridWidget();
 	this->loadSettings();
 
 	// Apply loaded PSF settings to the controller (loadSettings only deserializes
@@ -330,6 +333,20 @@ void MainWindow::setupViewMenu() {
 
 	connect(this->toggleMessageConsoleAction, &QAction::toggled, this->messageConsoleDock, &QDockWidget::setVisible);
 	connect(this->messageConsoleDock, &QDockWidget::visibilityChanged, this->toggleMessageConsoleAction, &QAction::setChecked);
+
+	// PSF Grid dock
+	this->togglePSFGridAction = new QAction("PSF Grid", this);
+	this->togglePSFGridAction->setCheckable(true);
+	this->viewMenu->addAction(this->togglePSFGridAction);
+
+	this->psfGridDock = new PSFGridDock(this);
+	this->addDockWidget(Qt::RightDockWidgetArea, this->psfGridDock);
+	this->psfGridDock->hide();
+
+	connect(this->togglePSFGridAction, &QAction::toggled,
+	        this->psfGridDock, &QDockWidget::setVisible);
+	connect(this->psfGridDock, &QDockWidget::visibilityChanged,
+	        this->togglePSFGridAction, &QAction::setChecked);
 }
 
 void MainWindow::setupExtrasMenu() {
@@ -631,6 +648,33 @@ void MainWindow::connectProcessingControlWidget() {
 	LOG_DEBUG() << "ProcessingControlWidget signal connections established";
 }
 
+void MainWindow::connectPSFGridWidget() {
+	if (this->applicationController == nullptr || this->psfGridDock == nullptr) return;
+
+	PSFGridWidget* gridWidget = qobject_cast<PSFGridWidget*>(this->psfGridDock->widget());
+	if (gridWidget == nullptr) return;
+
+	// Generate request → ApplicationController
+	connect(gridWidget, &PSFGridWidget::generateRequested,
+	        this->applicationController, &ApplicationController::generatePSFGrid);
+	connect(this->applicationController, &ApplicationController::psfGridGenerated,
+	        gridWidget, &PSFGridWidget::displayPSFGrid);
+
+	// Bidirectional patch selection
+	connect(gridWidget, &PSFGridWidget::patchClicked,
+	        this->applicationController, &ApplicationController::setCurrentPatch);
+	connect(this->applicationController, &ApplicationController::patchChanged,
+	        gridWidget, &PSFGridWidget::setCurrentPatch);
+
+	// Patch grid dimensions and frame tracking
+	connect(this->applicationController, &ApplicationController::patchGridConfigured,
+	        gridWidget, &PSFGridWidget::setPatchGridDimensions);
+	connect(this->applicationController, &ApplicationController::frameChanged,
+	        gridWidget, &PSFGridWidget::setCurrentFrame);
+
+	LOG_DEBUG() << "PSFGridWidget signal connections established";
+}
+
 void MainWindow::openImageData() {
 	QString selectedFilter = this->lastNameFilterInput;
 	const QString initialDir = this->lastOpenDirInput.isEmpty()	? QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) : this->lastOpenDirInput;
@@ -802,6 +846,10 @@ void MainWindow::loadSettings() {
 	if (this->messageConsoleDock) this->messageConsoleDock->setVisible(showConsole);
 	if (this->toggleMessageConsoleAction) this->toggleMessageConsoleAction->setChecked(showConsole);
 
+	const bool showPSFGrid = settings.value(KEY_PSF_GRID_VISIBLE, DEF_PSF_GRID_VISIBLE).toBool();
+	if (this->psfGridDock) this->psfGridDock->setVisible(showPSFGrid);
+	if (this->togglePSFGridAction) this->togglePSFGridAction->setChecked(showPSFGrid);
+
 	this->resize(this->windowSize);
 	this->move(this->windowPosition);
 	if (settings.value(KEY_WINDOW_MAXIMIZED, DEF_WINDOW_MAXIMIZED).toBool()) {
@@ -814,6 +862,11 @@ void MainWindow::loadSettings() {
 	this->viewerToolBar->setSettings(this->guiSettings->getStoredSettings(this->viewerToolBar->getName()));
 	this->psfGenerationWidget->setSettings(this->guiSettings->getStoredSettings(this->psfGenerationWidget->getName()));
 	this->processingControlWidget->setSettings(this->guiSettings->getStoredSettings(this->processingControlWidget->getName()));
+
+	PSFGridWidget* gridWidget = qobject_cast<PSFGridWidget*>(this->psfGridDock->widget());
+	if (gridWidget) {
+		gridWidget->setSettings(this->guiSettings->getStoredSettings(gridWidget->getName()));
+	}
 }
 
 void MainWindow::saveSettings() {
@@ -835,6 +888,7 @@ void MainWindow::saveSettings() {
 	settings[KEY_LAST_OPEN_DIR_OUTPUT] = this->lastOpenDirOutput;
 	settings[KEY_DOCK_STATE]       = this->saveState();
 	settings[KEY_CONSOLE_VISIBLE]  = (this->messageConsoleDock && this->messageConsoleDock->isVisible());
+	settings[KEY_PSF_GRID_VISIBLE] = (this->psfGridDock && this->psfGridDock->isVisible());
 	this->guiSettings->storeSettings(SETTINGS_GROUP, settings);
 
 	this->guiSettings->storeSettings(this->consoleWidget()->getName(), this->consoleWidget()->getSettings());
@@ -844,6 +898,11 @@ void MainWindow::saveSettings() {
 	this->guiSettings->storeSettings(this->processingControlWidget->getName(), this->processingControlWidget->getSettings());
 	this->guiSettings->storeSettings(this->recentInput->getName(),       this->recentInput->getSettings());
 	this->guiSettings->storeSettings(this->recentGroundTruth->getName(), this->recentGroundTruth->getSettings());
+
+	PSFGridWidget* gridWidget = qobject_cast<PSFGridWidget*>(this->psfGridDock->widget());
+	if (gridWidget) {
+		this->guiSettings->storeSettings(gridWidget->getName(), gridWidget->getSettings());
+	}
 }
 
 MessageConsoleWidget *MainWindow::consoleWidget() const

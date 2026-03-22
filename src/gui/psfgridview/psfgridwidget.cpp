@@ -1,0 +1,369 @@
+#define NOMINMAX
+#include "psfgridwidget.h"
+#include "utils/logging.h"
+
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QSplitter>
+#include <QPushButton>
+#include <QSpinBox>
+#include <QLabel>
+#include <QGraphicsView>
+#include <QGraphicsScene>
+#include <QGraphicsPixmapItem>
+#include <QGraphicsRectItem>
+#include <QWheelEvent>
+#include <QMenu>
+#include <QFileDialog>
+#include <QFile>
+#include <QDataStream>
+
+namespace {
+	const QString SETTINGS_GROUP    = QStringLiteral("psf_grid_widget");
+	const QString KEY_CROP_SIZE     = QStringLiteral("crop_size");
+	const QString KEY_SPLITTER_STATE = QStringLiteral("splitter_state");
+	const int     DEF_CROP_SIZE     = 64;
+}
+
+PSFGridWidget::PSFGridWidget(QWidget* parent)
+	: QWidget(parent)
+	, mosaicItem(nullptr)
+	, highlightRect(nullptr)
+	, currentPatchX(0)
+	, currentPatchY(0)
+	, currentFrame(0)
+	, patchCols(1)
+	, patchRows(1)
+{
+	this->setupUI();
+}
+
+QString PSFGridWidget::getName() const
+{
+	return SETTINGS_GROUP;
+}
+
+QVariantMap PSFGridWidget::getSettings() const
+{
+	QVariantMap settings;
+	settings[KEY_CROP_SIZE] = this->cropSizeSpinBox->value();
+	settings[KEY_SPLITTER_STATE] = this->splitter->saveState();
+	return settings;
+}
+
+void PSFGridWidget::setSettings(const QVariantMap& settings)
+{
+	this->cropSizeSpinBox->setValue(settings.value(KEY_CROP_SIZE, DEF_CROP_SIZE).toInt());
+	if (settings.contains(KEY_SPLITTER_STATE)) {
+		this->splitter->restoreState(settings.value(KEY_SPLITTER_STATE).toByteArray());
+	}
+}
+
+void PSFGridWidget::setupUI()
+{
+	QVBoxLayout* mainLayout = new QVBoxLayout(this);
+	mainLayout->setContentsMargins(0, 0, 0, 0);
+
+	this->splitter = new QSplitter(Qt::Vertical, this);
+
+	// Graphics view (top)
+	this->graphicsScene = new QGraphicsScene(this);
+	this->graphicsView = new QGraphicsView(this->graphicsScene, this);
+	this->graphicsView->setDragMode(QGraphicsView::ScrollHandDrag);
+	this->graphicsView->setRenderHint(QPainter::SmoothPixmapTransform, false);
+	this->graphicsView->setBackgroundBrush(QBrush(QColor(30, 30, 30)));
+	this->graphicsView->setContextMenuPolicy(Qt::CustomContextMenu);
+	this->graphicsView->viewport()->installEventFilter(this);
+	this->splitter->addWidget(this->graphicsView);
+
+	// Controls (bottom)
+	QWidget* controlsWidget = new QWidget(this);
+	QHBoxLayout* controlsLayout = new QHBoxLayout(controlsWidget);
+	controlsLayout->setContentsMargins(4, 4, 4, 4);
+
+	this->generateButton = new QPushButton(tr("Generate"), this);
+	controlsLayout->addWidget(this->generateButton);
+
+	controlsLayout->addWidget(new QLabel(tr("Crop:"), this));
+	this->cropSizeSpinBox = new QSpinBox(this);
+	this->cropSizeSpinBox->setRange(8, 512);
+	this->cropSizeSpinBox->setValue(DEF_CROP_SIZE);
+	this->cropSizeSpinBox->setSuffix(tr(" px"));
+	controlsLayout->addWidget(this->cropSizeSpinBox);
+
+	controlsLayout->addStretch();
+
+	this->infoLabel = new QLabel(this);
+	controlsLayout->addWidget(this->infoLabel);
+
+	this->splitter->addWidget(controlsWidget);
+
+	this->splitter->setStretchFactor(0, 3);
+	this->splitter->setStretchFactor(1, 0);
+
+	mainLayout->addWidget(this->splitter);
+
+	// Connections
+	connect(this->generateButton, &QPushButton::clicked,
+	        this, &PSFGridWidget::onGenerateClicked);
+	connect(this->graphicsView, &QWidget::customContextMenuRequested,
+	        this, &PSFGridWidget::showContextMenu);
+}
+
+void PSFGridWidget::onGenerateClicked()
+{
+	emit generateRequested(this->currentFrame, this->cropSizeSpinBox->value());
+}
+
+void PSFGridWidget::displayPSFGrid(const PSFGridResult& result)
+{
+	this->lastResult = result;
+
+	// Clear existing items
+	this->graphicsScene->clear();
+	this->mosaicItem = nullptr;
+	this->highlightRect = nullptr;
+
+	if (result.mosaicImage.isNull()) {
+		return;
+	}
+
+	// Add mosaic pixmap
+	this->mosaicItem = this->graphicsScene->addPixmap(
+		QPixmap::fromImage(result.mosaicImage));
+
+	// Create highlight rectangle
+	QPen highlightPen(QColor(255, 200, 0), 2);
+	highlightPen.setCosmetic(true);
+	this->highlightRect = this->graphicsScene->addRect(0, 0, 1, 1, highlightPen);
+	this->highlightRect->setZValue(1);
+
+	this->graphicsScene->setSceneRect(result.mosaicImage.rect());
+
+	this->updateHighlight();
+
+	this->infoLabel->setText(QString("%1x%2 patches, %3 px crop")
+		.arg(result.cols).arg(result.rows).arg(result.cellSize));
+
+	// Fit view to scene
+	this->graphicsView->fitInView(this->graphicsScene->sceneRect(), Qt::KeepAspectRatio);
+}
+
+void PSFGridWidget::setCurrentPatch(int x, int y)
+{
+	this->currentPatchX = x;
+	this->currentPatchY = y;
+	this->updateHighlight();
+}
+
+void PSFGridWidget::setPatchGridDimensions(int cols, int rows, int borderExtension)
+{
+	Q_UNUSED(borderExtension);
+	this->patchCols = cols;
+	this->patchRows = rows;
+}
+
+void PSFGridWidget::setCurrentFrame(int frame)
+{
+	this->currentFrame = frame;
+}
+
+void PSFGridWidget::updateHighlight()
+{
+	if (this->highlightRect == nullptr || this->lastResult.mosaicImage.isNull()) {
+		return;
+	}
+
+	int stride = this->lastResult.cellSize + this->lastResult.spacing;
+	int x = this->currentPatchX * stride;
+	int y = this->currentPatchY * stride;
+	this->highlightRect->setRect(x, y, this->lastResult.cellSize, this->lastResult.cellSize);
+}
+
+QPair<int, int> PSFGridWidget::cellAtScenePos(QPointF scenePos) const
+{
+	if (this->lastResult.mosaicImage.isNull()) {
+		return qMakePair(-1, -1);
+	}
+
+	int stride = this->lastResult.cellSize + this->lastResult.spacing;
+	int col = static_cast<int>(scenePos.x()) / stride;
+	int row = static_cast<int>(scenePos.y()) / stride;
+
+	// Check within cell bounds (not in spacing)
+	int localX = static_cast<int>(scenePos.x()) % stride;
+	int localY = static_cast<int>(scenePos.y()) % stride;
+	if (localX >= this->lastResult.cellSize || localY >= this->lastResult.cellSize) {
+		return qMakePair(-1, -1);
+	}
+
+	if (col < 0 || col >= this->lastResult.cols || row < 0 || row >= this->lastResult.rows) {
+		return qMakePair(-1, -1);
+	}
+
+	return qMakePair(col, row);
+}
+
+bool PSFGridWidget::eventFilter(QObject* obj, QEvent* event)
+{
+	if (obj == this->graphicsView->viewport()) {
+		if (event->type() == QEvent::Wheel) {
+			QWheelEvent* wheelEvent = static_cast<QWheelEvent*>(event);
+			double factor = (wheelEvent->angleDelta().y() > 0) ? 1.15 : (1.0 / 1.15);
+			this->graphicsView->scale(factor, factor);
+			return true;
+		}
+
+		if (event->type() == QEvent::MouseButtonPress) {
+			QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+			if (mouseEvent->button() == Qt::LeftButton &&
+			    !(mouseEvent->modifiers() & Qt::ControlModifier)) {
+				QPointF scenePos = this->graphicsView->mapToScene(mouseEvent->pos());
+				QPair<int, int> cell = this->cellAtScenePos(scenePos);
+				if (cell.first >= 0 && cell.second >= 0) {
+					emit patchClicked(cell.first, cell.second);
+				}
+			}
+		}
+	}
+
+	return QWidget::eventFilter(obj, event);
+}
+
+void PSFGridWidget::showContextMenu(const QPoint& pos)
+{
+	QMenu menu(this);
+
+	QAction* saveTifAction = menu.addAction(tr("Save as TIF..."));
+	QAction* savePngAction = menu.addAction(tr("Save as PNG..."));
+	menu.addSeparator();
+	QAction* resetViewAction = menu.addAction(tr("Reset View"));
+
+	bool hasMosaic = !this->lastResult.mosaicImage.isNull();
+	saveTifAction->setEnabled(hasMosaic);
+	savePngAction->setEnabled(hasMosaic);
+
+	QAction* chosen = menu.exec(this->graphicsView->mapToGlobal(pos));
+	if (chosen == saveTifAction) {
+		this->saveMosaicAs("tif");
+	} else if (chosen == savePngAction) {
+		this->saveMosaicAs("png");
+	} else if (chosen == resetViewAction) {
+		if (!this->lastResult.mosaicImage.isNull()) {
+			this->graphicsView->fitInView(this->graphicsScene->sceneRect(), Qt::KeepAspectRatio);
+		}
+	}
+}
+
+void PSFGridWidget::saveMosaicAs(const QString& format)
+{
+	if (this->lastResult.mosaicImage.isNull()) {
+		return;
+	}
+
+	QString filter;
+	if (format == "tif") {
+		filter = tr("TIFF Image (*.tif)");
+	} else {
+		filter = tr("PNG Image (*.png)");
+	}
+
+	QString filePath = QFileDialog::getSaveFileName(this, tr("Save PSF Grid"), QString(), filter);
+	if (filePath.isEmpty()) {
+		return;
+	}
+
+	if (format == "tif") {
+		this->saveMosaicAsTif(filePath);
+	} else {
+		this->lastResult.mosaicImage.save(filePath);
+		LOG_INFO() << "PSF grid mosaic saved as PNG:" << filePath;
+	}
+}
+
+void PSFGridWidget::saveMosaicAsTif(const QString& filePath)
+{
+	// Compose float32 mosaic from raw PSFs
+	int cols = this->lastResult.cols;
+	int rows = this->lastResult.rows;
+	int cellSize = this->lastResult.cellSize;
+	int spacing = this->lastResult.spacing;
+	int mosaicWidth = cols * cellSize + (cols - 1) * spacing;
+	int mosaicHeight = rows * cellSize + (rows - 1) * spacing;
+	int stride = cellSize + spacing;
+
+	QVector<float> mosaicData(mosaicWidth * mosaicHeight, 0.0f);
+
+	for (int py = 0; py < rows; py++) {
+		for (int px = 0; px < cols; px++) {
+			int patchIdx = py * cols + px;
+			if (patchIdx >= this->lastResult.rawPSFs.size() || this->lastResult.rawPSFs[patchIdx].isempty()) {
+				continue;
+			}
+
+			af::array floatArr = this->lastResult.rawPSFs[patchIdx].as(af::dtype::f32);
+			float* hostData = floatArr.host<float>();
+			int h = static_cast<int>(floatArr.dims(0));
+			int w = static_cast<int>(floatArr.dims(1));
+
+			int destX = px * stride;
+			int destY = py * stride;
+
+			// AF column-major → row-major mosaic
+			for (int cy = 0; cy < h && (destY + cy) < mosaicHeight; cy++) {
+				for (int cx = 0; cx < w && (destX + cx) < mosaicWidth; cx++) {
+					mosaicData[(destY + cy) * mosaicWidth + (destX + cx)] = hostData[cy + cx * h];
+				}
+			}
+
+			af::freeHost(hostData);
+		}
+	}
+
+	// Write single-page 32-bit float TIFF (same pattern as PSFFileManager)
+	QFile file(filePath);
+	if (!file.open(QIODevice::WriteOnly)) {
+		LOG_WARNING() << "Could not write PSF grid TIF:" << file.errorString();
+		return;
+	}
+
+	QDataStream stream(&file);
+	stream.setByteOrder(QDataStream::LittleEndian);
+
+	uint32_t bytesPerFrame = static_cast<uint32_t>(mosaicWidth) * static_cast<uint32_t>(mosaicHeight) * sizeof(float);
+	const int numIfdEntries = 10;
+	uint32_t ifdSize = 2 + numIfdEntries * 12 + 4;
+	uint32_t headerSize = 8;
+	uint32_t dataStart = headerSize + ifdSize;
+
+	auto writeIfdEntry = [&](uint16_t tag, uint16_t type, uint32_t count, uint32_t value) {
+		stream << tag << type << count << value;
+	};
+
+	// TIFF Header
+	stream.writeRawData("II", 2);
+	stream << static_cast<uint16_t>(42);
+	stream << headerSize;
+
+	// IFD
+	stream << static_cast<uint16_t>(numIfdEntries);
+	writeIfdEntry(256, 4, 1, static_cast<uint32_t>(mosaicWidth));
+	writeIfdEntry(257, 4, 1, static_cast<uint32_t>(mosaicHeight));
+	writeIfdEntry(258, 3, 1, 32);
+	writeIfdEntry(259, 3, 1, 1);
+	writeIfdEntry(262, 3, 1, 1);
+	writeIfdEntry(273, 4, 1, dataStart);
+	writeIfdEntry(277, 3, 1, 1);
+	writeIfdEntry(278, 4, 1, static_cast<uint32_t>(mosaicHeight));
+	writeIfdEntry(279, 4, 1, bytesPerFrame);
+	writeIfdEntry(339, 3, 1, 3);
+	stream << static_cast<uint32_t>(0);
+
+	// Row-major data is already in the correct order
+	stream.writeRawData(reinterpret_cast<const char*>(mosaicData.constData()),
+	                    static_cast<int>(bytesPerFrame));
+
+	file.close();
+	LOG_INFO() << "PSF grid mosaic saved as TIF:" << filePath
+			   << "(" << mosaicWidth << "x" << mosaicHeight << ", 32-bit float)";
+}

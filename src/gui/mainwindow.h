@@ -11,6 +11,7 @@
 #include <QList>
 #include "stylemanager.h"
 #include "gui/messageconsole/messageconsoledock.h"
+#include "gui/psfgridview/psfgriddock.h"
 #include "gui/viewertoolbar.h"
 #include "core/psf/psfsettings.h"
 
@@ -86,6 +87,7 @@ private:
 	void connectImageSessionViewer();
 	void connectPSFGenerationWidget();
 	void connectProcessingControlWidget();
+	void connectPSFGridWidget();
 	void loadSettings();
 	void saveSettings();
 
@@ -141,6 +143,8 @@ private:
 
 	// View actions
 	QAction* toggleMessageConsoleAction;
+	QAction* togglePSFGridAction;
+	PSFGridDock* psfGridDock;
 
 	// Viewer toolbar
 	ViewerToolBar* viewerToolBar;

@@ -8,6 +8,7 @@
 #include "core/optimization/optimizationjobbuilder.h"
 #include "core/processing/batchprocessor.h"
 #include "core/interpolation/interpolationorchestrator.h"
+#include "core/psf/psfgridgenerator.h"
 #include "utils/logging.h"
 #include "utils/settingsfilemanager.h"
 #include "utils/afdevicemanager.h"
@@ -476,6 +477,7 @@ void ApplicationController::initializeComponents()
 	this->interpolationOrchestrator = new InterpolationOrchestrator(this);
 	this->psfFileManager = new PSFFileManager(this);
 	this->batchProcessor = new BatchProcessor(this);
+	this->psfGridGenerator = new PSFGridGenerator(this);
 }
 
 void ApplicationController::connectSessionSignals()
@@ -865,6 +867,24 @@ void ApplicationController::setUseCustomPSFFolder(bool enabled)
 void ApplicationController::setCustomPSFFolder(const QString& folder)
 {
 	this->psfFileManager->setCustomPSFFolder(folder);
+}
+
+// --- PSF Grid ---
+
+void ApplicationController::generatePSFGrid(int frame, int cropSize)
+{
+	if (!this->hasInputData() || this->psfModule == nullptr || this->parameterTable == nullptr) {
+		LOG_WARNING() << "Cannot generate PSF grid: missing input data or parameters";
+		return;
+	}
+
+	this->storeCurrentCoefficients();
+
+	PSFGridResult result = this->psfGridGenerator->generate(
+		this->psfModule, this->parameterTable,
+		frame, this->getPatchGridCols(), this->getPatchGridRows(),
+		cropSize);
+	emit psfGridGenerated(result);
 }
 
 // --- Interpolation ---

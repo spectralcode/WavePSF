@@ -12,6 +12,7 @@
 #include "core/psf/psfsettings.h"
 #include "core/optimization/optimizationworker.h"
 #include "core/interpolation/tableinterpolator.h"
+#include "core/psf/psfgridgenerator.h"
 
 // Forward declarations
 class ImageSession;
@@ -22,6 +23,7 @@ class AFDeviceManager;
 class PSFFileManager;
 class BatchProcessor;
 class InterpolationOrchestrator;
+class PSFGridGenerator;
 
 class ApplicationController : public QObject
 {
@@ -107,6 +109,9 @@ public slots:
 	// Batch processing
 	void requestBatchDeconvolution();
 
+	// PSF grid
+	void generatePSFGrid(int frame, int cropSize);
+
 	// Interpolation
 	void interpolateCoefficientsInX();
 	void interpolateCoefficientsInY();
@@ -183,6 +188,9 @@ private:
 	// Batch processing
 	BatchProcessor* batchProcessor;
 
+	// PSF grid generation
+	PSFGridGenerator* psfGridGenerator;
+
 	// Parameter table cache: preserves per-patch coefficients when switching between generator types
 	QMap<QString, WavefrontParameterTable*> cachedParameterTables;
 
@@ -228,6 +236,9 @@ signals:
 
 	// Interpolation results
 	void interpolationCompleted(InterpolationResult result);
+
+	// PSF grid
+	void psfGridGenerated(PSFGridResult result);
 };
 
 #endif // APPLICATIONCONTROLLER_H

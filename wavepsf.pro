@@ -78,7 +78,9 @@ SOURCES += \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.cpp \
 	$$SOURCEDIR/gui/verticalscrollarea.cpp \
 	$$SOURCEDIR/gui/plotutils.cpp \
-	$$SOURCEDIR/utils/afdevicemanager.cpp
+	$$SOURCEDIR/utils/afdevicemanager.cpp \
+	$$SOURCEDIR/core/psf/psfgridgenerator.cpp \
+	$$SOURCEDIR/gui/psfgridview/psfgridwidget.cpp
 
 HEADERS += \
 	$$QCUSTOMPLOTDIR/qcustomplot.h \
@@ -142,7 +144,10 @@ HEADERS += \
 	$$SOURCEDIR/gui/qcppaletteobserver.h \
 	$$SOURCEDIR/gui/verticalscrollarea.h \
 	$$SOURCEDIR/gui/plotutils.h \
-	$$SOURCEDIR/utils/afdevicemanager.h
+	$$SOURCEDIR/utils/afdevicemanager.h \
+	$$SOURCEDIR/core/psf/psfgridgenerator.h \
+	$$SOURCEDIR/gui/psfgridview/psfgriddock.h \
+	$$SOURCEDIR/gui/psfgridview/psfgridwidget.h
 
 FORMS += \
 	$$SOURCEDIR/gui/mainwindow.ui

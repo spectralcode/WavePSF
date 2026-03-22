@@ -26,6 +26,7 @@ public:
 	PSFSettings getPSFSettings() const;
 	QString getGeneratorTypeName() const;
 	bool isUsingExternalPSF() const;
+	af::array computePSFFromCoefficients(const QVector<double>& coefficients);
 
 public slots:
 	void setCoefficient(int id, double value);

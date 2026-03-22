@@ -262,6 +262,16 @@ void PSFModule::setDeconvolutionNoiseToSignalFactor(float factor)
 	emit deconvolutionSettingsChanged();
 }
 
+af::array PSFModule::computePSFFromCoefficients(const QVector<double>& coefficients)
+{
+	QVector<double> saved = this->generator->getAllCoefficients();
+	this->generator->setAllCoefficients(coefficients);
+	af::array wavefront = this->generator->generateWavefront(this->gridSize);
+	af::array psf = this->calculator->computePSF(wavefront);
+	this->generator->setAllCoefficients(saved);
+	return psf;
+}
+
 void PSFModule::clearCachedArrays()
 {
 	this->currentWavefront = af::array();
