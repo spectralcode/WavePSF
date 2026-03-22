@@ -36,6 +36,7 @@ PSFGridResult PSFGridGenerator::generate(
 				psf = psf(af::seq(offset, offset + cropSize - 1),
 				          af::seq(offset, offset + cropSize - 1));
 			}
+			psf = af::transpose(psf); //transpose for correct display orientation 
 			result.rawPSFs[patchIdx] = psf;
 		}
 	}
