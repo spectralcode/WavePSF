@@ -95,21 +95,8 @@ bool PSFPreviewWidget::eventFilter(QObject* obj, QEvent* event)
 	switch (event->type()) {
 		case QEvent::Wheel: {
 			QWheelEvent* wheelEvent = static_cast<QWheelEvent*>(event);
-			double angle = wheelEvent->angleDelta().y();
-			double factor = qPow(1.0015, angle);
-
-			QPoint targetViewportPos = wheelEvent->pos();
-			QPointF targetScenePos = this->view->mapToScene(wheelEvent->pos());
-
+			double factor = (wheelEvent->angleDelta().y() > 0) ? 1.15 : (1.0 / 1.15);
 			this->scaleView(factor);
-			this->view->centerOn(targetScenePos);
-
-			QPointF deltaViewportPos = targetViewportPos
-				- QPointF(this->view->viewport()->width() / 2.0,
-						  this->view->viewport()->height() / 2.0);
-			QPointF viewportCenter = this->view->mapFromScene(targetScenePos) - deltaViewportPos;
-			this->view->centerOn(this->view->mapToScene(viewportCenter.toPoint()));
-
 			return true;
 		}
 
