@@ -94,6 +94,7 @@ public slots:
 	// Coefficient clipboard
 	void copyCoefficients();
 	void pasteCoefficients();
+	void undoPasteCoefficients();
 
 	// File output
 	void saveOutputToFile(const QString& filePath);
@@ -176,8 +177,12 @@ private:
 	QElapsedTimer progressUpdateTimer;
 	bool suppressLiveDeconv;
 
-	// Coefficient clipboard
+	// Coefficient clipboard and undo
 	QVector<double> coefficientClipboard;
+	QVector<double> undoCoefficients;
+	int undoFrame;
+	int undoPatchX;
+	int undoPatchY;
 
 	// Interpolation
 	InterpolationOrchestrator* interpolationOrchestrator;

@@ -88,6 +88,7 @@ QString ShortcutsDialog::buildHtml(const QString& keyColor)
 	html += section(tr("PSF Coefficients (global, outside text fields)"));
 	html += row(tr("Ctrl+C"),          tr("Copy coefficients of active patch"));
 	html += row(tr("Ctrl+V"),          tr("Paste coefficients to active patch"));
+	html += row(tr("Ctrl+Z"),          tr("Undo last paste"));
 	html += row(tr("Delete"),          tr("Reset coefficients of active patch to zero"));
 	html += QStringLiteral("</table>");
 

@@ -146,6 +146,12 @@ void ApplicationController::pasteCoefficients()
 {
 	if (this->coefficientClipboard.isEmpty() || this->psfModule == nullptr) return;
 
+	// Save undo state before overwriting
+	this->undoCoefficients = this->psfModule->getAllCoefficients();
+	this->undoFrame = this->getCurrentFrame();
+	this->undoPatchX = this->getCurrentPatchX();
+	this->undoPatchY = this->getCurrentPatchY();
+
 	// Clear external PSF override for current patch
 	if (this->hasInputData() && this->parameterTable != nullptr) {
 		int frame = this->getCurrentFrame();
@@ -156,6 +162,25 @@ void ApplicationController::pasteCoefficients()
 	this->psfModule->setAllCoefficients(this->coefficientClipboard);
 	this->storeCurrentCoefficients();
 	emit coefficientsLoaded(this->coefficientClipboard);
+}
+
+void ApplicationController::undoPasteCoefficients()
+{
+	if (this->undoCoefficients.isEmpty() || this->psfModule == nullptr || this->parameterTable == nullptr) return;
+
+	// Write undo coefficients back to the parameter table
+	int patchIdx = this->parameterTable->patchIndex(this->undoPatchX, this->undoPatchY);
+	this->parameterTable->setCoefficients(this->undoFrame, patchIdx, this->undoCoefficients);
+
+	// If we're still on the same patch, update sliders + PSF
+	if (this->getCurrentFrame() == this->undoFrame &&
+	    this->getCurrentPatchX() == this->undoPatchX &&
+	    this->getCurrentPatchY() == this->undoPatchY) {
+		this->psfModule->setAllCoefficients(this->undoCoefficients);
+		emit coefficientsLoaded(this->undoCoefficients);
+	}
+
+	this->undoCoefficients.clear();
 }
 
 void ApplicationController::saveParametersToFile(const QString& filePath)

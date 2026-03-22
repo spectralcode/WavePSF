@@ -104,11 +104,11 @@
 
 - there is a bug in batch optimization: when setting initial values source to "Offset from current" (btw this should be renamed to Offset from currenf frame or something like that) with value -1 and the optimization is going to the next frame the patches on this next frame do not get the initial values from the previous frame
 
-[done] - remember save output data location
+[done] remember save output data location
 
-- add ctrl + z to undo pasting coeffs to patch
+[done] add ctrl + z to undo pasting coeffs to patch
 
-[done] - remember save/load location wavefront coeff csv
+[done] remember save/load location wavefront coeff csv
 
 [done] add some kind of "loading" indicator when loading/saving wavefront coeff csv files
 

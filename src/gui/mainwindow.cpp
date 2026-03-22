@@ -124,6 +124,10 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
 				this->applicationController->pasteCoefficients();
 				return true;
 			}
+			if (keyEvent->matches(QKeySequence::Undo)) {
+				this->applicationController->undoPasteCoefficients();
+				return true;
+			}
 			if (keyEvent->key() == Qt::Key_Delete) {
 				this->applicationController->resetPSFCoefficients();
 				return true;
