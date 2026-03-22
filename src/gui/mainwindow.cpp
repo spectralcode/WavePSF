@@ -672,6 +672,10 @@ void MainWindow::connectPSFGridWidget() {
 	connect(this->applicationController, &ApplicationController::frameChanged,
 	        gridWidget, &PSFGridWidget::setCurrentFrame);
 
+	// Live PSF grid view update 
+	connect(this->applicationController, &ApplicationController::psfUpdatedForPatch,
+	        gridWidget, &PSFGridWidget::updateSinglePSF);
+
 	// Auto-sync orientation with viewers (when sync is on)
 	connect(this->sessionViewer, &ImageSessionViewer::viewerTransformChanged,
 	        gridWidget, &PSFGridWidget::applyViewTransform);

@@ -5,6 +5,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QSplitter>
+#include <QCheckBox>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QLabel>
@@ -21,9 +22,11 @@
 
 namespace {
 	const QString SETTINGS_GROUP    = QStringLiteral("psf_grid_widget");
-	const QString KEY_CROP_SIZE     = QStringLiteral("crop_size");
+	const QString KEY_CROP_SIZE      = QStringLiteral("crop_size");
+	const QString KEY_LIVE_UPDATE    = QStringLiteral("live_update");
 	const QString KEY_SPLITTER_STATE = QStringLiteral("splitter_state");
-	const int     DEF_CROP_SIZE     = 32;
+	const int     DEF_CROP_SIZE      = 32;
+	const bool    DEF_LIVE_UPDATE    = true;
 }
 
 PSFGridWidget::PSFGridWidget(QWidget* parent)
@@ -49,6 +52,7 @@ QVariantMap PSFGridWidget::getSettings() const
 {
 	QVariantMap settings;
 	settings[KEY_CROP_SIZE] = this->cropSizeSpinBox->value();
+	settings[KEY_LIVE_UPDATE] = this->liveUpdateCheckBox->isChecked();
 	settings[KEY_SPLITTER_STATE] = this->splitter->saveState();
 	return settings;
 }
@@ -56,6 +60,7 @@ QVariantMap PSFGridWidget::getSettings() const
 void PSFGridWidget::setSettings(const QVariantMap& settings)
 {
 	this->cropSizeSpinBox->setValue(settings.value(KEY_CROP_SIZE, DEF_CROP_SIZE).toInt());
+	this->liveUpdateCheckBox->setChecked(settings.value(KEY_LIVE_UPDATE, DEF_LIVE_UPDATE).toBool());
 	if (settings.contains(KEY_SPLITTER_STATE)) {
 		this->splitter->restoreState(settings.value(KEY_SPLITTER_STATE).toByteArray());
 	}
@@ -87,6 +92,13 @@ void PSFGridWidget::setupUI()
 	this->generateButton = new QPushButton(tr("Generate"), this);
 	controlsLayout->addWidget(this->generateButton);
 
+	this->liveUpdateCheckBox = new QCheckBox(tr("Auto-update"), this);
+	this->liveUpdateCheckBox->setChecked(DEF_LIVE_UPDATE);
+	this->liveUpdateCheckBox->setToolTip(tr("Automatically update the grid when coefficients change"));
+	controlsLayout->addWidget(this->liveUpdateCheckBox);
+
+	controlsLayout->addStretch();
+
 	controlsLayout->addWidget(new QLabel(tr("Crop:"), this));
 	this->cropSizeSpinBox = new QSpinBox(this);
 	this->cropSizeSpinBox->setRange(8, 512);
@@ -111,6 +123,9 @@ void PSFGridWidget::setupUI()
 	        this, &PSFGridWidget::onGenerateClicked);
 	connect(this->graphicsView, &QWidget::customContextMenuRequested,
 	        this, &PSFGridWidget::showContextMenu);
+	connect(this->liveUpdateCheckBox, &QCheckBox::toggled,
+	        this->generateButton, &QPushButton::setDisabled);
+	this->generateButton->setDisabled(this->liveUpdateCheckBox->isChecked());
 }
 
 void PSFGridWidget::onGenerateClicked()
@@ -237,6 +252,73 @@ void PSFGridWidget::applyViewTransform(QTransform viewTransform, QPointF)
 void PSFGridWidget::setSyncActive(bool active)
 {
 	this->syncActive = active;
+}
+
+void PSFGridWidget::updateSinglePSF(af::array psf, int patchX, int patchY)
+{
+	if (!this->liveUpdateCheckBox->isChecked()) {
+		return;
+	}
+	if (this->lastResult.mosaicImage.isNull() || this->mosaicItem == nullptr) {
+		// No mosaic yet — trigger full generation
+		emit generateRequested(this->currentFrame, this->cropSizeSpinBox->value());
+		return;
+	}
+
+	// Bounds check
+	if (patchX < 0 || patchX >= this->lastResult.cols ||
+	    patchY < 0 || patchY >= this->lastResult.rows) {
+		return;
+	}
+
+	int cellSize = this->lastResult.cellSize;
+
+	// Center-crop (same logic as PSFGridGenerator::generate)
+	int psfSize = static_cast<int>(psf.dims(0));
+	if (cellSize < psfSize) {
+		int offset = (psfSize - cellSize) / 2;
+		psf = psf(af::seq(offset, offset + cellSize - 1),
+		          af::seq(offset, offset + cellSize - 1));
+	}
+
+	// Transpose for correct display orientation
+	psf = af::transpose(psf);
+
+	// Store updated PSF
+	int patchIdx = patchY * this->lastResult.cols + patchX;
+	this->lastResult.rawPSFs[patchIdx] = psf;
+
+	// Convert to grayscale (same logic as PSFGridGenerator::afArrayToGrayscaleImage)
+	int h = static_cast<int>(psf.dims(0));
+	int w = static_cast<int>(psf.dims(1));
+	af::array floatArr = psf.as(af::dtype::f32);
+	float* hostData = floatArr.host<float>();
+
+	float peak = 0.0f;
+	for (int i = 0; i < w * h; i++) {
+		if (hostData[i] > peak) {
+			peak = hostData[i];
+		}
+	}
+	float scale = (peak > 0.0f) ? 255.0f / peak : 0.0f;
+
+	// Paint cell into mosaic
+	int stride = cellSize + this->lastResult.spacing;
+	int destX = patchX * stride;
+	int destY = patchY * stride;
+
+	for (int cy = 0; cy < h && (destY + cy) < this->lastResult.mosaicImage.height(); cy++) {
+		uchar* dstLine = this->lastResult.mosaicImage.scanLine(destY + cy);
+		for (int cx = 0; cx < w && (destX + cx) < this->lastResult.mosaicImage.width(); cx++) {
+			float val = hostData[cy + cx * h];
+			dstLine[destX + cx] = static_cast<uchar>(val * scale);
+		}
+	}
+
+	af::freeHost(hostData);
+
+	// Update display
+	this->mosaicItem->setPixmap(QPixmap::fromImage(this->lastResult.mosaicImage));
 }
 
 void PSFGridWidget::updateHighlight()

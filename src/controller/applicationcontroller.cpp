@@ -506,8 +506,10 @@ void ApplicationController::connectPSFModuleSignals()
 	if (this->psfModule != nullptr) {
 		connect(this->psfModule, &PSFModule::wavefrontUpdated,
 				this, &ApplicationController::psfWavefrontUpdated);
-		connect(this->psfModule, &PSFModule::psfUpdated,
-				this, &ApplicationController::psfUpdated);
+		connect(this->psfModule, &PSFModule::psfUpdated, this, [this](af::array psf) {
+			emit this->psfUpdated(psf);
+			emit this->psfUpdatedForPatch(psf, this->getCurrentPatchX(), this->getCurrentPatchY());
+		});
 		connect(this->psfModule, &PSFModule::parameterDescriptorsChanged,
 				this, &ApplicationController::psfParameterDescriptorsChanged);
 		connect(this->psfModule, &PSFModule::generatorTypeChanged,

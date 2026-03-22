@@ -6,6 +6,7 @@
 #include <QTransform>
 #include "core/psf/psfgridgenerator.h"
 
+class QCheckBox;
 class QPushButton;
 class QSpinBox;
 class QLabel;
@@ -33,6 +34,7 @@ public slots:
 	void rotate90();
 	void flipH();
 	void flipV();
+	void updateSinglePSF(af::array psf, int patchX, int patchY);
 	void applyViewTransform(QTransform transform, QPointF center);
 	void setSyncActive(bool active);
 
@@ -58,6 +60,7 @@ private:
 
 	// Controls
 	QPushButton* generateButton;
+	QCheckBox* liveUpdateCheckBox;
 	QSpinBox* cropSizeSpinBox;
 	QLabel* infoLabel;
 

@@ -212,6 +212,7 @@ signals:
 	// PSF pipeline results
 	void psfWavefrontUpdated(af::array wavefront);
 	void psfUpdated(af::array psf);
+	void psfUpdatedForPatch(af::array psf, int patchX, int patchY);
 	void psfParameterDescriptorsChanged(QVector<WavefrontParameter> descriptors);
 	void generatorTypeChanged(QString typeName);
 
