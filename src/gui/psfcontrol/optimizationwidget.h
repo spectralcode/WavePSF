@@ -56,6 +56,7 @@ private slots:
 	void onCancelClicked();
 	void onPatchTextChanged(const QString& text);
 	void resetPlotView();
+	void clearPlot();
 	void showPlotContextMenu(const QPoint& pos);
 	void onAlgorithmChanged(int index);
 	void updateMetricDescription();
@@ -128,6 +129,10 @@ private:
 	// Live preview
 	QCheckBox* livePreviewCheckBox;
 	QSpinBox* livePreviewIntervalSpinBox;
+
+	// Plot options
+	QCheckBox* clearPlotPerJobCheck;
+	int lastJobIndex;
 
 	// Status
 	QLabel* statusLabel;

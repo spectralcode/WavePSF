@@ -40,6 +40,7 @@ namespace {
 	const QString KEY_COEFFICIENT_SPEC      = QStringLiteral("coefficient_spec");
 	const QString KEY_LIVE_PREVIEW          = QStringLiteral("live_preview");
 	const QString KEY_LIVE_PREVIEW_INTERVAL = QStringLiteral("live_preview_interval");
+	const QString KEY_CLEAR_PLOT_PER_JOB   = QStringLiteral("clear_plot_per_job");
 
 	// Default values
 	const int     DEF_MODE                  = 0;
@@ -53,13 +54,15 @@ namespace {
 	const QString DEF_COEFFICIENT_SPEC      = QStringLiteral("2-8");
 	const bool    DEF_LIVE_PREVIEW          = true;
 	const int     DEF_LIVE_PREVIEW_INTERVAL = 10;
+	const bool    DEF_CLEAR_PLOT_PER_JOB   = true;
 }
 
 OptimizationWidget::OptimizationWidget(QWidget* parent)
 	: QWidget(parent),
 	  groundTruthAvailable(false),
 	  isRunning(false),
-	  currentFrame(0)
+	  currentFrame(0),
+	  lastJobIndex(-1)
 {
 	this->setupUI();
 }
@@ -293,6 +296,14 @@ void OptimizationWidget::setupControlSection(QVBoxLayout* layout)
 
 	layout->addLayout(previewLayout);
 
+	// Clear plot between batch jobs
+	QHBoxLayout* plotOptionsLayout = new QHBoxLayout();
+	this->clearPlotPerJobCheck = new QCheckBox(tr("Clear plot between batch jobs"), this);
+	this->clearPlotPerJobCheck->setChecked(DEF_CLEAR_PLOT_PER_JOB);
+	plotOptionsLayout->addWidget(this->clearPlotPerJobCheck);
+	plotOptionsLayout->addStretch();
+	layout->addLayout(plotOptionsLayout);
+
 	connect(this->startButton, &QPushButton::clicked,
 			this, &OptimizationWidget::onStartClicked);
 	connect(this->cancelButton, &QPushButton::clicked,
@@ -441,6 +452,14 @@ void OptimizationWidget::resetPlotView()
 	this->metricPlot->replot();
 }
 
+void OptimizationWidget::clearPlot()
+{
+	this->plotIterations.clear();
+	this->plotMetricValues.clear();
+	this->metricPlot->graph(0)->setData(this->plotIterations, this->plotMetricValues);
+	this->metricPlot->replot();
+}
+
 void OptimizationWidget::showPlotContextMenu(const QPoint& pos)
 {
 	QMenu menu(this);
@@ -451,6 +470,8 @@ void OptimizationWidget::showPlotContextMenu(const QPoint& pos)
 	menu.addSeparator();
 	QAction* resetAction = menu.addAction(tr("Reset View"));
 	connect(resetAction, &QAction::triggered, this, &OptimizationWidget::resetPlotView);
+	QAction* clearAction = menu.addAction(tr("Clear Plot"));
+	connect(clearAction, &QAction::triggered, this, &OptimizationWidget::clearPlot);
 	menu.exec(this->metricPlot->mapToGlobal(pos));
 }
 
@@ -592,6 +613,15 @@ void OptimizationWidget::updateProgress(const OptimizationProgress& progress)
 				.arg(progress.currentPatchY));
 	}
 
+	// Clear plot data when a new batch job starts
+	if (progress.currentJobIndex != this->lastJobIndex) {
+		if (this->clearPlotPerJobCheck->isChecked() && progress.totalJobs > 1) {
+			this->plotIterations.clear();
+			this->plotMetricValues.clear();
+		}
+		this->lastJobIndex = progress.currentJobIndex;
+	}
+
 	// Accumulate plot data (cheap)
 	this->plotIterations.append(this->plotIterations.size());
 	this->plotMetricValues.append(progress.currentMetric);
@@ -628,11 +658,8 @@ void OptimizationWidget::onOptimizationStarted()
 	this->setRunning(true);
 	this->statusLabel->setText(tr("Running..."));
 
-	// Clear plot
-	this->plotIterations.clear();
-	this->plotMetricValues.clear();
-	this->metricPlot->graph(0)->setData(this->plotIterations, this->plotMetricValues);
-	this->metricPlot->replot();
+	this->clearPlot();
+	this->lastJobIndex = -1;
 	this->replotTimer.start();
 }
 
@@ -745,6 +772,7 @@ QVariantMap OptimizationWidget::getSettings() const
 	settings.insert(KEY_COEFFICIENT_SPEC,      this->coefficientSpecLineEdit->text());
 	settings.insert(KEY_LIVE_PREVIEW,          this->livePreviewCheckBox->isChecked());
 	settings.insert(KEY_LIVE_PREVIEW_INTERVAL, this->livePreviewIntervalSpinBox->value());
+	settings.insert(KEY_CLEAR_PLOT_PER_JOB,   this->clearPlotPerJobCheck->isChecked());
 	return settings;
 }
 
@@ -788,6 +816,7 @@ void OptimizationWidget::setSettings(const QVariantMap& settings)
 	this->coefficientSpecLineEdit->setText(    settings.value(KEY_COEFFICIENT_SPEC,      DEF_COEFFICIENT_SPEC).toString());
 	this->livePreviewCheckBox->setChecked(     settings.value(KEY_LIVE_PREVIEW,          DEF_LIVE_PREVIEW).toBool());
 	this->livePreviewIntervalSpinBox->setValue(settings.value(KEY_LIVE_PREVIEW_INTERVAL, DEF_LIVE_PREVIEW_INTERVAL).toInt());
+	this->clearPlotPerJobCheck->setChecked(settings.value(KEY_CLEAR_PLOT_PER_JOB, DEF_CLEAR_PLOT_PER_JOB).toBool());
 }
 
 void OptimizationWidget::installScrollGuard(QWidget* widget)
