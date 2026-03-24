@@ -309,7 +309,7 @@ void ApplicationController::requestBatchDeconvolution()
 	this->suppressLiveDeconv = true;
 
 	this->batchProcessor->executeBatchDeconvolution(
-		this->imageSession, this->psfModule, this->parameterTable);
+		this->imageSession, this->psfModule, this->parameterTable, this->psfFileManager);
 
 	this->suppressLiveDeconv = false;
 	this->loadCoefficientsForCurrentPatch();

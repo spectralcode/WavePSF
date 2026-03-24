@@ -161,15 +161,29 @@ af::array PSFFileManager::loadPSFFromFolder(int frame, int patchIdx)
 		return af::array();
 	}
 
-	QString baseName = QString("%1_%2").arg(frame).arg(patchIdx);
 	QDir dir(this->customPSFFolder);
+
+	// Priority 1: exact match by "{frame}_{patchIdx}" convention
+	QString baseName = QString("%1_%2").arg(frame).arg(patchIdx);
 	QFileInfoList files = dir.entryInfoList(QDir::Files);
 	for (const QFileInfo& fi : qAsConst(files)) {
 		if (fi.baseName() == baseName) {
 			return this->loadPSFFromFile(fi.absoluteFilePath());
 		}
 	}
-	LOG_WARNING() << "No PSF file found for" << baseName << "in" << this->customPSFFolder;
+
+	// Priority 2: alphabetical index fallback (for arbitrary naming conventions)
+	QStringList filters;
+	filters << "*.tif" << "*.tiff" << "*.png" << "*.jpg" << "*.jpeg" << "*.bmp";
+	QFileInfoList imageFiles = dir.entryInfoList(filters, QDir::Files, QDir::Name);
+	int fileIndex = frame;
+	if (fileIndex >= 0 && fileIndex < imageFiles.size()) {
+		LOG_INFO() << "Loading PSF by alphabetical index:" << imageFiles[fileIndex].fileName();
+		return this->loadPSFFromFile(imageFiles[fileIndex].absoluteFilePath());
+	}
+
+	LOG_WARNING() << "No PSF file found for frame" << frame
+				  << "patch" << patchIdx << "in" << this->customPSFFolder;
 	return af::array();
 }
 

@@ -250,7 +250,7 @@ void MainWindow::setupProcessingMenu() {
 
 	this->deconvolveAllAction = new QAction("Deconvolve &All Frames", this);
 	this->deconvolveAllAction->setShortcut(QKeySequence("Ctrl+Shift+D"));
-	this->deconvolveAllAction->setStatusTip("Deconvolve all patches of every frame using stored coefficients");
+	this->deconvolveAllAction->setStatusTip("Deconvolve all patches of every frame using stored coefficients or external PSFs");
 	this->deconvolveAllAction->setEnabled(false);
 	connect(this->deconvolveAllAction, &QAction::triggered, this, &MainWindow::deconvolveAll);
 	this->processingMenu->addAction(this->deconvolveAllAction);
@@ -488,9 +488,11 @@ void MainWindow::connectApplicationController() {
 		connect(this->applicationController, &ApplicationController::psfSettingsUpdated,
 				this, [this](const PSFSettings& s) { this->currentPSFSettings = s; });
 
-		// Enable batch deconvolution action when parameters are loaded
+		// Enable batch deconvolution when parameters are loaded or custom PSF folder is active
 		connect(this->applicationController, &ApplicationController::parametersLoaded,
 				this, [this]() { this->deconvolveAllAction->setEnabled(true); });
+		connect(this->useCustomPSFFolderAction, &QAction::toggled,
+				this, [this](bool checked) { if (checked) this->deconvolveAllAction->setEnabled(true); });
 
 		// Disable batch deconvolution action when session is closed
 		connect(this->applicationController, &ApplicationController::sessionClosed,

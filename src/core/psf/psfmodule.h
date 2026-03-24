@@ -33,6 +33,7 @@ public slots:
 	void setAllCoefficients(const QVector<double>& coefficients);
 	void resetCoefficients();
 	void setExternalPSF(const af::array& psf);
+	void clearExternalPSF();
 	void setGridSize(int size);
 	af::array deconvolve(const af::array& input);
 

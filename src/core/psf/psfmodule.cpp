@@ -120,6 +120,12 @@ void PSFModule::setExternalPSF(const af::array& psf)
 	emit psfUpdated(psf);
 }
 
+void PSFModule::clearExternalPSF()
+{
+	this->usingExternalPSF = false;
+	this->externalPSF = af::array();
+}
+
 void PSFModule::resetCoefficients()
 {
 	this->generator->resetCoefficients();

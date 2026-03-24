@@ -1,6 +1,7 @@
 #include "batchprocessor.h"
 #include "controller/imagesession.h"
 #include "core/psf/psfmodule.h"
+#include "core/psf/psffilemanager.h"
 #include "data/wavefrontparametertable.h"
 #include "utils/logging.h"
 #include <QProgressDialog>
@@ -15,6 +16,7 @@ bool BatchProcessor::executeBatchDeconvolution(
 	ImageSession* imageSession,
 	PSFModule* psfModule,
 	WavefrontParameterTable* parameterTable,
+	PSFFileManager* psfFileManager,
 	QWidget* parentWidget)
 {
 	int frames = imageSession->getInputFrames();
@@ -50,19 +52,35 @@ bool BatchProcessor::executeBatchDeconvolution(
 					QString("Processing frame %1/%2, patch (%3,%4)...")
 						.arg(frame + 1).arg(frames).arg(x).arg(y));
 
-				// Load coefficients from parameter table
 				int patchIdx = parameterTable->patchIndex(x, y);
-				QVector<double> coeffs = parameterTable->getCoefficients(frame, patchIdx);
-				if (coeffs.isEmpty()) {
-					step++;
-					progressDialog.setValue(step);
-					QApplication::processEvents();
-					if (progressDialog.wasCanceled()) { cancelled = true; }
-					continue;
+
+				// Check external PSF sources (same priority as loadCoefficientsForCurrentPatch)
+				bool usedExternalPSF = false;
+				if (psfFileManager != nullptr) {
+					if (psfFileManager->hasOverride(frame, patchIdx)) {
+						psfModule->setExternalPSF(psfFileManager->getOverride(frame, patchIdx));
+						usedExternalPSF = true;
+					} else if (psfFileManager->isCustomFolderMode()) {
+						af::array psf = psfFileManager->loadPSFFromFolder(frame, patchIdx);
+						if (!psf.isempty()) {
+							psfModule->setExternalPSF(psf);
+							psfFileManager->storeOverride(frame, patchIdx, psf);
+							usedExternalPSF = true;
+						}
+					}
 				}
 
-				// Set coefficients (signals blocked, no GUI update)
-				psfModule->setAllCoefficients(coeffs);
+				if (!usedExternalPSF) {
+					QVector<double> coeffs = parameterTable->getCoefficients(frame, patchIdx);
+					if (coeffs.isEmpty()) {
+						step++;
+						progressDialog.setValue(step);
+						QApplication::processEvents();
+						if (progressDialog.wasCanceled()) { cancelled = true; }
+						continue;
+					}
+					psfModule->setAllCoefficients(coeffs);
+				}
 
 				// Get input patch
 				ImagePatch inputPatch = imageSession->getInputPatch(frame, x, y);
@@ -93,7 +111,8 @@ bool BatchProcessor::executeBatchDeconvolution(
 	// Flush last frame to CPU
 	imageSession->flushOutput();
 
-	// Restore signal state
+	// Restore normal PSF mode and signal state
+	psfModule->clearExternalPSF();
 	psfModule->blockSignals(oldBlockState);
 
 	if (cancelled) {
