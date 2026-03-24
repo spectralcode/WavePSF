@@ -58,6 +58,15 @@ void WavefrontParameterTable::clear()
 	this->coefficientsPerPatch = 0;
 }
 
+void WavefrontParameterTable::resetAllCoefficients()
+{
+	for (int f = 0; f < this->numberOfFrames; f++) {
+		for (int p = 0; p < this->patchesPerFrame; p++) {
+			this->table[f][p].fill(0.0);
+		}
+	}
+}
+
 void WavefrontParameterTable::setCoefficient(int frame, int patch, int index, double value)
 {
 	if (frame >= 0 && frame < this->numberOfFrames

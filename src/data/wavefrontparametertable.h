@@ -14,6 +14,7 @@ public:
 	// Resizing
 	void resize(int frames, int patchesInX, int patchesInY, int coeffsPerPatch);
 	void clear();
+	void resetAllCoefficients();
 
 	// Single coefficient access
 	void setCoefficient(int frame, int patch, int index, double value);

@@ -183,6 +183,26 @@ void ApplicationController::undoPasteCoefficients()
 	this->undoCoefficients.clear();
 }
 
+void ApplicationController::resetAllCoefficients()
+{
+	if (this->parameterTable == nullptr) return;
+	this->parameterTable->resetAllCoefficients();
+	this->loadCoefficientsForCurrentPatch();
+}
+
+void ApplicationController::clearExternalPSFs()
+{
+	if (this->psfFileManager != nullptr) {
+		this->psfFileManager->clearOverrides();
+		this->psfFileManager->setUseCustomPSFFolder(false);
+		emit customPSFFolderDisabled();
+	}
+	if (this->psfModule != nullptr) {
+		this->psfModule->clearExternalPSF();
+	}
+	this->loadCoefficientsForCurrentPatch();
+}
+
 void ApplicationController::saveParametersToFile(const QString& filePath)
 {
 	this->storeCurrentCoefficients();

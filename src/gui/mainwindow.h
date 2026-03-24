@@ -76,6 +76,7 @@ private slots:
 private:
 	void setupMenuBar();
 	void setupFileMenu();
+	void setupEditMenu();
 	void setupPSFMenu();
 	void setupProcessingMenu();
 	void setupViewMenu();
@@ -113,6 +114,7 @@ private:
 	QMenu* fileMenu;
 	RecentFilesMenu* recentInput;
 	RecentFilesMenu* recentGroundTruth;
+	QMenu* editMenu;
 	QMenu* psfMenu;
 	QMenu* processingMenu;
 	QMenu* viewMenu;

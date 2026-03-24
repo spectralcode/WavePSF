@@ -140,6 +140,7 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
 
 void MainWindow::setupMenuBar() {
 	this->setupFileMenu();
+	this->setupEditMenu();
 	this->setupPSFMenu();
 	this->setupProcessingMenu();
 	this->setupViewMenu();
@@ -201,6 +202,22 @@ void MainWindow::setupFileMenu() {
 	exitAction->setStatusTip("Exit the application");
 	connect(exitAction, &QAction::triggered, this, &QWidget::close);
 	this->fileMenu->addAction(exitAction);
+}
+
+void MainWindow::setupEditMenu() {
+	this->editMenu = this->menuBar()->addMenu("&Edit");
+
+	QAction* resetAllCoeffsAction = new QAction("Reset All Coefficients", this);
+	resetAllCoeffsAction->setStatusTip("Set all wavefront coefficients to zero for all frames and patches");
+	connect(resetAllCoeffsAction, &QAction::triggered,
+			this->applicationController, &ApplicationController::resetAllCoefficients);
+	this->editMenu->addAction(resetAllCoeffsAction);
+
+	QAction* clearExternalPSFsAction = new QAction("Clear External PSFs", this);
+	clearExternalPSFsAction->setStatusTip("Remove all loaded external PSFs from the override cache");
+	connect(clearExternalPSFsAction, &QAction::triggered,
+			this->applicationController, &ApplicationController::clearExternalPSFs);
+	this->editMenu->addAction(clearExternalPSFsAction);
 }
 
 void MainWindow::setupPSFMenu() {
@@ -493,6 +510,10 @@ void MainWindow::connectApplicationController() {
 				this, [this]() { this->deconvolveAllAction->setEnabled(true); });
 		connect(this->useCustomPSFFolderAction, &QAction::toggled,
 				this, [this](bool checked) { if (checked) this->deconvolveAllAction->setEnabled(true); });
+
+		// Uncheck custom PSF folder when external PSFs are cleared
+		connect(this->applicationController, &ApplicationController::customPSFFolderDisabled,
+				this, [this]() { this->useCustomPSFFolderAction->setChecked(false); });
 
 		// Disable batch deconvolution action when session is closed
 		connect(this->applicationController, &ApplicationController::sessionClosed,

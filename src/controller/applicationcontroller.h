@@ -96,6 +96,10 @@ public slots:
 	void pasteCoefficients();
 	void undoPasteCoefficients();
 
+	// Reset / clear
+	void resetAllCoefficients();
+	void clearExternalPSFs();
+
 	// File output
 	void saveOutputToFile(const QString& filePath);
 
@@ -213,6 +217,7 @@ signals:
 
 	// Session events
 	void sessionClosed();
+	void customPSFFolderDisabled();
 
 	// PSF pipeline results
 	void psfWavefrontUpdated(af::array wavefront);
