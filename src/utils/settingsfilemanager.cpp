@@ -65,6 +65,10 @@ QString SettingsFileManager::getSettingsFilePath() const {
 
 void SettingsFileManager::storeValues(QSettings* settings, QString groupName, QVariantMap settingsMap) {
 	settings->beginGroup(groupName);
+	// Clear stale keys/subgroups before writing current data
+	// Without this, removed settings (e.g. unchecked Zernike range overrides)
+	// stay in the INI file and reappear on next startup.
+	settings->remove("");
 	QMapIterator<QString, QVariant> i(settingsMap);
 	while (i.hasNext()) {
 		i.next();
