@@ -102,7 +102,7 @@ void PSFGridWidget::setupUI()
 
 	controlsLayout->addWidget(new QLabel(tr("Crop:"), this));
 	this->cropSizeSpinBox = new QSpinBox(this);
-	this->cropSizeSpinBox->setRange(8, 512);
+	this->cropSizeSpinBox->setRange(8, 1024);
 	this->cropSizeSpinBox->setValue(DEF_CROP_SIZE);
 	this->cropSizeSpinBox->setSuffix(tr(" px"));
 	controlsLayout->addWidget(this->cropSizeSpinBox);

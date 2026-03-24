@@ -243,7 +243,7 @@ void SettingsDialog::setupUI()
 	QFormLayout* psfLayout = new QFormLayout(psfTab);
 
 	this->gridSizeCombo = new QComboBox(psfTab);
-	this->gridSizeCombo->addItems({QStringLiteral("64"), QStringLiteral("128"), QStringLiteral("256"), QStringLiteral("512")});
+	this->gridSizeCombo->addItems({QStringLiteral("64"), QStringLiteral("128"), QStringLiteral("256"), QStringLiteral("512"), QStringLiteral("768"), QStringLiteral("1024")});
 	psfLayout->addRow(tr("Grid Size:"), this->gridSizeCombo);
 
 	this->apertureRadiusSpin = new QDoubleSpinBox(psfTab);
