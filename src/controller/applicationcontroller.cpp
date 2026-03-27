@@ -7,6 +7,7 @@
 #include "core/psf/psffilemanager.h"
 #include "core/optimization/optimizationjobbuilder.h"
 #include "core/processing/batchprocessor.h"
+#include "core/processing/volumetricprocessor.h"
 #include "core/interpolation/interpolationorchestrator.h"
 #include "core/psf/psfgridgenerator.h"
 #include "utils/logging.h"
@@ -308,12 +309,14 @@ void ApplicationController::setDeconvolutionLiveMode(bool enabled)
 {
 	this->deconvolutionLiveMode = enabled;
 	if (enabled) {
+		this->suppressLiveDeconv = false;
 		this->runDeconvolutionOnCurrentPatch();
 	}
 }
 
 void ApplicationController::requestDeconvolution()
 {
+	this->suppressLiveDeconv = false;
 	this->runDeconvolutionOnCurrentPatch();
 }
 
@@ -334,6 +337,31 @@ void ApplicationController::requestBatchDeconvolution()
 	this->suppressLiveDeconv = false;
 	this->loadCoefficientsForCurrentPatch();
 	emit batchDeconvolutionCompleted();
+}
+
+void ApplicationController::requestVolumetricDeconvolution(
+	const QString& psfFolderPath, int iterations)
+{
+	if (!this->hasInputData()) {
+		LOG_WARNING() << "Cannot run 3D deconvolution: no input data";
+		return;
+	}
+
+	this->suppressLiveDeconv = true;
+
+	bool success = this->volumetricProcessor->execute(
+		this->imageSession, psfFolderPath, iterations);
+
+	if (success) {
+		// Keep suppressLiveDeconv=true so that frame/patch changes don't
+		// trigger 2D deconvolution and overwrite the 3D result.
+		// Cleared when the user explicitly requests 2D deconvolution.
+		emit volumetricDeconvolutionCompleted();
+		LOG_INFO() << "3D volumetric deconvolution completed successfully";
+	} else {
+		this->suppressLiveDeconv = false;
+		LOG_WARNING() << "3D volumetric deconvolution did not complete";
+	}
 }
 
 void ApplicationController::runDeconvolutionOnCurrentPatch()
@@ -522,6 +550,9 @@ void ApplicationController::initializeComponents()
 	this->interpolationOrchestrator = new InterpolationOrchestrator(this);
 	this->psfFileManager = new PSFFileManager(this);
 	this->batchProcessor = new BatchProcessor(this);
+	this->volumetricProcessor = new VolumetricProcessor(this);
+	connect(this->volumetricProcessor, &VolumetricProcessor::error,
+			this, [](const QString& msg) { LOG_WARNING() << "3D deconvolution:" << msg; });
 	this->psfGridGenerator = new PSFGridGenerator(this);
 }
 

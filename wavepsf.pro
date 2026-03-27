@@ -75,6 +75,8 @@ SOURCES += \
 	$$SOURCEDIR/core/optimization/optimizationjobbuilder.cpp \
 	$$SOURCEDIR/core/psf/psffilemanager.cpp \
 	$$SOURCEDIR/core/processing/batchprocessor.cpp \
+	$$SOURCEDIR/core/processing/volumetricdeconvolver.cpp \
+	$$SOURCEDIR/core/processing/volumetricprocessor.cpp \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.cpp \
 	$$SOURCEDIR/gui/verticalscrollarea.cpp \
 	$$SOURCEDIR/gui/plotutils.cpp \
@@ -140,6 +142,8 @@ HEADERS += \
 	$$SOURCEDIR/core/optimization/optimizationjobbuilder.h \
 	$$SOURCEDIR/core/psf/psffilemanager.h \
 	$$SOURCEDIR/core/processing/batchprocessor.h \
+	$$SOURCEDIR/core/processing/volumetricdeconvolver.h \
+	$$SOURCEDIR/core/processing/volumetricprocessor.h \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.h \
 	$$SOURCEDIR/gui/qcppaletteobserver.h \
 	$$SOURCEDIR/gui/verticalscrollarea.h \

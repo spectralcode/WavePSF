@@ -22,6 +22,7 @@ class WavefrontParameterTable;
 class AFDeviceManager;
 class PSFFileManager;
 class BatchProcessor;
+class VolumetricProcessor;
 class InterpolationOrchestrator;
 class PSFGridGenerator;
 
@@ -113,6 +114,7 @@ public slots:
 
 	// Batch processing
 	void requestBatchDeconvolution();
+	void requestVolumetricDeconvolution(const QString& psfFolderPath, int iterations);
 
 	// PSF grid
 	void generatePSFGrid(int frame, int cropSize);
@@ -196,6 +198,7 @@ private:
 
 	// Batch processing
 	BatchProcessor* batchProcessor;
+	VolumetricProcessor* volumetricProcessor;
 
 	// PSF grid generation
 	PSFGridGenerator* psfGridGenerator;
@@ -244,6 +247,7 @@ signals:
 	// Batch processing
 	void parametersLoaded();
 	void batchDeconvolutionCompleted();
+	void volumetricDeconvolutionCompleted();
 
 	// Interpolation results
 	void interpolationCompleted(InterpolationResult result);

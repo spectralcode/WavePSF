@@ -68,6 +68,7 @@ private slots:
 
 	// Batch processing
 	void deconvolveAll();
+	void deconvolve3D();
 
 	// ApplicationController response handlers
 	void onInputFileLoaded(const QString& filePath);
@@ -139,6 +140,7 @@ private:
 
 	// Processing actions
 	QAction* deconvolveAllAction;
+	QAction* deconvolve3DAction;
 
 	// Style actions
 	QList<QAction*> styleActions;

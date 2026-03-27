@@ -415,6 +415,28 @@ void ImageSession::setCurrentOutputFrame(const af::array& frameData)
 	LOG_DEBUG() << "Current output frame updated";
 }
 
+af::array ImageSession::getInputFrame(int frameNr)
+{
+	if (!this->hasInputData() || this->inputAccessor == nullptr) {
+		return af::array();
+	}
+	if (!this->isValidFrame(frameNr)) {
+		return af::array();
+	}
+	return this->inputAccessor->getFrame(frameNr);
+}
+
+void ImageSession::setOutputFrame(int frameNr, const af::array& frameData)
+{
+	if (!this->hasOutputData() || this->outputAccessor == nullptr) {
+		return;
+	}
+	if (!this->isValidFrame(frameNr)) {
+		return;
+	}
+	this->outputAccessor->writeFrame(frameNr, frameData);
+}
+
 // State getters
 int ImageSession::getCurrentFrame() const { return this->currentFrame; }
 QPoint ImageSession::getCurrentPatch() const { return this->currentPatch; }

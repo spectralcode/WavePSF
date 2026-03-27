@@ -45,6 +45,10 @@ public:
 	af::array getCurrentGroundTruthFrame();
 	void setCurrentOutputFrame(const af::array& frameData);
 
+	// Arbitrary frame access (no side effects on currentFrame)
+	af::array getInputFrame(int frameNr);
+	void setOutputFrame(int frameNr, const af::array& frameData);
+
 	// State getters
 	int getCurrentFrame() const;
 	QPoint getCurrentPatch() const;

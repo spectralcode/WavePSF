@@ -113,3 +113,19 @@
 [done] add some kind of "loading" indicator when loading/saving wavefront coeff csv files
 
 - change the mouse interaction (zoom, translation, etc) for input/output viewer or for psf grid viewer such that all viewers use same control (i think the control of psf grid viewer is more intuitive and this should be used)
+
+- add optional 3d deconvolution functionality (maybe ui in deconvolution tab). maybe richardson-lucy only? see:
+	- https://svi.nl/Huygens-Deconvolution
+	- https://bigwww.epfl.ch/deconvolution/
+	- https://www.sciencedirect.com/science/article/pii/S1046202316305096
+	- https://imagej.net/imaging/deconvolution 
+
+- add option to select what initial estimate should be used for 3d deconvolution
+
+- add 3d PSF generator: input frame above focal plane with user defined zernike coeffs, frame nr of focal plane --> coeffs of start frame, and user defined or 0.0. coeffs in focal plane frame, are then used to make linear or maybe parabolic fit to generate 3d PSF
+
+- add optional cross sectional view 
+
+- maybe add volume viewer
+
+- maybe move set custom psf folder and use custom psf folder from PSF menu to PSF Generator groupb box in the Generator drop down. maybe call it "custom psf" or "from file"
