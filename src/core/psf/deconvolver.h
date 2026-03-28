@@ -5,6 +5,8 @@
 #include <QStringList>
 #include <arrayfire.h>
 
+class VolumetricDeconvolver;
+
 class Deconvolver : public QObject
 {
 	Q_OBJECT
@@ -14,7 +16,8 @@ public:
 		LANDWEBER,
 		TIKHONOV,
 		WIENER,
-		CONVOLUTION
+		CONVOLUTION,
+		RICHARDSON_LUCY_3D
 	};
 
 	explicit Deconvolver(int iterations = 128, QObject* parent = nullptr);
@@ -27,11 +30,16 @@ public:
 	void setRelaxationFactor(float factor);
 	void setRegularizationFactor(float factor);
 	void setNoiseToSignalFactor(float factor);
+	void setVolumePaddingMode(int mode);
+	void setAccelerationMode(int mode);
+
+	bool is3DAlgorithm() const;
 
 	static QStringList getAlgorithmNames();
 
 signals:
 	void error(QString message);
+	void iterationCompleted(int currentIteration, int totalIterations);
 
 private:
 	Algorithm algorithm;
@@ -39,6 +47,8 @@ private:
 	float landweberRelaxationFactor;
 	float tikhonovRegularizationFactor;
 	float wienerNoiseToSignalFactor;
+
+	VolumetricDeconvolver* volumetricDeconvolver;
 
 	af::array wienerDeconvolution(const af::array& blurredInput, const af::array& psf, float nsr) const;
 	void conserveTotalIntensity(const af::array& blurredInput, af::array& result);

@@ -28,6 +28,8 @@ signals:
 	void relaxationFactorChanged(float factor);
 	void regularizationFactorChanged(float factor);
 	void noiseToSignalFactorChanged(float factor);
+	void paddingModeChanged(int mode);
+	void accelerationModeChanged(int mode);
 	void liveModeChanged(bool enabled);
 	void deconvolutionRequested();
 
@@ -53,6 +55,10 @@ private:
 	QLabel* relaxationLabel;
 	QLabel* regularizationLabel;
 	QLabel* noiseToSignalLabel;
+	QLabel* paddingModeLabel;
+	QComboBox* paddingModeComboBox;
+	QLabel* accelerationModeLabel;
+	QComboBox* accelerationModeComboBox;
 };
 
 #endif // DECONVOLUTIONSETTINGSWIDGET_H

@@ -93,6 +93,10 @@ ProcessingControlWidget::ProcessingControlWidget(QWidget* parent)
 			this, &ProcessingControlWidget::deconvRegularizationFactorChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::noiseToSignalFactorChanged,
 			this, &ProcessingControlWidget::deconvNoiseToSignalFactorChanged);
+	connect(this->deconvSettings, &DeconvolutionSettingsWidget::paddingModeChanged,
+			this, &ProcessingControlWidget::deconvPaddingModeChanged);
+	connect(this->deconvSettings, &DeconvolutionSettingsWidget::accelerationModeChanged,
+			this, &ProcessingControlWidget::deconvAccelerationModeChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::liveModeChanged,
 			this, &ProcessingControlWidget::deconvLiveModeChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::deconvolutionRequested,

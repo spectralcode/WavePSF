@@ -36,6 +36,8 @@ public slots:
 	void clearExternalPSF();
 	void setGridSize(int size);
 	af::array deconvolve(const af::array& input);
+	af::array deconvolve(const af::array& input, const af::array& psf);
+	bool is3DAlgorithm() const;
 
 	// Generator switching
 	void setGeneratorType(const QString& typeName);
@@ -49,6 +51,8 @@ public slots:
 	void setDeconvolutionRelaxationFactor(float factor);
 	void setDeconvolutionRegularizationFactor(float factor);
 	void setDeconvolutionNoiseToSignalFactor(float factor);
+	void setVolumePaddingMode(int mode);
+	void setAccelerationMode(int mode);
 
 	void clearCachedArrays();
 
@@ -59,6 +63,7 @@ signals:
 	void generatorTypeChanged(QString typeName);
 	void nollIndicesChanged();
 	void deconvolutionSettingsChanged();
+	void deconvolutionIterationCompleted(int currentIteration, int totalIterations);
 	void error(QString message);
 
 private:

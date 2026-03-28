@@ -1,180 +1,98 @@
-#define NOMINMAX
 #include "volumetricprocessor.h"
-#include "volumetricdeconvolver.h"
 #include "controller/imagesession.h"
+#include "core/psf/psfmodule.h"
+#include "core/psf/psffilemanager.h"
+#include "data/wavefrontparametertable.h"
 #include "utils/logging.h"
-#include <QDir>
-#include <QFileInfo>
-#include <QProgressDialog>
-#include <QMessageBox>
-#include <QApplication>
 
-VolumetricProcessor::VolumetricProcessor(QObject* parent)
-	: QObject(parent)
+// --- Static helpers for per-patch volumetric deconvolution ---
+
+af::array VolumetricProcessor::resolve2DPSF(PSFModule* psfModule,
+	WavefrontParameterTable* paramTable,
+	PSFFileManager* psfFileManager,
+	int frame, int patchIdx)
 {
-}
-
-af::array VolumetricProcessor::loadVolume(ImageSession* imageSession)
-{
-	int frames = imageSession->getInputFrames();
-	int H = imageSession->getInputHeight();
-	int W = imageSession->getInputWidth();
-
-	if (frames == 0 || H == 0 || W == 0) {
-		return af::array();
+	// Priority 1: Override map (one-shot loaded PSFs)
+	if (psfFileManager != nullptr && psfFileManager->hasOverride(frame, patchIdx)) {
+		return psfFileManager->getOverride(frame, patchIdx);
 	}
 
-	af::array volume = af::constant(0.0f, W, H, frames);
-	for (int f = 0; f < frames; ++f) {
-		af::array frame = imageSession->getInputFrame(f);
-		if (frame.isempty()) {
-			LOG_WARNING() << "Failed to load frame" << f << "for 3D volume";
-			return af::array();
+	// Priority 2: Custom PSF folder
+	if (psfFileManager != nullptr && psfFileManager->isCustomFolderMode()) {
+		af::array psf = psfFileManager->loadPSFFromFolder(frame, patchIdx);
+		if (!psf.isempty()) {
+			psfFileManager->storeOverride(frame, patchIdx, psf);
+			return psf;
 		}
-		volume(af::span, af::span, f) = frame.as(f32);
 	}
-	return volume;
+
+	// Priority 3: Compute from coefficients
+	QVector<double> coeffs = paramTable->getCoefficients(frame, patchIdx);
+	if (!coeffs.isEmpty()) {
+		return psfModule->computePSFFromCoefficients(coeffs);
+	}
+
+	return af::array();
 }
 
-af::array VolumetricProcessor::loadPSFVolume(const QString& folderPath)
+af::array VolumetricProcessor::assembleSubvolume(ImageSession* session,
+	int patchX, int patchY)
 {
-	QDir dir(folderPath);
-	QStringList filters;
-	filters << "*.tif" << "*.tiff";
-	QFileInfoList files = dir.entryInfoList(filters, QDir::Files, QDir::Name);
+	int frames = session->getInputFrames();
+	if (frames == 0) return af::array();
 
-	if (files.isEmpty()) {
-		emit error(QString("No TIFF files found in PSF folder: %1").arg(folderPath));
-		return af::array();
+	ImagePatch first = session->getInputPatch(0, patchX, patchY);
+	if (!first.isValid()) return af::array();
+
+	int pH = first.data.dims(0);
+	int pW = first.data.dims(1);
+
+	af::array subvolume = af::constant(0.0f, pH, pW, frames);
+	subvolume(af::span, af::span, 0) = first.data.as(f32);
+
+	for (int f = 1; f < frames; ++f) {
+		ImagePatch patch = session->getInputPatch(f, patchX, patchY);
+		if (!patch.isValid()) return af::array();
+		subvolume(af::span, af::span, f) = patch.data.as(f32);
 	}
 
-	// Load first file to get dimensions
-	af::array first = af::loadImageNative(
-		files[0].absoluteFilePath().toStdString().c_str()).as(f32);
-	if (first.isempty()) {
-		emit error(QString("Failed to load first PSF slice: %1")
-			.arg(files[0].absoluteFilePath()));
-		return af::array();
-	}
+	return subvolume;
+}
 
-	int pH = first.dims(0);
-	int pW = first.dims(1);
-	int pD = files.size();
+af::array VolumetricProcessor::assemble3DPSF(PSFModule* psfModule,
+	WavefrontParameterTable* paramTable,
+	PSFFileManager* psfFileManager,
+	int patchIdx, int numFrames)
+{
+	if (numFrames == 0) return af::array();
 
-	af::array psfVolume = af::constant(0.0f, pH, pW, pD);
-	psfVolume(af::span, af::span, 0) = first;
+	af::array firstPSF = resolve2DPSF(psfModule, paramTable, psfFileManager, 0, patchIdx);
+	if (firstPSF.isempty()) return af::array();
 
-	for (int i = 1; i < pD; ++i) {
-		af::array slice = af::loadImageNative(
-			files[i].absoluteFilePath().toStdString().c_str()).as(f32);
-		if (slice.dims(0) != pH || slice.dims(1) != pW) {
-			emit error(QString("PSF slice %1 has different dimensions (%2x%3) than first slice (%4x%5)")
-				.arg(files[i].fileName())
-				.arg(slice.dims(0)).arg(slice.dims(1))
-				.arg(pH).arg(pW));
-			return af::array();
+	int pH = firstPSF.dims(0);
+	int pW = firstPSF.dims(1);
+
+	af::array psf3d = af::constant(0.0f, pH, pW, numFrames);
+	psf3d(af::span, af::span, 0) = firstPSF;
+
+	for (int f = 1; f < numFrames; ++f) {
+		af::array slice = resolve2DPSF(psfModule, paramTable, psfFileManager, f, patchIdx);
+		if (slice.isempty()) {
+			LOG_WARNING() << "No PSF available for frame" << f << "patch" << patchIdx;
+			continue;
 		}
-		psfVolume(af::span, af::span, i) = slice;
+		psf3d(af::span, af::span, f) = slice;
 	}
 
-	// af::loadImageNative returns (height, width) but the input volume
-	// uses (width, height) convention. Transpose to match.
-	psfVolume = af::reorder(psfVolume, 1, 0, 2);
-
-	LOG_INFO() << "Loaded 3D PSF:" << psfVolume.dims(0) << "x"
-			   << psfVolume.dims(1) << "x" << psfVolume.dims(2)
-			   << "from" << folderPath;
-	return psfVolume;
+	return psf3d;
 }
 
-void VolumetricProcessor::writeVolumeToOutput(ImageSession* imageSession,
-	const af::array& volume)
+void VolumetricProcessor::writeSubvolumeToOutput(ImageSession* session,
+	int patchX, int patchY, const af::array& result)
 {
-	int frames = volume.dims(2);
+	int frames = result.dims(2);
 	for (int f = 0; f < frames; ++f) {
-		af::array slice = volume(af::span, af::span, f);
-		imageSession->setOutputFrame(f, slice);
+		af::array slice = result(af::span, af::span, f);
+		session->setOutputPatch(f, patchX, patchY, slice);
 	}
-}
-
-bool VolumetricProcessor::execute(ImageSession* imageSession,
-	const QString& psfFolderPath, int iterations, QWidget* parentWidget)
-{
-	if (imageSession == nullptr || !imageSession->hasInputData()) {
-		emit error("No input data loaded.");
-		return false;
-	}
-
-	int H = imageSession->getInputHeight();
-	int W = imageSession->getInputWidth();
-	int D = imageSession->getInputFrames();
-
-	// GPU memory check
-	size_t requiredBytes = VolumetricDeconvolver::estimateGPUMemory(W, H, D);
-	double requiredMB = static_cast<double>(requiredBytes) / (1024.0 * 1024.0);
-
-	QString memMsg = QString("3D Deconvolution requires approximately %1 MB of GPU memory.\n"
-		"Volume: %2 x %3 x %4\nIterations: %5\n\nProceed?")
-		.arg(requiredMB, 0, 'f', 0).arg(H).arg(W).arg(D).arg(iterations);
-
-	if (QMessageBox::question(parentWidget, "3D Deconvolution",
-		memMsg, QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
-		return false;
-	}
-
-	// Progress dialog
-	QProgressDialog progress("Loading image volume...", "Cancel", 0, 0, parentWidget);
-	progress.setWindowTitle("3D Deconvolution");
-	progress.setWindowModality(Qt::ApplicationModal);
-	progress.setMinimumDuration(0);
-	progress.show();
-	QApplication::processEvents();
-
-	// Load input volume
-	af::array volume = this->loadVolume(imageSession);
-	if (volume.isempty()) {
-		emit error("Failed to load image volume.");
-		return false;
-	}
-	if (progress.wasCanceled()) return false;
-
-	// Load 3D PSF
-	progress.setLabelText("Loading 3D PSF...");
-	QApplication::processEvents();
-
-	af::array psf = this->loadPSFVolume(psfFolderPath);
-	if (psf.isempty()) return false;
-	if (progress.wasCanceled()) return false;
-
-	// Run 3D Richardson-Lucy
-	progress.setMaximum(iterations);
-	progress.setLabelText("Running 3D Richardson-Lucy...");
-	progress.setValue(0);
-
-	VolumetricDeconvolver deconvolver(this);
-	connect(&deconvolver, &VolumetricDeconvolver::iterationCompleted,
-		&progress, [&progress](int current, int total) {
-			progress.setValue(current);
-			progress.setLabelText(
-				QString("3D Richardson-Lucy: iteration %1 / %2")
-					.arg(current).arg(total));
-			QApplication::processEvents();
-		});
-
-	af::array result = deconvolver.deconvolve(volume, psf, iterations);
-	if (result.isempty()) return false;
-	if (progress.wasCanceled()) return false;
-
-	// Write result
-	progress.setLabelText("Writing deconvolved volume...");
-	progress.setMaximum(0);
-	QApplication::processEvents();
-
-	this->writeVolumeToOutput(imageSession, result);
-
-	progress.close();
-
-	LOG_INFO() << "3D deconvolution completed:" << H << "x" << W << "x" << D
-			   << "," << iterations << "iterations";
-	return true;
 }

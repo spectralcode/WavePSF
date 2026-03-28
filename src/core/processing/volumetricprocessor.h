@@ -1,37 +1,39 @@
 #ifndef VOLUMETRICPROCESSOR_H
 #define VOLUMETRICPROCESSOR_H
 
-#include <QObject>
 #include <QString>
 #include <arrayfire.h>
 
 class ImageSession;
-class QWidget;
+class PSFModule;
+class PSFFileManager;
+class WavefrontParameterTable;
 
-class VolumetricProcessor : public QObject
+class VolumetricProcessor
 {
-	Q_OBJECT
 public:
-	explicit VolumetricProcessor(QObject* parent = nullptr);
+	// Assemble subvolume from all frames for one spatial patch
+	static af::array assembleSubvolume(ImageSession* session, int patchX, int patchY);
 
-	// Full 3D deconvolution pipeline:
-	// 1. GPU memory check with user confirmation
-	// 2. Load input volume (all frames)
-	// 3. Load 3D PSF from folder of TIFF slices
-	// 4. Run 3D Richardson-Lucy
-	// 5. Write result back to output
-	bool execute(ImageSession* imageSession,
-				 const QString& psfFolderPath,
-				 int iterations,
-				 QWidget* parentWidget = nullptr);
+	// Assemble 3D PSF by stacking per-frame 2D PSFs (same priority as 2D batch)
+	static af::array assemble3DPSF(PSFModule* psfModule,
+								   WavefrontParameterTable* paramTable,
+								   PSFFileManager* psfFileManager,
+								   int patchIdx, int numFrames);
 
-signals:
-	void error(QString message);
+	// Write 3D result back to output, one frame at a time
+	static void writeSubvolumeToOutput(ImageSession* session,
+									   int patchX, int patchY,
+									   const af::array& result);
 
 private:
-	af::array loadVolume(ImageSession* imageSession);
-	af::array loadPSFVolume(const QString& folderPath);
-	void writeVolumeToOutput(ImageSession* imageSession, const af::array& volume);
+	VolumetricProcessor() = delete;
+
+	// Resolve single 2D PSF for (frame, patchIdx) using existing priority
+	static af::array resolve2DPSF(PSFModule* psfModule,
+								  WavefrontParameterTable* paramTable,
+								  PSFFileManager* psfFileManager,
+								  int frame, int patchIdx);
 };
 
 #endif // VOLUMETRICPROCESSOR_H

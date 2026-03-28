@@ -1,4 +1,5 @@
 #include "deconvolver.h"
+#include "core/processing/volumetricdeconvolver.h"
 #include "utils/logging.h"
 #include <algorithm>
 
@@ -10,7 +11,12 @@ Deconvolver::Deconvolver(int iterations, QObject* parent)
 	, landweberRelaxationFactor(0.65f)
 	, tikhonovRegularizationFactor(0.005f)
 	, wienerNoiseToSignalFactor(0.01f)
+	, volumetricDeconvolver(new VolumetricDeconvolver(this))
 {
+	connect(this->volumetricDeconvolver, &VolumetricDeconvolver::iterationCompleted,
+			this, &Deconvolver::iterationCompleted);
+	connect(this->volumetricDeconvolver, &VolumetricDeconvolver::error,
+			this, &Deconvolver::error);
 }
 
 Deconvolver::~Deconvolver()
@@ -58,6 +64,10 @@ af::array Deconvolver::deconvolve(const af::array& blurredInput, const af::array
 
 			case CONVOLUTION:
 				result = af::convolve2(input, kernel);
+				break;
+
+			case RICHARDSON_LUCY_3D:
+				result = this->volumetricDeconvolver->deconvolve(input, kernel, this->iterations);
 				break;
 
 			default:
@@ -117,6 +127,23 @@ void Deconvolver::setNoiseToSignalFactor(float factor)
 	}
 }
 
+void Deconvolver::setVolumePaddingMode(int mode)
+{
+	this->volumetricDeconvolver->setPaddingMode(
+		static_cast<VolumetricDeconvolver::PaddingMode>(mode));
+}
+
+void Deconvolver::setAccelerationMode(int mode)
+{
+	this->volumetricDeconvolver->setAccelerationMode(
+		static_cast<VolumetricDeconvolver::AccelerationMode>(mode));
+}
+
+bool Deconvolver::is3DAlgorithm() const
+{
+	return this->algorithm == RICHARDSON_LUCY_3D;
+}
+
 QStringList Deconvolver::getAlgorithmNames()
 {
 	return QStringList {
@@ -124,7 +151,8 @@ QStringList Deconvolver::getAlgorithmNames()
 		"Landweber",
 		"Tikhonov",
 		"Wiener",
-		"Convolution"
+		"Convolution",
+		"Richardson-Lucy 3D"
 	};
 }
 

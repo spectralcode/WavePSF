@@ -13,6 +13,8 @@
 #include "utils/logging.h"
 #include "utils/settingsfilemanager.h"
 #include "utils/afdevicemanager.h"
+#include <QProgressDialog>
+#include <QApplication>
 
 ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent), afDeviceManager(afDeviceManager), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
@@ -67,8 +69,18 @@ void ApplicationController::setCurrentFrame(int frame)
 {
 	if (this->imageSession != nullptr) {
 		this->storeCurrentCoefficients();
+
+		// Suppress live deconvolution during frame change for 3D algorithms.
+		// 3D processes all frames at once, so frame change should not re-trigger.
+		bool suppress3D = this->deconvolutionLiveMode &&
+						  this->psfModule != nullptr &&
+						  this->psfModule->is3DAlgorithm();
+		if (suppress3D) this->suppressLiveDeconv = true;
+
 		this->imageSession->setCurrentFrame(frame);
 		this->loadCoefficientsForCurrentPatch();
+
+		if (suppress3D) this->suppressLiveDeconv = false;
 	}
 }
 
@@ -305,6 +317,20 @@ void ApplicationController::setDeconvolutionNoiseToSignalFactor(float factor)
 	}
 }
 
+void ApplicationController::setVolumePaddingMode(int mode)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->setVolumePaddingMode(mode);
+	}
+}
+
+void ApplicationController::setAccelerationMode(int mode)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->setAccelerationMode(mode);
+	}
+}
+
 void ApplicationController::setDeconvolutionLiveMode(bool enabled)
 {
 	this->deconvolutionLiveMode = enabled;
@@ -339,34 +365,14 @@ void ApplicationController::requestBatchDeconvolution()
 	emit batchDeconvolutionCompleted();
 }
 
-void ApplicationController::requestVolumetricDeconvolution(
-	const QString& psfFolderPath, int iterations)
-{
-	if (!this->hasInputData()) {
-		LOG_WARNING() << "Cannot run 3D deconvolution: no input data";
-		return;
-	}
-
-	this->suppressLiveDeconv = true;
-
-	bool success = this->volumetricProcessor->execute(
-		this->imageSession, psfFolderPath, iterations);
-
-	if (success) {
-		// Keep suppressLiveDeconv=true so that frame/patch changes don't
-		// trigger 2D deconvolution and overwrite the 3D result.
-		// Cleared when the user explicitly requests 2D deconvolution.
-		emit volumetricDeconvolutionCompleted();
-		LOG_INFO() << "3D volumetric deconvolution completed successfully";
-	} else {
-		this->suppressLiveDeconv = false;
-		LOG_WARNING() << "3D volumetric deconvolution did not complete";
-	}
-}
-
 void ApplicationController::runDeconvolutionOnCurrentPatch()
 {
 	if (!this->hasInputData() || this->psfModule == nullptr) {
+		return;
+	}
+
+	if (this->psfModule->is3DAlgorithm()) {
+		this->runVolumetricDeconvolutionOnCurrentPatch();
 		return;
 	}
 
@@ -382,6 +388,78 @@ void ApplicationController::runDeconvolutionOnCurrentPatch()
 	}
 
 	this->imageSession->setCurrentOutputPatch(result);
+}
+
+void ApplicationController::runVolumetricDeconvolutionOnCurrentPatch()
+{
+	if (this->parameterTable == nullptr || this->imageSession == nullptr) {
+		return;
+	}
+
+	int patchX = this->getCurrentPatchX();
+	int patchY = this->getCurrentPatchY();
+	int patchIdx = this->parameterTable->patchIndex(patchX, patchY);
+	int frames = this->imageSession->getInputFrames();
+
+	af::array subvolume = VolumetricProcessor::assembleSubvolume(
+		this->imageSession, patchX, patchY);
+	if (subvolume.isempty()) {
+		LOG_WARNING() << "3D deconv: empty subvolume for patch" << patchX << patchY;
+		return;
+	}
+	LOG_INFO() << "3D deconv: subvolume" << subvolume.dims(0) << "x"
+			   << subvolume.dims(1) << "x" << subvolume.dims(2);
+
+	af::array psf3D = VolumetricProcessor::assemble3DPSF(
+		this->psfModule, this->parameterTable, this->psfFileManager,
+		patchIdx, frames);
+	if (psf3D.isempty()) {
+		LOG_WARNING() << "3D deconv: empty 3D PSF for patch" << patchX << patchY;
+		return;
+	}
+	LOG_INFO() << "3D deconv: PSF" << psf3D.dims(0) << "x"
+			   << psf3D.dims(1) << "x" << psf3D.dims(2);
+
+	// Show progress dialog for 3D RL iterations
+	QProgressDialog progress("Preparing 3D deconvolution...", QString(), 0, 0);
+	progress.setWindowTitle("3D Deconvolution");
+	progress.setWindowModality(Qt::ApplicationModal);
+	progress.setMinimumDuration(0);
+	progress.show();
+	QApplication::processEvents();
+
+	QMetaObject::Connection iterConn = connect(this->psfModule,
+		&PSFModule::deconvolutionIterationCompleted,
+		[&progress](int curIter, int totalIter) {
+			if (progress.maximum() != totalIter) {
+				progress.setMaximum(totalIter);
+			}
+			progress.setValue(curIter);
+			progress.setLabelText(
+				QString("3D Richardson-Lucy: iteration %1 / %2")
+					.arg(curIter).arg(totalIter));
+			QApplication::processEvents();
+		});
+
+	af::array result = this->psfModule->deconvolve(subvolume, psf3D);
+
+	disconnect(iterConn);
+	progress.close();
+
+	if (result.isempty()) {
+		LOG_WARNING() << "3D deconv: deconvolution returned empty result";
+		return;
+	}
+	LOG_INFO() << "3D deconv: result" << result.dims(0) << "x"
+			   << result.dims(1) << "x" << result.dims(2);
+
+	VolumetricProcessor::writeSubvolumeToOutput(
+		this->imageSession, patchX, patchY, result);
+
+	// Trigger viewer refresh via the same signal chain as 2D:
+	// setCurrentOutputPatch → outputPatchUpdated → deconvolutionCompleted
+	this->imageSession->setCurrentOutputPatch(
+		result(af::span, af::span, this->getCurrentFrame()));
 }
 
 void ApplicationController::handlePSFUpdatedForDeconvolution(af::array psf)
@@ -550,9 +628,6 @@ void ApplicationController::initializeComponents()
 	this->interpolationOrchestrator = new InterpolationOrchestrator(this);
 	this->psfFileManager = new PSFFileManager(this);
 	this->batchProcessor = new BatchProcessor(this);
-	this->volumetricProcessor = new VolumetricProcessor(this);
-	connect(this->volumetricProcessor, &VolumetricProcessor::error,
-			this, [](const QString& msg) { LOG_WARNING() << "3D deconvolution:" << msg; });
 	this->psfGridGenerator = new PSFGridGenerator(this);
 }
 

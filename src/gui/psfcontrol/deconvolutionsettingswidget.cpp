@@ -1,5 +1,6 @@
 #include "deconvolutionsettingswidget.h"
 #include "core/psf/deconvolver.h"
+#include "core/processing/volumetricdeconvolver.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -22,6 +23,8 @@ namespace {
 	const QString KEY_RELAXATION_FACTOR     = QStringLiteral("relaxation_factor");
 	const QString KEY_REGULARIZATION_FACTOR = QStringLiteral("regularization_factor");
 	const QString KEY_NOISE_TO_SIGNAL       = QStringLiteral("noise_to_signal_factor");
+	const QString KEY_PADDING_MODE          = QStringLiteral("padding_mode");
+	const QString KEY_ACCELERATION          = QStringLiteral("acceleration_enabled");
 	const QString KEY_LIVE_MODE             = QStringLiteral("live_mode");
 
 	// Default values
@@ -30,6 +33,8 @@ namespace {
 	const double DEF_RELAXATION_FACTOR     = 0.65;
 	const double DEF_REGULARIZATION_FACTOR = 0.005;
 	const double DEF_NOISE_TO_SIGNAL       = 0.01;
+	const int    DEF_PADDING_MODE          = VolumetricDeconvolver::MIRROR_PAD;
+	const int    DEF_ACCELERATION          = VolumetricDeconvolver::ACCEL_BIGGS_ANDREWS;
 	const bool   DEF_LIVE_MODE             = true;
 }
 
@@ -100,6 +105,22 @@ void DeconvolutionSettingsWidget::setupUI()
 	this->installScrollGuard(this->noiseToSignalFactorSpinBox);
 	formLayout->addRow(this->noiseToSignalLabel, this->noiseToSignalFactorSpinBox);
 
+	// Volume padding mode (3D RL only)
+	this->paddingModeLabel = new QLabel(tr("Volume Padding:"), controlsWidget);
+	this->paddingModeComboBox = new QComboBox(controlsWidget);
+	this->paddingModeComboBox->addItems(VolumetricDeconvolver::getPaddingModeNames());
+	this->paddingModeComboBox->setCurrentIndex(DEF_PADDING_MODE);
+	this->installScrollGuard(this->paddingModeComboBox);
+	formLayout->addRow(this->paddingModeLabel, this->paddingModeComboBox);
+
+	// Acceleration mode (3D RL only)
+	this->accelerationModeLabel = new QLabel(tr("Acceleration:"), controlsWidget);
+	this->accelerationModeComboBox = new QComboBox(controlsWidget);
+	this->accelerationModeComboBox->addItems(VolumetricDeconvolver::getAccelerationModeNames());
+	this->accelerationModeComboBox->setCurrentIndex(DEF_ACCELERATION);
+	this->installScrollGuard(this->accelerationModeComboBox);
+	formLayout->addRow(this->accelerationModeLabel, this->accelerationModeComboBox);
+
 	controlsLayout->addLayout(formLayout);
 
 	// Separator
@@ -141,6 +162,12 @@ void DeconvolutionSettingsWidget::setupUI()
 	connect(this->noiseToSignalFactorSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
 			this, [this](double value) { emit this->noiseToSignalFactorChanged(static_cast<float>(value)); });
 
+	connect(this->paddingModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, &DeconvolutionSettingsWidget::paddingModeChanged);
+
+	connect(this->accelerationModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, &DeconvolutionSettingsWidget::accelerationModeChanged);
+
 	connect(this->liveModeCheckBox, &QCheckBox::toggled,
 			this, [this](bool checked) {
 				this->deconvolveButton->setEnabled(!checked);
@@ -166,10 +193,15 @@ void DeconvolutionSettingsWidget::updateParameterVisibility(int algorithmIndex)
 	this->regularizationFactorSpinBox->setVisible(false);
 	this->noiseToSignalLabel->setVisible(false);
 	this->noiseToSignalFactorSpinBox->setVisible(false);
+	this->paddingModeLabel->setVisible(false);
+	this->paddingModeComboBox->setVisible(false);
+	this->accelerationModeLabel->setVisible(false);
+	this->accelerationModeComboBox->setVisible(false);
 
-	// Iterations are used by RL and Landweber
+	// Iterations are used by RL, Landweber, and 3D RL
 	bool showIterations = (algorithmIndex == Deconvolver::RICHARDSON_LUCY ||
-						   algorithmIndex == Deconvolver::LANDWEBER);
+						   algorithmIndex == Deconvolver::LANDWEBER ||
+						   algorithmIndex == Deconvolver::RICHARDSON_LUCY_3D);
 	this->iterationsLabel->setVisible(showIterations);
 	this->iterationsSpinBox->setVisible(showIterations);
 
@@ -186,6 +218,12 @@ void DeconvolutionSettingsWidget::updateParameterVisibility(int algorithmIndex)
 		case Deconvolver::WIENER:
 			this->noiseToSignalLabel->setVisible(true);
 			this->noiseToSignalFactorSpinBox->setVisible(true);
+			break;
+		case Deconvolver::RICHARDSON_LUCY_3D:
+			this->paddingModeLabel->setVisible(true);
+			this->paddingModeComboBox->setVisible(true);
+			this->accelerationModeLabel->setVisible(true);
+			this->accelerationModeComboBox->setVisible(true);
 			break;
 		default:
 			break;
@@ -205,6 +243,8 @@ QVariantMap DeconvolutionSettingsWidget::getSettings() const
 	settings.insert(KEY_RELAXATION_FACTOR,     this->relaxationFactorSpinBox->value());
 	settings.insert(KEY_REGULARIZATION_FACTOR, this->regularizationFactorSpinBox->value());
 	settings.insert(KEY_NOISE_TO_SIGNAL,       this->noiseToSignalFactorSpinBox->value());
+	settings.insert(KEY_PADDING_MODE,          this->paddingModeComboBox->currentIndex());
+	settings.insert(KEY_ACCELERATION,          this->accelerationModeComboBox->currentIndex());
 	settings.insert(KEY_LIVE_MODE,             this->liveModeCheckBox->isChecked());
 	return settings;
 }
@@ -216,6 +256,8 @@ void DeconvolutionSettingsWidget::setSettings(const QVariantMap& settings)
 	this->relaxationFactorSpinBox->setValue(       settings.value(KEY_RELAXATION_FACTOR,     DEF_RELAXATION_FACTOR).toDouble());
 	this->regularizationFactorSpinBox->setValue(   settings.value(KEY_REGULARIZATION_FACTOR, DEF_REGULARIZATION_FACTOR).toDouble());
 	this->noiseToSignalFactorSpinBox->setValue(    settings.value(KEY_NOISE_TO_SIGNAL,        DEF_NOISE_TO_SIGNAL).toDouble());
+	this->paddingModeComboBox->setCurrentIndex(   settings.value(KEY_PADDING_MODE,           DEF_PADDING_MODE).toInt());
+	this->accelerationModeComboBox->setCurrentIndex(settings.value(KEY_ACCELERATION,          DEF_ACCELERATION).toInt());
 	this->liveModeCheckBox->setChecked(            settings.value(KEY_LIVE_MODE,              DEF_LIVE_MODE).toBool());
 }
 

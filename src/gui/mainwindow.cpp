@@ -18,7 +18,6 @@
 
 
 #include <QFileDialog>
-#include <QInputDialog>
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QMenuBar>
@@ -65,7 +64,7 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	  viewMenu(nullptr), extrasMenu(nullptr), styleMenu(nullptr),
 	  openImageDataAction(nullptr), openGroundTruthAction(nullptr),
 	  saveParametersAction(nullptr), loadParametersAction(nullptr), saveOutputAction(nullptr),
-	  deconvolveAllAction(nullptr), deconvolve3DAction(nullptr),
+	  deconvolveAllAction(nullptr),
 	  viewerToolBar(nullptr),
 	  sessionViewer(nullptr),
 	  psfGenerationWidget(nullptr), processingControlWidget(nullptr),
@@ -272,31 +271,10 @@ void MainWindow::setupProcessingMenu() {
 	this->deconvolveAllAction->setEnabled(false);
 	connect(this->deconvolveAllAction, &QAction::triggered, this, &MainWindow::deconvolveAll);
 	this->processingMenu->addAction(this->deconvolveAllAction);
-
-	this->processingMenu->addSeparator();
-
-	this->deconvolve3DAction = new QAction("3D Volume Deconvolution...", this);
-	this->deconvolve3DAction->setStatusTip("Run 3D Richardson-Lucy deconvolution on the full image stack using an external PSF folder");
-	this->deconvolve3DAction->setEnabled(false);
-	connect(this->deconvolve3DAction, &QAction::triggered, this, &MainWindow::deconvolve3D);
-	this->processingMenu->addAction(this->deconvolve3DAction);
 }
 
 void MainWindow::deconvolveAll() {
 	this->applicationController->requestBatchDeconvolution();
-}
-
-void MainWindow::deconvolve3D() {
-	QString psfFolder = QFileDialog::getExistingDirectory(
-		this, "Select 3D PSF Folder (contains TIFF z-slices)", QString());
-	if (psfFolder.isEmpty()) return;
-
-	bool ok;
-	int iterations = QInputDialog::getInt(this, "3D Deconvolution",
-		"Number of Richardson-Lucy iterations:", 50, 1, 10240, 1, &ok);
-	if (!ok) return;
-
-	this->applicationController->requestVolumetricDeconvolution(psfFolder, iterations);
 }
 
 void MainWindow::loadPSF() {
@@ -537,15 +515,10 @@ void MainWindow::connectApplicationController() {
 		connect(this->applicationController, &ApplicationController::customPSFFolderDisabled,
 				this, [this]() { this->useCustomPSFFolderAction->setChecked(false); });
 
-		// Enable 3D deconvolution when input is loaded, disable on session close
-		connect(this->applicationController, &ApplicationController::inputFileLoaded,
-				this, [this]() { this->deconvolve3DAction->setEnabled(true); });
-
-		// Disable batch/3D deconvolution actions when session is closed
+		// Disable batch deconvolution action when session is closed
 		connect(this->applicationController, &ApplicationController::sessionClosed,
 				this, [this]() {
 					this->deconvolveAllAction->setEnabled(false);
-					this->deconvolve3DAction->setEnabled(false);
 				});
 	}
 }
@@ -642,6 +615,10 @@ void MainWindow::connectProcessingControlWidget() {
 			this->applicationController, &ApplicationController::setDeconvolutionRegularizationFactor);
 	connect(ctrl, &ProcessingControlWidget::deconvNoiseToSignalFactorChanged,
 			this->applicationController, &ApplicationController::setDeconvolutionNoiseToSignalFactor);
+	connect(ctrl, &ProcessingControlWidget::deconvPaddingModeChanged,
+			this->applicationController, &ApplicationController::setVolumePaddingMode);
+	connect(ctrl, &ProcessingControlWidget::deconvAccelerationModeChanged,
+			this->applicationController, &ApplicationController::setAccelerationMode);
 	connect(ctrl, &ProcessingControlWidget::deconvLiveModeChanged,
 			this->applicationController, &ApplicationController::setDeconvolutionLiveMode);
 	connect(ctrl, &ProcessingControlWidget::deconvolutionRequested,
@@ -649,8 +626,6 @@ void MainWindow::connectProcessingControlWidget() {
 
 	// Deconvolution completed → refresh output viewer
 	connect(this->applicationController, &ApplicationController::deconvolutionCompleted,
-			this->sessionViewer, &ImageSessionViewer::refreshOutputViewer);
-	connect(this->applicationController, &ApplicationController::volumetricDeconvolutionCompleted,
 			this->sessionViewer, &ImageSessionViewer::refreshOutputViewer);
 
 	// --- Optimization signals ---

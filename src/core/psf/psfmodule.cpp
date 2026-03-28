@@ -28,6 +28,8 @@ PSFModule::PSFModule(AFDeviceManager* afDeviceManager, QObject* parent)
 	this->deconvolver = new Deconvolver(128, this);
 
 	connect(this->deconvolver, &Deconvolver::error, this, &PSFModule::error);
+	connect(this->deconvolver, &Deconvolver::iterationCompleted,
+			this, &PSFModule::deconvolutionIterationCompleted);
 
 	// Warm up ArrayFire: first GPU operation triggers backend init + JIT compilation.
 	// Run a small dummy pipeline so the cost is paid at startup, not on first slider move.
@@ -150,6 +152,16 @@ af::array PSFModule::deconvolve(const af::array& input)
 	return this->deconvolver->deconvolve(input, psf);
 }
 
+af::array PSFModule::deconvolve(const af::array& input, const af::array& psf)
+{
+	return this->deconvolver->deconvolve(input, psf);
+}
+
+bool PSFModule::is3DAlgorithm() const
+{
+	return this->deconvolver->is3DAlgorithm();
+}
+
 void PSFModule::setGeneratorType(const QString& typeName)
 {
 	if (this->generator->typeName() == typeName) {
@@ -265,6 +277,18 @@ void PSFModule::setDeconvolutionRegularizationFactor(float factor)
 void PSFModule::setDeconvolutionNoiseToSignalFactor(float factor)
 {
 	this->deconvolver->setNoiseToSignalFactor(factor);
+	emit deconvolutionSettingsChanged();
+}
+
+void PSFModule::setVolumePaddingMode(int mode)
+{
+	this->deconvolver->setVolumePaddingMode(mode);
+	emit deconvolutionSettingsChanged();
+}
+
+void PSFModule::setAccelerationMode(int mode)
+{
+	this->deconvolver->setAccelerationMode(mode);
 	emit deconvolutionSettingsChanged();
 }
 
