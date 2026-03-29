@@ -41,7 +41,7 @@ ImageSessionViewer::ImageSessionViewer(QWidget* parent)
 	  frameControlsGroup(nullptr), frameSlider(nullptr), frameSpinBox(nullptr),
 	  patchSlider(nullptr), patchSpinBox(nullptr),
 	  inputViewer(nullptr), outputViewer(nullptr), activeViewer(nullptr), crossSectionWidget(nullptr), updatingControls(false),
-	  viewSyncEnabled(false), crossSectionVisible(false),
+	  viewSyncEnabled(false), crossSectionVisible(false), patchGridVisible(true),
 	  connectedInputData(nullptr), connectedOutputData(nullptr)
 {
 	this->setupUI();
@@ -320,6 +320,7 @@ void ImageSessionViewer::flipViewersV()
 
 void ImageSessionViewer::setPatchGridVisible(bool visible)
 {
+	this->patchGridVisible = visible;
 	this->activeViewer->setPatchGridVisible(visible);
 	if (this->viewSyncEnabled)
 		this->otherViewer()->setPatchGridVisible(visible);
@@ -673,7 +674,7 @@ void ImageSessionViewer::updateDataInViewers()
 				this->connectedInputData = this->imageSession->getInputData();
 				this->inputViewer->connectImageData(this->connectedInputData);
 			}
-			this->inputViewer->setPatchGridVisible(true);
+			this->inputViewer->setPatchGridVisible(this->patchGridVisible);
 		} else {
 			this->connectedInputData = nullptr;
 			this->inputViewer->disconnectImageData();
@@ -684,7 +685,7 @@ void ImageSessionViewer::updateDataInViewers()
 				this->connectedOutputData = this->imageSession->getOutputData();
 				this->outputViewer->connectImageData(this->connectedOutputData);
 			}
-			this->outputViewer->setPatchGridVisible(true);
+			this->outputViewer->setPatchGridVisible(this->patchGridVisible);
 		} else {
 			this->connectedOutputData = nullptr;
 			this->outputViewer->disconnectImageData();

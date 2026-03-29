@@ -133,6 +133,7 @@ private:
 	QMetaObject::Connection viewSyncConn1;
 	QMetaObject::Connection viewSyncConn2;
 	bool crossSectionVisible;
+	bool patchGridVisible;
 
 	// Last-connected data pointers (used for safe comparison in updateDataInViewers)
 	const ImageData* connectedInputData;
