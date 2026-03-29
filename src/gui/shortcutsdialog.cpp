@@ -80,7 +80,7 @@ QString ShortcutsDialog::buildHtml(const QString& keyColor)
 	html += row(tr("V"),               tr("Flip image vertical"));
 	html += row(tr("+"),               tr("Zoom in"));
 	html += row(tr("-"),               tr("Zoom out"));
-	html += row(tr("Ctrl + Scroll"),   tr("Zoom centered on cursor"));
+	html += row(tr("Scroll"),          tr("Zoom centered on cursor"));
 	html += row(tr("Right-click"),     tr("Context menu (rotate, flip, zoom, copy/paste/reset)"));
 	html += QStringLiteral("</table>");
 
