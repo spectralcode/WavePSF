@@ -11,6 +11,7 @@
 #include <QSplitter>
 #include <QTimer>
 #include "controller/imagesession.h"
+#include "datacrosssectionwidget.h"
 
 // Forward declarations
 class ImageDataViewer;
@@ -45,6 +46,8 @@ public slots:
 	void refreshOutputViewer();
 	void setDisplaySettings(bool autoRange, double min, double max);
 	void setViewSyncEnabled(bool enabled);
+	void setCrossSectionVisible(bool visible);
+	DataCrossSectionWidget* getCrossSectionWidget() const { return this->crossSectionWidget; }
 	void rotateViewers90();
 	void flipViewersH();
 	void flipViewersV();
@@ -76,6 +79,7 @@ signals:
 	void resetCoefficientsRequested();
 
 	void navigatePatch(int dx, int dy);
+	void crossSectionVisibilityChanged(bool visible);
 
 	// Settings propagation
 	void patchGridConfigurationRequested(int cols, int rows, int borderExtension);
@@ -121,12 +125,14 @@ private:
 	ImageDataViewer* inputViewer;
 	ImageDataViewer* outputViewer;
 	ImageDataViewer* activeViewer;
+	DataCrossSectionWidget* crossSectionWidget;
 
 	// State tracking
 	bool updatingControls;
 	bool viewSyncEnabled;
 	QMetaObject::Connection viewSyncConn1;
 	QMetaObject::Connection viewSyncConn2;
+	bool crossSectionVisible;
 
 	// Last-connected data pointers (used for safe comparison in updateDataInViewers)
 	const ImageData* connectedInputData;

@@ -1,5 +1,6 @@
 #include "imagesessionviewer.h"
 #include "imagedataviewer.h"
+#include "datacrosssectionwidget.h"
 #include "controller/imagesession.h"
 #include "utils/logging.h"
 #include <QHBoxLayout>
@@ -39,8 +40,8 @@ ImageSessionViewer::ImageSessionViewer(QWidget* parent)
 	  mainSplitter(nullptr), controlsWidget(nullptr), sidebarLayout(nullptr), rightSplitter(nullptr), viewersWidget(nullptr),
 	  frameControlsGroup(nullptr), frameSlider(nullptr), frameSpinBox(nullptr),
 	  patchSlider(nullptr), patchSpinBox(nullptr),
-	  inputViewer(nullptr), outputViewer(nullptr), activeViewer(nullptr), updatingControls(false),
-	  viewSyncEnabled(false),
+	  inputViewer(nullptr), outputViewer(nullptr), activeViewer(nullptr), crossSectionWidget(nullptr), updatingControls(false),
+	  viewSyncEnabled(false), crossSectionVisible(false),
 	  connectedInputData(nullptr), connectedOutputData(nullptr)
 {
 	this->setupUI();
@@ -62,7 +63,12 @@ void ImageSessionViewer::addBottomPanel(QWidget* widget)
 {
 	this->rightSplitter->addWidget(widget);
 	this->rightSplitter->setStretchFactor(0, 3); // viewers
-	this->rightSplitter->setStretchFactor(1, 1); // bottom panel
+	if (this->crossSectionWidget != nullptr) {
+		this->rightSplitter->setStretchFactor(1, 1); // cross-section
+		this->rightSplitter->setStretchFactor(2, 1); // bottom panel
+	} else {
+		this->rightSplitter->setStretchFactor(1, 1); // bottom panel
+	}
 }
 
 QString ImageSessionViewer::getName() const
@@ -267,6 +273,9 @@ void ImageSessionViewer::setDisplaySettings(bool autoRange, double min, double m
 			this->outputViewer->setDisplayRange(min, max);
 		}
 	}
+	if (this->crossSectionWidget != nullptr) {
+		this->crossSectionWidget->setDisplaySettings(autoRange, min, max);
+	}
 }
 
 void ImageSessionViewer::setViewSyncEnabled(bool enabled)
@@ -320,6 +329,21 @@ void ImageSessionViewer::setAxisOverlayVisible(bool visible)
 {
 	this->inputViewer->setAxisOverlayVisible(visible);
 	this->outputViewer->setAxisOverlayVisible(visible);
+}
+
+void ImageSessionViewer::setCrossSectionVisible(bool visible)
+{
+	if (!this->crossSectionWidget) return;
+	if (this->crossSectionVisible == visible) return;
+	this->crossSectionVisible = visible;
+	this->crossSectionWidget->setVisible(visible);
+	// keep splitter proportions reasonable when showing/hiding
+	if (visible) {
+		this->rightSplitter->setStretchFactor(0, 3);
+		this->rightSplitter->setStretchFactor(1, 1);
+		this->crossSectionWidget->refreshPanels();
+	}
+	emit crossSectionVisibilityChanged(visible);
 }
 
 bool ImageSessionViewer::getAutoRangeEnabled() const
@@ -393,9 +417,15 @@ void ImageSessionViewer::setupUI()
 
 	controlsScrollArea->setWidget(this->controlsWidget);
 
-	// Wrap viewers in vertical splitter (bottom panel added later via addBottomPanel)
+	// Wrap viewers and cross-section in vertical splitter (bottom panel added later via addBottomPanel)
 	this->rightSplitter = new QSplitter(Qt::Vertical);
 	this->rightSplitter->addWidget(this->viewersWidget);
+	if (this->crossSectionWidget != nullptr) {
+		this->rightSplitter->addWidget(this->crossSectionWidget);
+		this->crossSectionWidget->setVisible(false);
+		this->rightSplitter->setStretchFactor(0, 3);
+		this->rightSplitter->setStretchFactor(1, 1);
+	}
 
 	// Add to main horizontal splitter
 	this->mainSplitter->addWidget(controlsScrollArea);
@@ -474,6 +504,7 @@ void ImageSessionViewer::setupImageViewers()
 	this->inputViewer  = new ImageDataViewer("Input",  this->viewersWidget);
 	this->outputViewer = new ImageDataViewer("Output", this->viewersWidget);
 	this->activeViewer = this->inputViewer;
+	this->crossSectionWidget = new DataCrossSectionWidget(this);
 
 	// Enable drag and drop on input viewer only
 	this->inputViewer->enableInputDataDrops(true);
@@ -572,6 +603,9 @@ void ImageSessionViewer::syncViewersToSession()
 			if (this->outputViewer != nullptr) {
 				this->outputViewer->setCurrentFrame(currentFrame);
 			}
+			if (this->crossSectionWidget != nullptr) {
+				this->crossSectionWidget->setCurrentFrame(currentFrame);
+			}
 		}
 
 		// Sync patch grid configuration
@@ -639,6 +673,19 @@ void ImageSessionViewer::updateDataInViewers()
 		} else {
 			this->connectedOutputData = nullptr;
 			this->outputViewer->disconnectImageData();
+		}
+
+		if (this->crossSectionWidget != nullptr) {
+			if (this->imageSession->hasInputData()) {
+				this->crossSectionWidget->setInputData(this->imageSession->getInputData());
+			} else {
+				this->crossSectionWidget->setInputData(nullptr);
+			}
+			if (this->imageSession->hasOutputData()) {
+				this->crossSectionWidget->setOutputData(this->imageSession->getOutputData());
+			} else {
+				this->crossSectionWidget->setOutputData(nullptr);
+			}
 		}
 
 		this->updatingControls = false;

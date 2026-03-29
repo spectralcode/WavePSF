@@ -3,6 +3,7 @@
 #include "utils/settingsfilemanager.h"
 #include "controller/applicationcontroller.h"
 #include "gui/imagesessionviewer/imagesessionviewer.h"
+#include "gui/imagesessionviewer/datacrosssectionwidget.h"
 #include "gui/psfcontrol/psfgenerationwidget.h"
 #include "gui/psfcontrol/processingcontrolwidget.h"
 #include "gui/psfcontrol/settingsdialog.h"
@@ -49,9 +50,11 @@ namespace {
 	const QString KEY_DOCK_STATE          = QStringLiteral("dock_state_v1");
 	const QString KEY_CONSOLE_VISIBLE     = QStringLiteral("message_console_visible");
 	const QString KEY_PSF_GRID_VISIBLE    = QStringLiteral("psf_grid_visible");
+	const QString KEY_CROSS_SECTION_VISIBLE = QStringLiteral("cross_section_visible");
 	const bool DEF_WINDOW_MAXIMIZED = false;
 	const bool DEF_CONSOLE_VISIBLE  = false;
 	const bool DEF_PSF_GRID_VISIBLE = false;
+	const bool DEF_CROSS_SECTION_VISIBLE = false;
 }
 
 MainWindow::MainWindow(SettingsFileManager* guiSettings,
@@ -66,7 +69,7 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	  openImageDataAction(nullptr), openGroundTruthAction(nullptr),
 	  saveParametersAction(nullptr), loadParametersAction(nullptr), saveOutputAction(nullptr),
 	  deconvolveAllAction(nullptr),
-	  toggleCrossSectionAction(nullptr), crossSectionDock(nullptr),
+	  toggleCrossSectionAction(nullptr),
 	  viewerToolBar(nullptr),
 	  sessionViewer(nullptr),
 	  psfGenerationWidget(nullptr), processingControlWidget(nullptr),
@@ -332,15 +335,6 @@ void MainWindow::setupViewMenu() {
 	this->toggleCrossSectionAction = new QAction("Cross-Section Viewer", this);
 	this->toggleCrossSectionAction->setCheckable(true);
 	this->viewMenu->addAction(this->toggleCrossSectionAction);
-
-	this->crossSectionDock = new CrossSectionDock(this);
-	this->addDockWidget(Qt::BottomDockWidgetArea, this->crossSectionDock);
-	this->crossSectionDock->hide();
-
-	connect(this->toggleCrossSectionAction, &QAction::toggled,
-	        this->crossSectionDock, &QDockWidget::setVisible);
-	connect(this->crossSectionDock, &QDockWidget::visibilityChanged,
-	        this->toggleCrossSectionAction, &QAction::setChecked);
 }
 
 void MainWindow::setupExtrasMenu() {
@@ -525,12 +519,16 @@ void MainWindow::connectImageSessionViewer() {
 		LOG_DEBUG() << "ImageSessionViewer signal connections established";
 	}
 
-	// Cross-Section Viewer dock connections
-	if (this->crossSectionDock != nullptr) {
-		auto* csWidget = this->crossSectionDock->crossSectionWidget();
+	// Cross-Section Viewer connections (inline panel in ImageSessionViewer)
+	if (this->sessionViewer != nullptr) {
+		auto* csWidget = this->sessionViewer->getCrossSectionWidget();
+		connect(this->toggleCrossSectionAction, &QAction::toggled,
+		        this->sessionViewer, &ImageSessionViewer::setCrossSectionVisible);
+		connect(this->sessionViewer, &ImageSessionViewer::crossSectionVisibilityChanged,
+		        this->toggleCrossSectionAction, &QAction::setChecked);
 
 		connect(this->applicationController, &ApplicationController::imageSessionChanged,
-				csWidget, [csWidget](ImageSession* session) {
+		        csWidget, [csWidget](ImageSession* session) {
 			if (session && session->hasInputData()) {
 				csWidget->setInputData(session->getInputData());
 			} else {
@@ -541,10 +539,22 @@ void MainWindow::connectImageSessionViewer() {
 			} else {
 				csWidget->setOutputData(nullptr);
 			}
+
+			// Keep cross-section slices updated when output is modified in-place
+			if (session) {
+				QObject::connect(session, &ImageSession::outputPatchUpdated,
+					csWidget, &DataCrossSectionWidget::refreshPanels,
+					Qt::UniqueConnection);
+				QObject::connect(session, &ImageSession::outputDataChanged,
+					csWidget, &DataCrossSectionWidget::refreshPanels,
+					Qt::UniqueConnection);
+			}
 		});
 
 		connect(this->applicationController, &ApplicationController::frameChanged,
-				csWidget, &DataCrossSectionWidget::setCurrentFrame);
+		        csWidget, &DataCrossSectionWidget::setCurrentFrame);
+		connect(csWidget, &DataCrossSectionWidget::frameChangeRequested,
+		        this->applicationController, &ApplicationController::setCurrentFrame);
 	}
 }
 
@@ -901,6 +911,10 @@ void MainWindow::loadSettings() {
 	if (this->psfGridDock) this->psfGridDock->setVisible(showPSFGrid);
 	if (this->togglePSFGridAction) this->togglePSFGridAction->setChecked(showPSFGrid);
 
+	const bool showCrossSection = settings.value(KEY_CROSS_SECTION_VISIBLE, DEF_CROSS_SECTION_VISIBLE).toBool();
+	if (this->sessionViewer) this->sessionViewer->setCrossSectionVisible(showCrossSection);
+	if (this->toggleCrossSectionAction) this->toggleCrossSectionAction->setChecked(showCrossSection);
+
 	this->resize(this->windowSize);
 	this->move(this->windowPosition);
 	if (settings.value(KEY_WINDOW_MAXIMIZED, DEF_WINDOW_MAXIMIZED).toBool()) {
@@ -940,6 +954,7 @@ void MainWindow::saveSettings() {
 	settings[KEY_DOCK_STATE]       = this->saveState();
 	settings[KEY_CONSOLE_VISIBLE]  = (this->messageConsoleDock && this->messageConsoleDock->isVisible());
 	settings[KEY_PSF_GRID_VISIBLE] = (this->psfGridDock && this->psfGridDock->isVisible());
+	settings[KEY_CROSS_SECTION_VISIBLE] = (this->sessionViewer && this->sessionViewer->getCrossSectionWidget() && this->sessionViewer->getCrossSectionWidget()->isVisible());
 	this->guiSettings->storeSettings(SETTINGS_GROUP, settings);
 
 	this->guiSettings->storeSettings(this->consoleWidget()->getName(), this->consoleWidget()->getSettings());
