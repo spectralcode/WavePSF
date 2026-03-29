@@ -573,6 +573,12 @@ void ImageSessionViewer::connectSignals()
 	        this->crossSectionWidget, &DataCrossSectionWidget::setYPosition);
 	connect(this->outputViewer, &ImageDataViewer::yPositionLineDragged,
 	        this->crossSectionWidget, &DataCrossSectionWidget::setYPosition);
+
+	// Y position line toggle: sync other viewer
+	connect(this->inputViewer, &ImageDataViewer::yPositionLineToggled,
+	        this->outputViewer, &ImageDataViewer::setYPositionLineVisible);
+	connect(this->outputViewer, &ImageDataViewer::yPositionLineToggled,
+	        this->inputViewer, &ImageDataViewer::setYPositionLineVisible);
 }
 
 void ImageSessionViewer::updateFrameControls()

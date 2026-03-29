@@ -32,6 +32,7 @@ private:
 	bool syncActive;
 	bool axisOverlayVisible;
 	QGraphicsLineItem* yPositionLine;
+	bool yPositionLineActive;
 	bool draggingYLine;
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
 	void mousePressEvent(QMouseEvent* event) override;
@@ -91,6 +92,7 @@ signals:
 	void viewTransformChanged(QTransform transform, QPointF centerInScene);
 	void navigatePatch(int dx, int dy);
 	void yPositionLineDragged(int y);
+	void yPositionLineToggled(bool visible);
 };
 
 #endif // GRAPHICSVIEW_H

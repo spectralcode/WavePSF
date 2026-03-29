@@ -45,6 +45,7 @@ GraphicsView::GraphicsView(QWidget* parent) : QGraphicsView(parent)
 	this->yPositionLine->setPen(QPen(Qt::red, 1));
 	this->yPositionLine->setVisible(false);
 	this->scene->addItem(this->yPositionLine);
+	this->yPositionLineActive = false;
 	this->draggingYLine = false;
 
 	this->viewport()->setMouseTracking(true);
@@ -339,6 +340,17 @@ void GraphicsView::contextMenuEvent(QContextMenuEvent* event) {
 	QAction* fitAction = menu.addAction(tr("Fit to View"));
 	connect(fitAction, &QAction::triggered, this, &GraphicsView::displayFullScene);
 
+	if (this->yPositionLineActive) {
+		menu.addSeparator();
+		QAction* toggleLine = menu.addAction(tr("Show Position Line"));
+		toggleLine->setCheckable(true);
+		toggleLine->setChecked(this->yPositionLine->isVisible());
+		connect(toggleLine, &QAction::toggled, this, [this](bool checked) {
+			this->yPositionLine->setVisible(checked);
+			emit yPositionLineToggled(checked);
+		});
+	}
+
 	menu.exec(event->globalPos());
 }
 
@@ -524,6 +536,7 @@ void GraphicsView::setYPositionLineY(int y) {
 }
 
 void GraphicsView::setYPositionLineVisible(bool visible) {
+	this->yPositionLineActive = visible;
 	this->yPositionLine->setVisible(visible);
 }
 

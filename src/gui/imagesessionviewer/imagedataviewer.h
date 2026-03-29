@@ -146,6 +146,7 @@ signals:
 	void viewTransformChanged(QTransform transform, QPointF centerInScene);
 	void navigatePatch(int dx, int dy);
 	void yPositionLineDragged(int y);
+	void yPositionLineToggled(bool visible);
 };
 
 #endif // IMAGEDATAVIEWER_H

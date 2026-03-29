@@ -441,6 +441,7 @@ void ImageDataViewer::connectSignals()
 	connect(this->frameView, &GraphicsView::viewTransformChanged, this, &ImageDataViewer::viewTransformChanged);
 	connect(this->frameView, &GraphicsView::navigatePatch, this, &ImageDataViewer::navigatePatch);
 	connect(this->frameView, &GraphicsView::yPositionLineDragged, this, &ImageDataViewer::yPositionLineDragged);
+	connect(this->frameView, &GraphicsView::yPositionLineToggled, this, &ImageDataViewer::yPositionLineToggled);
 	connect(this->gtToggleButton, &QToolButton::clicked, this, [this](bool checked) {
 		this->showReference(checked);
 	});
