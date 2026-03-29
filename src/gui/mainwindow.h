@@ -61,10 +61,8 @@ private slots:
 	void openSettings();
 
 	// PSF operations
-	void loadPSF();
 	void savePSF();
 	void setPSFSaveFolder();
-	void setCustomPSFFolder();
 
 	// Batch processing
 	void deconvolveAll();
@@ -130,12 +128,9 @@ private:
 	QAction* saveOutputAction;
 
 	// PSF actions
-	QAction* loadPSFAction;
 	QAction* savePSFAction;
 	QAction* autoSavePSFAction;
 	QAction* setPSFSaveFolderAction;
-	QAction* useCustomPSFFolderAction;
-	QAction* setCustomPSFFolderAction;
 
 	// Processing actions
 	QAction* deconvolveAllAction;

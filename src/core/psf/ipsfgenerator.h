@@ -8,6 +8,13 @@
 #include "wavefrontparameter.h"
 #include "iwavefrontgenerator.h"
 
+struct PSFRequest
+{
+	int gridSize = 128;
+	int frame = 0;
+	int patchIdx = 0;
+};
+
 class IPSFGenerator
 {
 public:
@@ -31,7 +38,7 @@ public:
 	virtual void resetCoefficients() {}
 
 	// Core: generate the PSF (2D or 3D)
-	virtual af::array generatePSF(int gridSize) = 0;
+	virtual af::array generatePSF(const PSFRequest& request) = 0;
 
 	// Wavefront display (optional)
 	virtual bool hasWavefront() const { return false; }

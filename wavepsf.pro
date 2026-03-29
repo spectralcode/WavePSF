@@ -80,6 +80,7 @@ SOURCES += \
 	$$SOURCEDIR/core/interpolation/interpolationorchestrator.cpp \
 	$$SOURCEDIR/core/optimization/optimizationjobbuilder.cpp \
 	$$SOURCEDIR/core/psf/psffilemanager.cpp \
+	$$SOURCEDIR/core/psf/filepsfgenerator.cpp \
 	$$SOURCEDIR/core/processing/batchprocessor.cpp \
 	$$SOURCEDIR/core/processing/volumetricdeconvolver.cpp \
 	$$SOURCEDIR/core/processing/volumetricprocessor.cpp \
@@ -155,6 +156,7 @@ HEADERS += \
 	$$SOURCEDIR/core/interpolation/interpolationorchestrator.h \
 	$$SOURCEDIR/core/optimization/optimizationjobbuilder.h \
 	$$SOURCEDIR/core/psf/psffilemanager.h \
+	$$SOURCEDIR/core/psf/filepsfgenerator.h \
 	$$SOURCEDIR/core/processing/batchprocessor.h \
 	$$SOURCEDIR/core/processing/volumetricdeconvolver.h \
 	$$SOURCEDIR/core/processing/volumetricprocessor.h \

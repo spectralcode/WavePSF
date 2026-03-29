@@ -85,8 +85,10 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 							  const af::array& groundTruthPatch) -> double {
 		try {
 			generator->setAllCoefficients(coefficients);
+			PSFRequest req;
+			req.gridSize = config.psfSettings.gridSize;
 			af::array psf = PSFModule::focalSlice(
-				generator->generatePSF(config.psfSettings.gridSize));
+				generator->generatePSF(req));
 			af::array deconvolved = deconvolver.deconvolve(inputPatch, psf);
 			if (deconvolved.isempty()) return (std::numeric_limits<double>::max)();
 

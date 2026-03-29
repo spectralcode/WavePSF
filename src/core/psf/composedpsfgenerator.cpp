@@ -90,10 +90,10 @@ void ComposedPSFGenerator::resetCoefficients()
 	this->generator->resetCoefficients();
 }
 
-af::array ComposedPSFGenerator::generatePSF(int gridSize)
+af::array ComposedPSFGenerator::generatePSF(const PSFRequest& request)
 {
-	this->lastWavefront = this->generator->generateWavefront(gridSize);
-	return this->propagator_->computePSF(this->lastWavefront, gridSize);
+	this->lastWavefront = this->generator->generateWavefront(request.gridSize);
+	return this->propagator_->computePSF(this->lastWavefront, request.gridSize);
 }
 
 af::array ComposedPSFGenerator::getLastWavefront() const

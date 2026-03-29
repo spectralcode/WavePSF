@@ -103,18 +103,17 @@ public slots:
 
 	// Reset / clear
 	void resetAllCoefficients();
-	void clearExternalPSFs();
 
 	// File output
 	void saveOutputToFile(const QString& filePath);
 
 	// PSF file I/O
-	void loadPSFFromFile(const QString& filePath);
 	void savePSFToFile(const QString& filePath);
 	void setAutoSavePSF(bool enabled);
 	void setPSFSaveFolder(const QString& folder);
-	void setUseCustomPSFFolder(bool enabled);
-	void setCustomPSFFolder(const QString& folder);
+
+	// File-based PSF generator
+	void setFilePSFSource(const QString& path);
 
 	// Batch processing
 	void requestBatchDeconvolution();
@@ -225,7 +224,6 @@ signals:
 
 	// Session events
 	void sessionClosed();
-	void customPSFFolderDisabled();
 
 	// PSF pipeline results
 	void psfWavefrontUpdated(af::array wavefront);

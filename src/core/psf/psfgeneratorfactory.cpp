@@ -4,6 +4,7 @@
 #include "deformablemirror/deformablemirrorgenerator.h"
 #include "psfcalculator.h"
 #include "richardswolfcalculator.h"
+#include "filepsfgenerator.h"
 
 
 IPSFGenerator* PSFGeneratorFactory::create(const QString& typeName, QObject* parent)
@@ -22,6 +23,9 @@ IPSFGenerator* PSFGeneratorFactory::create(const QString& typeName, QObject* par
 			new RichardsWolfCalculator(nullptr),
 			parent);
 	}
+	if (typeName == QLatin1String("From File")) {
+		return new FilePSFGenerator(parent);
+	}
 	// Default: Zernike
 	return new ComposedPSFGenerator(
 		QStringLiteral("Zernike"),
@@ -34,5 +38,6 @@ QStringList PSFGeneratorFactory::availableTypeNames()
 {
 	return { QStringLiteral("Zernike"),
 			 QStringLiteral("Deformable Mirror"),
-			 QStringLiteral("3D PSF Microscopy") };
+			 QStringLiteral("3D PSF Microscopy"),
+			 QStringLiteral("From File") };
 }

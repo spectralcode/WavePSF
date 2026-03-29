@@ -24,7 +24,6 @@ public:
 	af::array getCurrentPSF() const;
 	PSFSettings getPSFSettings() const;
 	QString getGeneratorTypeName() const;
-	bool isUsingExternalPSF() const;
 	af::array computePSFFromCoefficients(const QVector<double>& coefficients);
 
 	IPSFGenerator* getGenerator() const;
@@ -39,8 +38,8 @@ public slots:
 	void setCoefficient(int id, double value);
 	void setAllCoefficients(const QVector<double>& coefficients);
 	void resetCoefficients();
-	void setExternalPSF(const af::array& psf);
-	void clearExternalPSF();
+	void setCurrentPatch(int frame, int patchIdx);
+	void refreshPSF();
 	void setGridSize(int size);
 	af::array deconvolve(const af::array& input);
 	af::array deconvolve(const af::array& input, const af::array& psf);
@@ -82,11 +81,11 @@ private:
 	Deconvolver* deconvolver;
 
 	int gridSize;
+	int currentFrame;
+	int currentPatchIdx;
 	QMap<QString, QVariantMap> allGeneratorSettings;
 	QVector<WavefrontParameter> cachedDescriptors;
 	af::array currentPSF;
-	af::array externalPSF;
-	bool usingExternalPSF;
 };
 
 #endif // PSFMODULE_H

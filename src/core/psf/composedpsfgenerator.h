@@ -34,7 +34,7 @@ public:
 	void resetCoefficients() override;
 
 	// PSF generation — generator + propagator pipeline
-	af::array generatePSF(int gridSize) override;
+	af::array generatePSF(const PSFRequest& request) override;
 	bool hasWavefront() const override { return true; }
 	af::array getLastWavefront() const override;
 

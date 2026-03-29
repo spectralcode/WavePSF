@@ -2,7 +2,7 @@
 #include "volumetricprocessor.h"
 #include "controller/imagesession.h"
 #include "core/psf/psfmodule.h"
-#include "core/psf/psffilemanager.h"
+#include "core/psf/ipsfgenerator.h"
 #include "data/wavefrontparametertable.h"
 #include "utils/logging.h"
 #include <QProgressDialog>
@@ -17,13 +17,12 @@ bool BatchProcessor::executeBatchDeconvolution(
 	ImageSession* imageSession,
 	PSFModule* psfModule,
 	WavefrontParameterTable* parameterTable,
-	PSFFileManager* psfFileManager,
 	QWidget* parentWidget)
 {
 	// Delegate to volumetric batch if 3D algorithm is selected
 	if (psfModule->is3DAlgorithm()) {
 		return this->executeBatchVolumetricDeconvolution(
-			imageSession, psfModule, parameterTable, psfFileManager, parentWidget);
+			imageSession, psfModule, parameterTable, parentWidget);
 	}
 
 	int frames = imageSession->getInputFrames();
@@ -48,6 +47,7 @@ bool BatchProcessor::executeBatchDeconvolution(
 
 	LOG_INFO() << "Starting batch deconvolution:" << frames << "frames," << cols << "x" << rows << "patches";
 
+	bool supportsCoeffs = psfModule->getGenerator()->supportsCoefficients();
 	int step = 0;
 	bool cancelled = false;
 
@@ -60,24 +60,9 @@ bool BatchProcessor::executeBatchDeconvolution(
 						.arg(frame + 1).arg(frames).arg(x).arg(y));
 
 				int patchIdx = parameterTable->patchIndex(x, y);
+				psfModule->setCurrentPatch(frame, patchIdx);
 
-				// Check external PSF sources (same priority as loadCoefficientsForCurrentPatch)
-				bool usedExternalPSF = false;
-				if (psfFileManager != nullptr) {
-					if (psfFileManager->hasOverride(frame, patchIdx)) {
-						psfModule->setExternalPSF(psfFileManager->getOverride(frame, patchIdx));
-						usedExternalPSF = true;
-					} else if (psfFileManager->isCustomFolderMode()) {
-						af::array psf = psfFileManager->loadPSFFromFolder(frame, patchIdx);
-						if (!psf.isempty()) {
-							psfModule->setExternalPSF(psf);
-							psfFileManager->storeOverride(frame, patchIdx, psf);
-							usedExternalPSF = true;
-						}
-					}
-				}
-
-				if (!usedExternalPSF) {
+				if (supportsCoeffs) {
 					QVector<double> coeffs = parameterTable->getCoefficients(frame, patchIdx);
 					if (coeffs.isEmpty()) {
 						step++;
@@ -87,6 +72,8 @@ bool BatchProcessor::executeBatchDeconvolution(
 						continue;
 					}
 					psfModule->setAllCoefficients(coeffs);
+				} else {
+					psfModule->refreshPSF();
 				}
 
 				// Get input patch
@@ -118,8 +105,6 @@ bool BatchProcessor::executeBatchDeconvolution(
 	// Flush last frame to CPU
 	imageSession->flushOutput();
 
-	// Restore normal PSF mode and signal state
-	psfModule->clearExternalPSF();
 	psfModule->blockSignals(oldBlockState);
 
 	if (cancelled) {
@@ -135,7 +120,6 @@ bool BatchProcessor::executeBatchVolumetricDeconvolution(
 	ImageSession* imageSession,
 	PSFModule* psfModule,
 	WavefrontParameterTable* parameterTable,
-	PSFFileManager* psfFileManager,
 	QWidget* parentWidget)
 {
 	int frames = imageSession->getInputFrames();
@@ -193,7 +177,7 @@ bool BatchProcessor::executeBatchVolumetricDeconvolution(
 			}
 
 			af::array psf3D = VolumetricProcessor::assemble3DPSF(
-				psfModule, parameterTable, psfFileManager, patchIdx, frames);
+				psfModule, parameterTable, patchIdx, frames);
 			if (psf3D.isempty()) {
 				LOG_WARNING() << "Skipping patch (" << x << "," << y << "): no 3D PSF available";
 				patchStep++;

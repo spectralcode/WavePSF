@@ -2,7 +2,6 @@
 #include "controller/imagesession.h"
 #include "core/psf/psfmodule.h"
 #include "core/psf/ipsfgenerator.h"
-#include "core/psf/psffilemanager.h"
 #include "data/wavefrontparametertable.h"
 #include "utils/logging.h"
 
@@ -10,27 +9,24 @@
 
 af::array VolumetricProcessor::resolve2DPSF(PSFModule* psfModule,
 	WavefrontParameterTable* paramTable,
-	PSFFileManager* psfFileManager,
 	int frame, int patchIdx)
 {
-	// Priority 1: Override map (one-shot loaded PSFs)
-	if (psfFileManager != nullptr && psfFileManager->hasOverride(frame, patchIdx)) {
-		return psfFileManager->getOverride(frame, patchIdx);
-	}
+	psfModule->setCurrentPatch(frame, patchIdx);
 
-	// Priority 2: Custom PSF folder
-	if (psfFileManager != nullptr && psfFileManager->isCustomFolderMode()) {
-		af::array psf = psfFileManager->loadPSFFromFolder(frame, patchIdx);
+	if (psfModule->getGenerator()->supportsCoefficients()) {
+		QVector<double> coeffs = paramTable->getCoefficients(frame, patchIdx);
+		if (!coeffs.isEmpty()) {
+			return psfModule->computePSFFromCoefficients(coeffs);
+		}
+	} else {
+		PSFRequest req;
+		req.gridSize = 0; // ignored by FilePSFGenerator
+		req.frame = frame;
+		req.patchIdx = patchIdx;
+		af::array psf = psfModule->getGenerator()->generatePSF(req);
 		if (!psf.isempty()) {
-			psfFileManager->storeOverride(frame, patchIdx, psf);
 			return psf;
 		}
-	}
-
-	// Priority 3: Compute from coefficients
-	QVector<double> coeffs = paramTable->getCoefficients(frame, patchIdx);
-	if (!coeffs.isEmpty()) {
-		return psfModule->computePSFFromCoefficients(coeffs);
 	}
 
 	return af::array();
@@ -62,31 +58,27 @@ af::array VolumetricProcessor::assembleSubvolume(ImageSession* session,
 
 af::array VolumetricProcessor::assemble3DPSF(PSFModule* psfModule,
 	WavefrontParameterTable* paramTable,
-	PSFFileManager* psfFileManager,
 	int patchIdx, int numFrames)
 {
 	if (numFrames == 0) return af::array();
 
-	// 3D generator mode: resolve per-patch 3D PSF (frame 0 is canonical slot)
+	// 3D generator mode: generate the full 3D PSF directly
 	if (psfModule->getGenerator()->is3D()) {
-		// Priority 1: per-patch 3D override (loaded PSF file)
-		if (psfFileManager != nullptr && psfFileManager->hasOverride(0, patchIdx)) {
-			return psfFileManager->getOverride(0, patchIdx);
-		}
+		psfModule->setCurrentPatch(0, patchIdx);
 
-		// Priority 2: custom PSF folder
-		if (psfFileManager != nullptr && psfFileManager->isCustomFolderMode()) {
-			af::array psf = psfFileManager->loadPSFFromFolder(0, patchIdx);
+		if (psfModule->getGenerator()->supportsCoefficients()) {
+			QVector<double> coeffs = paramTable->getCoefficients(0, patchIdx);
+			if (!coeffs.isEmpty()) {
+				return psfModule->computePSFFromCoefficients(coeffs);
+			}
+		} else {
+			PSFRequest req;
+			req.frame = 0;
+			req.patchIdx = patchIdx;
+			af::array psf = psfModule->getGenerator()->generatePSF(req);
 			if (!psf.isempty()) {
-				psfFileManager->storeOverride(0, patchIdx, psf);
 				return psf;
 			}
-		}
-
-		// Priority 3: compute from stored coefficients
-		QVector<double> coeffs = paramTable->getCoefficients(0, patchIdx);
-		if (!coeffs.isEmpty()) {
-			return psfModule->computePSFFromCoefficients(coeffs);
 		}
 
 		// Fallback: use the currently cached PSF
@@ -94,7 +86,7 @@ af::array VolumetricProcessor::assemble3DPSF(PSFModule* psfModule,
 	}
 
 	// Scalar mode: stack per-frame 2D PSFs into a 3D volume
-	af::array firstPSF = resolve2DPSF(psfModule, paramTable, psfFileManager, 0, patchIdx);
+	af::array firstPSF = resolve2DPSF(psfModule, paramTable, 0, patchIdx);
 	if (firstPSF.isempty()) return af::array();
 
 	int pH = firstPSF.dims(0);
@@ -104,7 +96,7 @@ af::array VolumetricProcessor::assemble3DPSF(PSFModule* psfModule,
 	psf3d(af::span, af::span, 0) = firstPSF;
 
 	for (int f = 1; f < numFrames; ++f) {
-		af::array slice = resolve2DPSF(psfModule, paramTable, psfFileManager, f, patchIdx);
+		af::array slice = resolve2DPSF(psfModule, paramTable, f, patchIdx);
 		if (slice.isempty()) {
 			LOG_WARNING() << "No PSF available for frame" << f << "patch" << patchIdx;
 			continue;

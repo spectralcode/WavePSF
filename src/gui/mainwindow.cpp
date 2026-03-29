@@ -213,20 +213,10 @@ void MainWindow::setupEditMenu() {
 			this->applicationController, &ApplicationController::resetAllCoefficients);
 	this->editMenu->addAction(resetAllCoeffsAction);
 
-	QAction* clearExternalPSFsAction = new QAction("Clear External PSFs", this);
-	clearExternalPSFsAction->setStatusTip("Remove all loaded external PSFs from the override cache");
-	connect(clearExternalPSFsAction, &QAction::triggered,
-			this->applicationController, &ApplicationController::clearExternalPSFs);
-	this->editMenu->addAction(clearExternalPSFsAction);
 }
 
 void MainWindow::setupPSFMenu() {
 	this->psfMenu = this->menuBar()->addMenu("&PSF");
-
-	this->loadPSFAction = new QAction("&Load PSF from File...", this);
-	this->loadPSFAction->setStatusTip("Load a PSF kernel from an image file");
-	connect(this->loadPSFAction, &QAction::triggered, this, &MainWindow::loadPSF);
-	this->psfMenu->addAction(this->loadPSFAction);
 
 	this->savePSFAction = new QAction("&Save PSF...", this);
 	this->savePSFAction->setStatusTip("Save the current PSF kernel as a 32-bit float TIFF");
@@ -246,20 +236,6 @@ void MainWindow::setupPSFMenu() {
 	this->setPSFSaveFolderAction->setStatusTip("Set the folder for PSF auto-save output");
 	connect(this->setPSFSaveFolderAction, &QAction::triggered, this, &MainWindow::setPSFSaveFolder);
 	this->psfMenu->addAction(this->setPSFSaveFolderAction);
-
-	this->psfMenu->addSeparator();
-
-	this->useCustomPSFFolderAction = new QAction("&Use Custom PSF Folder", this);
-	this->useCustomPSFFolderAction->setCheckable(true);
-	this->useCustomPSFFolderAction->setStatusTip("Load PSFs from folder on patch/frame switch instead of computing");
-	connect(this->useCustomPSFFolderAction, &QAction::toggled,
-			this->applicationController, &ApplicationController::setUseCustomPSFFolder);
-	this->psfMenu->addAction(this->useCustomPSFFolderAction);
-
-	this->setCustomPSFFolderAction = new QAction("Set &Custom PSF Folder...", this);
-	this->setCustomPSFFolderAction->setStatusTip("Set the folder containing per-patch PSF files");
-	connect(this->setCustomPSFFolderAction, &QAction::triggered, this, &MainWindow::setCustomPSFFolder);
-	this->psfMenu->addAction(this->setCustomPSFFolderAction);
 }
 
 void MainWindow::setupProcessingMenu() {
@@ -275,16 +251,6 @@ void MainWindow::setupProcessingMenu() {
 
 void MainWindow::deconvolveAll() {
 	this->applicationController->requestBatchDeconvolution();
-}
-
-void MainWindow::loadPSF() {
-	const QString filePath = QFileDialog::getOpenFileName(
-		this, "Load PSF", QString(),
-		"Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;All Files (*)");
-	if (!filePath.isEmpty()) {
-		this->applicationController->loadPSFFromFile(filePath);
-		this->statusBar()->showMessage("PSF loaded from file", 3000);
-	}
 }
 
 void MainWindow::savePSF() {
@@ -303,15 +269,6 @@ void MainWindow::setPSFSaveFolder() {
 	if (!dir.isEmpty()) {
 		this->applicationController->setPSFSaveFolder(dir);
 		this->statusBar()->showMessage("PSF save folder: " + dir, 3000);
-	}
-}
-
-void MainWindow::setCustomPSFFolder() {
-	const QString dir = QFileDialog::getExistingDirectory(
-		this, "Select Custom PSF Folder");
-	if (!dir.isEmpty()) {
-		this->applicationController->setCustomPSFFolder(dir);
-		this->statusBar()->showMessage("Custom PSF folder: " + dir, 3000);
 	}
 }
 
@@ -505,15 +462,9 @@ void MainWindow::connectApplicationController() {
 		connect(this->applicationController, &ApplicationController::psfSettingsUpdated,
 				this, [this](const PSFSettings& s) { this->currentPSFSettings = s; });
 
-		// Enable batch deconvolution when parameters are loaded or custom PSF folder is active
+		// Enable batch deconvolution when parameters are loaded
 		connect(this->applicationController, &ApplicationController::parametersLoaded,
 				this, [this]() { this->deconvolveAllAction->setEnabled(true); });
-		connect(this->useCustomPSFFolderAction, &QAction::toggled,
-				this, [this](bool checked) { if (checked) this->deconvolveAllAction->setEnabled(true); });
-
-		// Uncheck custom PSF folder when external PSFs are cleared
-		connect(this->applicationController, &ApplicationController::customPSFFolderDisabled,
-				this, [this]() { this->useCustomPSFFolderAction->setChecked(false); });
 
 		// Disable batch deconvolution action when session is closed
 		connect(this->applicationController, &ApplicationController::sessionClosed,
@@ -593,6 +544,10 @@ void MainWindow::connectPSFGenerationWidget() {
 	// Inline settings → ApplicationController
 	connect(genWidget, &PSFGenerationWidget::inlineSettingsChanged,
 			this->applicationController, &ApplicationController::applyInlineSettings);
+
+	// File PSF source → ApplicationController
+	connect(genWidget, &PSFGenerationWidget::filePSFSourceSelected,
+			this->applicationController, &ApplicationController::setFilePSFSource);
 
 	LOG_DEBUG() << "PSFGenerationWidget signal connections established";
 }

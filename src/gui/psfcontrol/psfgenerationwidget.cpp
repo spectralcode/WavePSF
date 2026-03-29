@@ -11,6 +11,8 @@
 #include <QStackedWidget>
 #include <QComboBox>
 #include <QLabel>
+#include <QPushButton>
+#include <QFileDialog>
 #include <QSplitter>
 
 namespace {
@@ -40,22 +42,47 @@ PSFGenerationWidget::PSFGenerationWidget(QWidget* parent)
 	this->rwSettingsWidget->setVisible(false);
 	mainLayout->addWidget(this->rwSettingsWidget);
 
+	// File browser widget (visible only in "From File" mode)
+	this->fileBrowserWidget = new QWidget(this);
+	QVBoxLayout* fbLayout = new QVBoxLayout(this->fileBrowserWidget);
+	fbLayout->setContentsMargins(0, 0, 0, 0);
+	this->fileSourceLabel = new QLabel(tr("No source selected"), this);
+	this->fileSourceLabel->setWordWrap(true);
+	fbLayout->addWidget(this->fileSourceLabel);
+	QHBoxLayout* fbButtonLayout = new QHBoxLayout();
+	QPushButton* browseFolderBtn = new QPushButton(tr("Browse Folder..."), this);
+	QPushButton* browseFileBtn = new QPushButton(tr("Browse File..."), this);
+	fbButtonLayout->addWidget(browseFolderBtn);
+	fbButtonLayout->addWidget(browseFileBtn);
+	fbButtonLayout->addStretch();
+	fbLayout->addLayout(fbButtonLayout);
+	fbLayout->addStretch();
+	this->fileBrowserWidget->setVisible(false);
+	mainLayout->addWidget(this->fileBrowserWidget);
+
+	connect(browseFolderBtn, &QPushButton::clicked, this, &PSFGenerationWidget::browseForFolder);
+	connect(browseFileBtn, &QPushButton::clicked, this, &PSFGenerationWidget::browseForFile);
+
 	// Content: coefficients (left) | wavefront + PSF (right)
 	QHBoxLayout* contentLayout = new QHBoxLayout();
 
+	this->coefficientContainer = new QWidget(this);
+	QVBoxLayout* coeffLayout = new QVBoxLayout(this->coefficientContainer);
+	coeffLayout->setContentsMargins(0, 0, 0, 0);
 	this->coeffEditor = new CoefficientEditorWidget(this);
-	contentLayout->addWidget(this->coeffEditor, 1);
+	coeffLayout->addWidget(this->coeffEditor);
+	contentLayout->addWidget(this->coefficientContainer, 1);
 
 	// Right column: wavefront plot (top) + PSF preview (bottom), resizable via splitter
 	QSplitter* rightSplitter = new QSplitter(Qt::Vertical, this);
 
-	QWidget* wavefrontContainer = new QWidget(this);
-	QVBoxLayout* wfLayout = new QVBoxLayout(wavefrontContainer);
+	this->wavefrontContainer = new QWidget(this);
+	QVBoxLayout* wfLayout = new QVBoxLayout(this->wavefrontContainer);
 	wfLayout->setContentsMargins(0, 0, 0, 0);
 	this->wavefrontPlot = new WavefrontPlotWidget(this);
 	wfLayout->addWidget(new QLabel(tr("Wavefront"), this));
 	wfLayout->addWidget(this->wavefrontPlot, 1);
-	rightSplitter->addWidget(wavefrontContainer);
+	rightSplitter->addWidget(this->wavefrontContainer);
 
 	// PSF preview: stacked widget for 2D/3D modes
 	QWidget* psfContainer = new QWidget(this);
@@ -169,6 +196,12 @@ void PSFGenerationWidget::setPSFSettings(const PSFSettings& settings)
 	if (is3D) {
 		this->rwSettingsWidget->setSettings(propSettings);
 	}
+
+	// Toggle coefficient editor / wavefront vs file browser
+	bool isFileMode = (settings.generatorTypeName == QStringLiteral("From File"));
+	this->coefficientContainer->setVisible(!isFileMode);
+	this->wavefrontContainer->setVisible(!isFileMode);
+	this->fileBrowserWidget->setVisible(isFileMode);
 }
 
 void PSFGenerationWidget::setPSFMode(const QString& modeName)
@@ -179,4 +212,23 @@ void PSFGenerationWidget::setPSFMode(const QString& modeName)
 		this->generatorTypeCombo->setCurrentIndex(idx);
 	}
 	this->generatorTypeCombo->blockSignals(false);
+}
+
+void PSFGenerationWidget::browseForFolder()
+{
+	QString folder = QFileDialog::getExistingDirectory(this, tr("Select PSF Folder"));
+	if (!folder.isEmpty()) {
+		this->fileSourceLabel->setText(folder);
+		emit filePSFSourceSelected(folder);
+	}
+}
+
+void PSFGenerationWidget::browseForFile()
+{
+	QString file = QFileDialog::getOpenFileName(this, tr("Select PSF File"),
+		QString(), tr("Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp)"));
+	if (!file.isEmpty()) {
+		this->fileSourceLabel->setText(file);
+		emit filePSFSourceSelected(file);
+	}
 }

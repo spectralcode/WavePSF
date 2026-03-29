@@ -14,6 +14,8 @@ class PSFPreviewWidget;
 class PSF3DPreviewWidget;
 class RWSettingsWidget;
 class QComboBox;
+class QLabel;
+class QPushButton;
 class QStackedWidget;
 
 class PSFGenerationWidget : public QGroupBox
@@ -43,8 +45,11 @@ signals:
 	void resetRequested();
 	void psfModeChangeRequested(QString modeName);
 	void inlineSettingsChanged(QVariantMap settings);
+	void filePSFSourceSelected(QString path);
 
 private:
+	void browseForFolder();
+	void browseForFile();
 	QComboBox* generatorTypeCombo;
 	CoefficientEditorWidget* coeffEditor;
 	WavefrontPlotWidget* wavefrontPlot;
@@ -52,6 +57,10 @@ private:
 	PSF3DPreviewWidget* psf3DPreview;
 	QStackedWidget* psfPreviewStack;
 	RWSettingsWidget* rwSettingsWidget;
+	QWidget* fileBrowserWidget;
+	QLabel* fileSourceLabel;
+	QWidget* coefficientContainer;
+	QWidget* wavefrontContainer;
 	PSFSettings currentSettings;
 };
 

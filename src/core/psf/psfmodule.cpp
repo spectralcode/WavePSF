@@ -9,7 +9,8 @@
 PSFModule::PSFModule(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent)
 	, gridSize(128)
-	, usingExternalPSF(false)
+	, currentFrame(0)
+	, currentPatchIdx(0)
 {
 	connect(afDeviceManager, &AFDeviceManager::aboutToChangeDevice,
 			this, &PSFModule::clearCachedArrays);
@@ -51,15 +52,7 @@ af::array PSFModule::getCurrentWavefront() const
 
 af::array PSFModule::getCurrentPSF() const
 {
-	if (this->usingExternalPSF && !this->externalPSF.isempty()) {
-		return this->externalPSF;
-	}
 	return this->currentPSF;
-}
-
-bool PSFModule::isUsingExternalPSF() const
-{
-	return this->usingExternalPSF;
 }
 
 IPSFGenerator* PSFModule::getGenerator() const
@@ -109,26 +102,22 @@ void PSFModule::setCoefficient(int id, double value)
 
 void PSFModule::setAllCoefficients(const QVector<double>& coefficients)
 {
-	bool wasExternal = this->usingExternalPSF;
-	this->usingExternalPSF = false;
-	if (!wasExternal && this->generator->getAllCoefficients() == coefficients) {
+	if (this->generator->getAllCoefficients() == coefficients) {
 		return;
 	}
 	this->generator->setAllCoefficients(coefficients);
 	this->regeneratePipeline();
 }
 
-void PSFModule::setExternalPSF(const af::array& psf)
+void PSFModule::setCurrentPatch(int frame, int patchIdx)
 {
-	this->externalPSF = psf;
-	this->usingExternalPSF = true;
-	emit psfUpdated(psf);
+	this->currentFrame = frame;
+	this->currentPatchIdx = patchIdx;
 }
 
-void PSFModule::clearExternalPSF()
+void PSFModule::refreshPSF()
 {
-	this->usingExternalPSF = false;
-	this->externalPSF = af::array();
+	this->regeneratePipeline();
 }
 
 void PSFModule::resetCoefficients()
@@ -170,10 +159,6 @@ void PSFModule::switchGenerator(const QString& typeName)
 	if (this->generator->typeName() == typeName) {
 		return;
 	}
-
-	// Clear external PSF override on mode switch (avoid stale override)
-	this->usingExternalPSF = false;
-	this->externalPSF = af::array();
 
 	// Cache outgoing generator settings
 	this->allGeneratorSettings[this->generator->typeName()] =
@@ -292,7 +277,9 @@ af::array PSFModule::computePSFFromCoefficients(const QVector<double>& coefficie
 {
 	QVector<double> saved = this->generator->getAllCoefficients();
 	this->generator->setAllCoefficients(coefficients);
-	af::array psf = this->generator->generatePSF(this->gridSize);
+	PSFRequest req;
+	req.gridSize = this->gridSize;
+	af::array psf = this->generator->generatePSF(req);
 	this->generator->setAllCoefficients(saved);
 	return psf;
 }
@@ -300,15 +287,17 @@ af::array PSFModule::computePSFFromCoefficients(const QVector<double>& coefficie
 void PSFModule::clearCachedArrays()
 {
 	this->currentPSF = af::array();
-	this->externalPSF = af::array();
 	this->generator->invalidateCache();
 }
 
 void PSFModule::regeneratePipeline()
 {
-	this->usingExternalPSF = false;
 	try {
-		this->currentPSF = this->generator->generatePSF(this->gridSize);
+		PSFRequest req;
+		req.gridSize = this->gridSize;
+		req.frame = this->currentFrame;
+		req.patchIdx = this->currentPatchIdx;
+		this->currentPSF = this->generator->generatePSF(req);
 		if (this->generator->hasWavefront()) {
 			emit wavefrontUpdated(this->generator->getLastWavefront());
 		}

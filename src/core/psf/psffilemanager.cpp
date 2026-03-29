@@ -10,7 +10,6 @@
 PSFFileManager::PSFFileManager(QObject* parent)
 	: QObject(parent)
 	, autoSavePSFEnabled(false)
-	, useCustomPSFFolder(false)
 {
 }
 
@@ -133,63 +132,6 @@ af::array PSFFileManager::loadPSFFromFile(const QString& filePath)
 	}
 }
 
-void PSFFileManager::storeOverride(int frame, int patchIdx, const af::array& psf)
-{
-	this->externalPSFOverrides[qMakePair(frame, patchIdx)] = psf;
-}
-
-void PSFFileManager::removeOverride(int frame, int patchIdx)
-{
-	this->externalPSFOverrides.remove(qMakePair(frame, patchIdx));
-}
-
-bool PSFFileManager::hasOverride(int frame, int patchIdx) const
-{
-	return this->externalPSFOverrides.contains(qMakePair(frame, patchIdx));
-}
-
-af::array PSFFileManager::getOverride(int frame, int patchIdx) const
-{
-	return this->externalPSFOverrides.value(qMakePair(frame, patchIdx));
-}
-
-void PSFFileManager::clearOverrides()
-{
-	this->externalPSFOverrides.clear();
-}
-
-af::array PSFFileManager::loadPSFFromFolder(int frame, int patchIdx)
-{
-	if (this->customPSFFolder.isEmpty()) {
-		return af::array();
-	}
-
-	QDir dir(this->customPSFFolder);
-
-	// Priority 1: exact match by "{frame}_{patchIdx}" convention
-	QString baseName = QString("%1_%2").arg(frame).arg(patchIdx);
-	QFileInfoList files = dir.entryInfoList(QDir::Files);
-	for (const QFileInfo& fi : qAsConst(files)) {
-		if (fi.baseName() == baseName) {
-			return this->loadPSFFromFile(fi.absoluteFilePath());
-		}
-	}
-
-	// Priority 2: alphabetical index fallback (for arbitrary naming conventions)
-	QStringList filters;
-	filters << "*.tif" << "*.tiff" << "*.png" << "*.jpg" << "*.jpeg" << "*.bmp";
-	QFileInfoList imageFiles = dir.entryInfoList(filters, QDir::Files, QDir::Name);
-	int fileIndex = frame;
-	if (fileIndex >= 0 && fileIndex < imageFiles.size()) {
-		LOG_INFO() << "Loading PSF by alphabetical index:" << imageFiles[fileIndex].fileName();
-		return this->loadPSFFromFile(imageFiles[fileIndex].absoluteFilePath());
-	}
-
-	LOG_WARNING() << "No PSF file found for frame" << frame
-				  << "patch" << patchIdx << "in" << this->customPSFFolder;
-	return af::array();
-}
-
 void PSFFileManager::autoSaveIfEnabled(int frame, int patchIdx, PSFModule* psfModule)
 {
 	if (!this->autoSavePSFEnabled || this->psfSaveFolder.isEmpty()) {
@@ -197,11 +139,6 @@ void PSFFileManager::autoSaveIfEnabled(int frame, int patchIdx, PSFModule* psfMo
 	}
 	QString name = QString("%1_%2.tif").arg(frame).arg(patchIdx);
 	this->savePSFToFile(this->psfSaveFolder + "/" + name, psfModule);
-}
-
-bool PSFFileManager::isCustomFolderMode() const
-{
-	return this->useCustomPSFFolder && !this->customPSFFolder.isEmpty();
 }
 
 void PSFFileManager::setAutoSavePSF(bool enabled)
@@ -214,16 +151,4 @@ void PSFFileManager::setPSFSaveFolder(const QString& folder)
 {
 	this->psfSaveFolder = folder;
 	LOG_INFO() << "PSF save folder set to:" << folder;
-}
-
-void PSFFileManager::setUseCustomPSFFolder(bool enabled)
-{
-	this->useCustomPSFFolder = enabled;
-	LOG_INFO() << "Custom PSF folder" << (enabled ? "enabled" : "disabled");
-}
-
-void PSFFileManager::setCustomPSFFolder(const QString& folder)
-{
-	this->customPSFFolder = folder;
-	LOG_INFO() << "Custom PSF folder set to:" << folder;
 }

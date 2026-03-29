@@ -6,7 +6,6 @@
 
 class ImageSession;
 class PSFModule;
-class PSFFileManager;
 class WavefrontParameterTable;
 
 class VolumetricProcessor
@@ -15,10 +14,9 @@ public:
 	// Assemble subvolume from all frames for one spatial patch
 	static af::array assembleSubvolume(ImageSession* session, int patchX, int patchY);
 
-	// Assemble 3D PSF by stacking per-frame 2D PSFs (same priority as 2D batch)
+	// Assemble 3D PSF by stacking per-frame 2D PSFs or using 3D generator
 	static af::array assemble3DPSF(PSFModule* psfModule,
 								   WavefrontParameterTable* paramTable,
-								   PSFFileManager* psfFileManager,
 								   int patchIdx, int numFrames);
 
 	// Write 3D result back to output, one frame at a time
@@ -29,10 +27,9 @@ public:
 private:
 	VolumetricProcessor() = delete;
 
-	// Resolve single 2D PSF for (frame, patchIdx) using existing priority
+	// Resolve single 2D PSF for (frame, patchIdx)
 	static af::array resolve2DPSF(PSFModule* psfModule,
 								  WavefrontParameterTable* paramTable,
-								  PSFFileManager* psfFileManager,
 								  int frame, int patchIdx);
 };
 

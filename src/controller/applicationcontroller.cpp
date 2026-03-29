@@ -6,6 +6,7 @@
 #include "core/psf/psfmodule.h"
 #include "core/psf/ipsfgenerator.h"
 #include "core/psf/psffilemanager.h"
+#include "core/psf/filepsfgenerator.h"
 #include "core/optimization/optimizationjobbuilder.h"
 #include "core/processing/batchprocessor.h"
 #include "core/processing/volumetricprocessor.h"
@@ -31,9 +32,6 @@ ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, Q
 	this->initializeOptimizationThread();
 
 	// React to device changes from AFDeviceManager (each component clears its own caches via self-connection)
-	connect(this->afDeviceManager, &AFDeviceManager::aboutToChangeDevice, this, [this]() {
-		this->psfFileManager->clearOverrides();
-	});
 	connect(this->afDeviceManager, &AFDeviceManager::deviceChanged, this, [this]() {
 		if (this->hasInputData())
 			this->psfModule->applyPSFSettings(this->psfModule->getPSFSettings());
@@ -117,13 +115,6 @@ void ApplicationController::configurePatchGrid(int cols, int rows, int borderExt
 
 void ApplicationController::setPSFCoefficient(int id, double value)
 {
-	// Clear external PSF override for current patch (user is manually adjusting coefficients)
-	if (this->hasInputData() && this->parameterTable != nullptr) {
-		int frame = this->getCurrentFrame();
-		int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
-		this->psfFileManager->removeOverride(frame, patchIdx);
-	}
-
 	if (this->psfModule != nullptr) {
 		this->psfModule->setCoefficient(id, value);
 	}
@@ -132,13 +123,6 @@ void ApplicationController::setPSFCoefficient(int id, double value)
 
 void ApplicationController::resetPSFCoefficients()
 {
-	// Clear external PSF override for current patch
-	if (this->hasInputData() && this->parameterTable != nullptr) {
-		int frame = this->getCurrentFrame();
-		int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
-		this->psfFileManager->removeOverride(frame, patchIdx);
-	}
-
 	if (this->psfModule != nullptr) {
 		this->psfModule->resetCoefficients();
 	}
@@ -165,13 +149,6 @@ void ApplicationController::pasteCoefficients()
 	this->undoFrame = this->getCurrentFrame();
 	this->undoPatchX = this->getCurrentPatchX();
 	this->undoPatchY = this->getCurrentPatchY();
-
-	// Clear external PSF override for current patch
-	if (this->hasInputData() && this->parameterTable != nullptr) {
-		int frame = this->getCurrentFrame();
-		int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
-		this->psfFileManager->removeOverride(frame, patchIdx);
-	}
 
 	this->psfModule->setAllCoefficients(this->coefficientClipboard);
 	this->storeCurrentCoefficients();
@@ -201,19 +178,6 @@ void ApplicationController::resetAllCoefficients()
 {
 	if (this->parameterTable == nullptr) return;
 	this->parameterTable->resetAllCoefficients();
-	this->loadCoefficientsForCurrentPatch();
-}
-
-void ApplicationController::clearExternalPSFs()
-{
-	if (this->psfFileManager != nullptr) {
-		this->psfFileManager->clearOverrides();
-		this->psfFileManager->setUseCustomPSFFolder(false);
-		emit customPSFFolderDisabled();
-	}
-	if (this->psfModule != nullptr) {
-		this->psfModule->clearExternalPSF();
-	}
 	this->loadCoefficientsForCurrentPatch();
 }
 
@@ -369,7 +333,7 @@ void ApplicationController::requestBatchDeconvolution()
 	this->suppressLiveDeconv = true;
 
 	this->batchProcessor->executeBatchDeconvolution(
-		this->imageSession, this->psfModule, this->parameterTable, this->psfFileManager);
+		this->imageSession, this->psfModule, this->parameterTable);
 
 	this->suppressLiveDeconv = false;
 	this->loadCoefficientsForCurrentPatch();
@@ -422,7 +386,7 @@ void ApplicationController::runVolumetricDeconvolutionOnCurrentPatch()
 			   << subvolume.dims(1) << "x" << subvolume.dims(2);
 
 	af::array psf3D = VolumetricProcessor::assemble3DPSF(
-		this->psfModule, this->parameterTable, this->psfFileManager,
+		this->psfModule, this->parameterTable,
 		patchIdx, frames);
 	if (psf3D.isempty()) {
 		LOG_WARNING() << "3D deconv: empty 3D PSF for patch" << patchX << patchY;
@@ -598,9 +562,6 @@ void ApplicationController::requestOpenGroundTruthFile(const QString& filePath)
 
 void ApplicationController::handleInputDataChanged()
 {
-	// Clear per-patch PSF overrides (new file loaded)
-	this->psfFileManager->clearOverrides();
-
 	// Invalidate cached parameter tables (dimensions no longer valid)
 	qDeleteAll(this->cachedParameterTables);
 	this->cachedParameterTables.clear();
@@ -704,7 +665,7 @@ void ApplicationController::connectDeconvolutionSignals()
 
 	if (this->imageSession != nullptr) {
 		// Note: deconvolution on patch/frame change is triggered via
-		// loadCoefficientsForCurrentPatch() → setAllCoefficients()/setExternalPSF()
+		// loadCoefficientsForCurrentPatch() → setAllCoefficients()/refreshPSF()
 		// → psfUpdated → handlePSFUpdatedForDeconvolution(), so no separate
 		// patchChanged/frameChanged → deconvolve connections are needed.
 
@@ -747,27 +708,16 @@ void ApplicationController::loadCoefficientsForCurrentPatch()
 
 	int frame = this->coefficientFrame();
 	int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
+	this->psfModule->setCurrentPatch(frame, patchIdx);
 
-	// Check per-patch external PSF override (from one-shot "Load PSF from File")
-	if (this->psfFileManager->hasOverride(frame, patchIdx)) {
-		this->psfModule->setExternalPSF(this->psfFileManager->getOverride(frame, patchIdx));
-		return;
-	}
-
-	// Custom PSF folder mode: load PSF from file instead of computing from coefficients
-	if (this->psfFileManager->isCustomFolderMode()) {
-		af::array psf = this->psfFileManager->loadPSFFromFolder(frame, patchIdx);
-		if (!psf.isempty()) {
-			this->psfModule->setExternalPSF(psf);
-			this->psfFileManager->storeOverride(frame, patchIdx, psf);
+	if (this->psfModule->getGenerator()->supportsCoefficients()) {
+		QVector<double> coeffs = this->parameterTable->getCoefficients(frame, patchIdx);
+		if (!coeffs.isEmpty()) {
+			this->psfModule->setAllCoefficients(coeffs);
+			emit coefficientsLoaded(coeffs);
 		}
-		return;
-	}
-
-	QVector<double> coeffs = this->parameterTable->getCoefficients(frame, patchIdx);
-	if (!coeffs.isEmpty()) {
-		this->psfModule->setAllCoefficients(coeffs);
-		emit coefficientsLoaded(coeffs);
+	} else {
+		this->psfModule->refreshPSF();
 	}
 }
 
@@ -1019,24 +969,6 @@ void ApplicationController::savePSFToFile(const QString& filePath)
 	this->psfFileManager->savePSFToFile(filePath, this->psfModule);
 }
 
-void ApplicationController::loadPSFFromFile(const QString& filePath)
-{
-	if (this->psfModule == nullptr) return;
-
-	af::array psf = this->psfFileManager->loadPSFFromFile(filePath);
-	if (!psf.isempty()) {
-		this->psfModule->setExternalPSF(psf);
-
-		// Store per-patch override so it persists across patch switches
-		if (this->hasInputData() && this->parameterTable != nullptr) {
-			int frame = this->getCurrentFrame();
-			int patchIdx = this->parameterTable->patchIndex(
-				this->getCurrentPatchX(), this->getCurrentPatchY());
-			this->psfFileManager->storeOverride(frame, patchIdx, psf);
-		}
-	}
-}
-
 void ApplicationController::setAutoSavePSF(bool enabled)
 {
 	this->psfFileManager->setAutoSavePSF(enabled);
@@ -1047,14 +979,17 @@ void ApplicationController::setPSFSaveFolder(const QString& folder)
 	this->psfFileManager->setPSFSaveFolder(folder);
 }
 
-void ApplicationController::setUseCustomPSFFolder(bool enabled)
+void ApplicationController::setFilePSFSource(const QString& path)
 {
-	this->psfFileManager->setUseCustomPSFFolder(enabled);
-}
-
-void ApplicationController::setCustomPSFFolder(const QString& folder)
-{
-	this->psfFileManager->setCustomPSFFolder(folder);
+	if (this->psfModule == nullptr) {
+		return;
+	}
+	FilePSFGenerator* fileGen = dynamic_cast<FilePSFGenerator*>(this->psfModule->getGenerator());
+	if (fileGen == nullptr) {
+		return;
+	}
+	fileGen->setSource(path);
+	this->psfModule->refreshPSF();
 }
 
 // --- PSF Grid ---
