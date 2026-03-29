@@ -81,6 +81,7 @@ private:
 	double polAngle;
 	double xyStepNm;
 	ScalingMode scalingMode;
+	bool confocalEnabled;
 
 	// Cached coordinate grids (rebuilt when gridSize changes)
 	int cachedGridSize;

@@ -37,6 +37,8 @@ const int    DEF_POLARIZATION    = 0;  // Unpolarized
 const double DEF_POL_ANGLE       = 0.0;
 const double DEF_XY_STEP_NM      = 64.0;
 const int    DEF_SCALING_MODE    = 0;  // FastScaling
+const QString KEY_CONFOCAL       = QStringLiteral("confocal_enabled");
+const bool   DEF_CONFOCAL        = false;
 }
 
 
@@ -54,6 +56,7 @@ RichardsWolfCalculator::RichardsWolfCalculator(QObject* parent)
 	, polAngle(DEF_POL_ANGLE)
 	, xyStepNm(DEF_XY_STEP_NM)
 	, scalingMode(FastScaling)
+	, confocalEnabled(DEF_CONFOCAL)
 	, cachedGridSize(0)
 {
 }
@@ -213,6 +216,9 @@ af::array RichardsWolfCalculator::computePSF(const af::array& wavefront, int gri
 
 		af::array psf = resampleSlice(computeSlice(unity));
 		centerPad(psf);
+		if (this->confocalEnabled) {
+			psf = psf * psf;
+		}
 		normalize(psf);
 		return psf;
 	}
@@ -232,6 +238,9 @@ af::array RichardsWolfCalculator::computePSF(const af::array& wavefront, int gri
 	}
 
 	centerPad(psf3D);
+	if (this->confocalEnabled) {
+		psf3D = psf3D * psf3D;
+	}
 	normalize(psf3D);
 	return psf3D;
 }
@@ -392,6 +401,7 @@ QVariantMap RichardsWolfCalculator::serializeSettings() const
 	m[KEY_POL_ANGLE]      = this->polAngle;
 	m[KEY_XY_STEP_NM]     = this->xyStepNm;
 	m[KEY_SCALING_MODE]   = static_cast<int>(this->scalingMode);
+	m[KEY_CONFOCAL]       = this->confocalEnabled;
 	return m;
 }
 
@@ -412,6 +422,7 @@ void RichardsWolfCalculator::deserializeSettings(const QVariantMap& settings)
 	this->xyStepNm         = settings.value(KEY_XY_STEP_NM, DEF_XY_STEP_NM).toDouble();
 	this->scalingMode      = static_cast<ScalingMode>(
 		settings.value(KEY_SCALING_MODE, DEF_SCALING_MODE).toInt());
+	this->confocalEnabled  = settings.value(KEY_CONFOCAL, DEF_CONFOCAL).toBool();
 	this->cachedGridSize   = 0; // force rebuild
 }
 

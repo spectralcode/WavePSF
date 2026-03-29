@@ -5,6 +5,7 @@
 #include <QMap>
 #include <QVariantMap>
 
+class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
@@ -31,6 +32,7 @@ private:
 	QComboBox* polarizationCombo;
 	QLabel* polAngleLabel;
 	QDoubleSpinBox* polAngleSpinBox;
+	QCheckBox* confocalCheckBox;
 };
 
 #endif // RWSETTINGSWIDGET_H

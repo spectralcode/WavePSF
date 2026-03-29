@@ -3,6 +3,7 @@
 #include <QFormLayout>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QCheckBox>
 #include <QLabel>
 #include <QSpinBox>
 
@@ -83,6 +84,14 @@ RWSettingsWidget::RWSettingsWidget(QWidget* parent)
 	        this, &RWSettingsWidget::emitSettingChanged);
 	connect(this->polAngleSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
 	        this, &RWSettingsWidget::emitSettingChanged);
+
+	// Confocal mode checkbox
+	this->confocalCheckBox = new QCheckBox(tr("Confocal Mode"), this);
+	this->confocalCheckBox->setToolTip(tr("Approximate confocal PSF by squaring the widefield PSF intensity.\n"
+	                                      "This simulates the effect of a pinhole rejecting out-of-focus light."));
+	layout->addRow(QString(), this->confocalCheckBox);
+	connect(this->confocalCheckBox, &QCheckBox::toggled,
+	        this, &RWSettingsWidget::emitSettingChanged);
 }
 
 QVariantMap RWSettingsWidget::getSettings() const
@@ -97,6 +106,7 @@ QVariantMap RWSettingsWidget::getSettings() const
 	map[QStringLiteral("scaling_mode")] = this->scalingCombo->currentIndex();
 	map[QStringLiteral("polarization_mode")] = this->polarizationCombo->currentIndex();
 	map[QStringLiteral("polarization_angle")] = this->polAngleSpinBox->value();
+	map[QStringLiteral("confocal_enabled")] = this->confocalCheckBox->isChecked();
 	return map;
 }
 
@@ -129,6 +139,12 @@ void RWSettingsWidget::setSettings(const QVariantMap& settings)
 		this->polAngleSpinBox->setValue(
 			settings[QStringLiteral("polarization_angle")].toDouble());
 		this->polAngleSpinBox->blockSignals(false);
+	}
+	if (settings.contains(QStringLiteral("confocal_enabled"))) {
+		this->confocalCheckBox->blockSignals(true);
+		this->confocalCheckBox->setChecked(
+			settings[QStringLiteral("confocal_enabled")].toBool());
+		this->confocalCheckBox->blockSignals(false);
 	}
 }
 
