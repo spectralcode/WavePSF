@@ -4,21 +4,22 @@
 #include <algorithm>
 
 namespace {
+	const int    DEF_MIN_NOLL   = 2;
+	const int    DEF_MAX_NOLL   = 22;
 	const double DEF_GLOBAL_MIN = -3.0;
-	const double DEF_GLOBAL_MAX =  3;
+	const double DEF_GLOBAL_MAX =  3.0;
 	const double DEF_STEP       =  0.1;
 }
 
 
-ZernikeGenerator::ZernikeGenerator(int minNollIndex, int maxNollIndex, QObject* parent)
+ZernikeGenerator::ZernikeGenerator(QObject* parent)
 	: QObject(parent)
 	, globalMinValue(DEF_GLOBAL_MIN)
 	, globalMaxValue(DEF_GLOBAL_MAX)
 	, stepValue(DEF_STEP)
 	, cachedGridSize(0)
 {
-	// Build indices list from min..max range
-	for (int i = minNollIndex; i <= maxNollIndex; ++i) {
+	for (int i = DEF_MIN_NOLL; i <= DEF_MAX_NOLL; ++i) {
 		this->nollIndices.append(i);
 	}
 	this->initializeBasisDefinitions();

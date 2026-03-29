@@ -7,9 +7,7 @@
 #include "wavefrontparameter.h"
 #include "psfsettings.h"
 
-class IWavefrontGenerator;
-class PSFCalculator;
-class RichardsWolfCalculator;
+class IPSFGenerator;
 class Deconvolver;
 class AFDeviceManager;
 
@@ -17,13 +15,6 @@ class PSFModule : public QObject
 {
 	Q_OBJECT
 public:
-	// PSF computation model — the "PSF Generator" dropdown is a mode selector
-	// that maps to a wavefront generator type + PSF model:
-	//   Zernike            → ZernikeGenerator + SCALAR_FOURIER
-	//   Deformable Mirror  → DeformableMirrorGenerator + SCALAR_FOURIER
-	//   3D PSF Microscopy  → ZernikeGenerator + MICROSCOPY_3D
-	enum PSFModel { SCALAR_FOURIER = 0, MICROSCOPY_3D = 1 };
-
 	explicit PSFModule(AFDeviceManager* afDeviceManager, QObject* parent = nullptr);
 	~PSFModule() override;
 
@@ -36,8 +27,7 @@ public:
 	bool isUsingExternalPSF() const;
 	af::array computePSFFromCoefficients(const QVector<double>& coefficients);
 
-	PSFModel getPSFModel() const;
-	RichardsWolfCalculator* getRWCalculator() const;
+	IPSFGenerator* getGenerator() const;
 
 	// Returns mode names for the "PSF Generator" dropdown
 	static QStringList availablePSFModes();
@@ -56,13 +46,13 @@ public slots:
 	af::array deconvolve(const af::array& input, const af::array& psf);
 	bool is3DAlgorithm() const;
 
-	// Generator/mode switching
-	void setGeneratorType(const QString& typeName);
-	void setPSFMode(const QString& modeName);
+	// Single switching API
+	void switchGenerator(const QString& typeName);
 
 	// PSF settings
 	void applyPSFSettings(const PSFSettings& settings);
-	void applyRWSettings(const QVariantMap& rwSettings);
+	void applyInlineSettings(const QVariantMap& settings);
+	void setNumOutputPlanes(int numPlanes);
 
 	// Deconvolution settings forwarding
 	void setDeconvolutionAlgorithm(int algorithm);
@@ -79,9 +69,7 @@ signals:
 	void wavefrontUpdated(af::array wavefront);
 	void psfUpdated(af::array psf);
 	void parameterDescriptorsChanged(QVector<WavefrontParameter> descriptors);
-	void generatorTypeChanged(QString typeName);
-	void psfModelChanged(int model);
-	void psfModeChanged(QString modeName);
+	void generatorChanged(QString typeName);
 	void nollIndicesChanged();
 	void deconvolutionSettingsChanged();
 	void deconvolutionIterationCompleted(int currentIteration, int totalIterations);
@@ -90,16 +78,12 @@ signals:
 private:
 	void regeneratePipeline();
 
-	IWavefrontGenerator* generator;
-	PSFCalculator* calculator;
-	RichardsWolfCalculator* rwCalculator;
+	IPSFGenerator* generator;
 	Deconvolver* deconvolver;
 
-	PSFModel psfModel;
 	int gridSize;
 	QMap<QString, QVariantMap> allGeneratorSettings;
 	QVector<WavefrontParameter> cachedDescriptors;
-	af::array currentWavefront;
 	af::array currentPSF;
 	af::array externalPSF;
 	bool usingExternalPSF;

@@ -43,16 +43,13 @@ signals:
 
 public slots:
 	void updateGeneratorType(const QString& typeName);
-	void updatePSFModel(int model);
 
 private slots:
-	void onNollIndicesChanged();
 	void onApplyClicked();
 
 private:
 	void setupUI();
 	void populateFromSettings(const PSFSettings& settings);
-	void rebuildOverrideTable(const QVector<int>& indices);
 	bool validateSettings() const;
 	void updateValidationState();
 
@@ -64,8 +61,20 @@ private:
 	QVariantMap readGeneratorSettingsWidgets(const QString& typeName) const;
 	void populateGeneratorSettingsWidgets(const QString& typeName, const QVariantMap& gs);
 
-	// Zernike GroupBox (custom UI)
-	QGroupBox* zernikeGroupBox;
+	// Per-mode Zernike wavefront UI (modes that use ZernikeGenerator)
+	struct ZernikeWidgets {
+		QGroupBox* groupBox = nullptr;
+		QLineEdit* nollIndicesEdit = nullptr;
+		QDoubleSpinBox* globalMinSpin = nullptr;
+		QDoubleSpinBox* globalMaxSpin = nullptr;
+		QTableWidget* overrideTable = nullptr;
+	};
+	ZernikeWidgets buildZernikeUI(const QString& modeName, QWidget* parent);
+	void rebuildOverrideTable(ZernikeWidgets& zw, const QVector<int>& indices);
+	QVariantMap readZernikeSettings(const ZernikeWidgets& zw) const;
+	void populateZernikeWidgets(ZernikeWidgets& zw, const QVariantMap& zernikeGs);
+
+	QMap<QString, ZernikeWidgets> zernikeWidgets;
 
 	// Auto-generated GroupBoxes for descriptor-based generators (typeName → GroupBox)
 	QMap<QString, QGroupBox*> generatorGroupBoxes;
@@ -73,19 +82,8 @@ private:
 	// Auto-generated setting widgets (typeName → key → QSpinBox or QDoubleSpinBox)
 	QMap<QString, QMap<QString, QWidget*>> generatorSettingWidgets;
 
-	// Zernike generator controls
-	QLineEdit* nollIndicesEdit;
-	QDoubleSpinBox* globalMinSpin;
-	QDoubleSpinBox* globalMaxSpin;
-	QTableWidget* overrideTable;
-
 	// PSF calculation controls
 	QComboBox* gridSizeCombo;
-	QDoubleSpinBox* apertureRadiusSpin;
-	QComboBox* apertureGeometryCombo;
-	QComboBox* normalizationCombo;
-	QComboBox* paddingFactorCombo;
-	QDoubleSpinBox* phaseScaleSpin;
 
 	// Display controls
 	QCheckBox* displayAutoRangeCheck;

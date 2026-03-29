@@ -2,9 +2,9 @@
 #include "ioptimizer.h"
 #include "optimizerfactory.h"
 #include "imagemetriccalculator.h"
-#include "core/psf/iwavefrontgenerator.h"
-#include "core/psf/wavefrontgeneratorfactory.h"
-#include "core/psf/psfcalculator.h"
+#include "core/psf/ipsfgenerator.h"
+#include "core/psf/psfgeneratorfactory.h"
+#include "core/psf/psfmodule.h"
 #include "core/psf/deconvolver.h"
 #include "utils/afdevicemanager.h"
 #include <limits>
@@ -57,8 +57,8 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 		return;
 	}
 
-	// Create LOCAL PSF pipeline instances on this worker thread
-	IWavefrontGenerator* generator = WavefrontGeneratorFactory::create(
+	// Create LOCAL PSF generator on this worker thread
+	IPSFGenerator* generator = PSFGeneratorFactory::create(
 		config.psfSettings.generatorTypeName, nullptr);
 	if (!generator) {
 		emit error(QStringLiteral("Unknown generator type: %1").arg(config.psfSettings.generatorTypeName));
@@ -67,12 +67,11 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 		emit optimizationFinished(result);
 		return;
 	}
-	generator->deserializeSettings(config.psfSettings.generatorSettings);
-
-	PSFCalculator calculator(config.psfSettings.phaseScale,
-							 config.psfSettings.apertureRadius);
-	calculator.setNormalizationMode(
-		static_cast<PSFCalculator::NormalizationMode>(config.psfSettings.normalizationMode));
+	QVariantMap cachedSettings = config.psfSettings.allGeneratorSettings.value(
+		config.psfSettings.generatorTypeName);
+	if (!cachedSettings.isEmpty()) {
+		generator->deserializeSettings(cachedSettings);
+	}
 
 	Deconvolver deconvolver(config.deconvIterations);
 	deconvolver.setAlgorithm(static_cast<Deconvolver::Algorithm>(config.deconvAlgorithm));
@@ -86,8 +85,8 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 							  const af::array& groundTruthPatch) -> double {
 		try {
 			generator->setAllCoefficients(coefficients);
-			af::array wavefront = generator->generateWavefront(config.psfSettings.gridSize);
-			af::array psf = calculator.computePSF(wavefront);
+			af::array psf = PSFModule::focalSlice(
+				generator->generatePSF(config.psfSettings.gridSize));
 			af::array deconvolved = deconvolver.deconvolve(inputPatch, psf);
 			if (deconvolved.isempty()) return (std::numeric_limits<double>::max)();
 

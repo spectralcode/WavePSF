@@ -448,11 +448,9 @@ void MainWindow::openSettings() {
 		this->settingsDialog = nullptr;
 	});
 
-	// Keep dialog in sync when generator type or PSF model changes externally
-	connect(this->applicationController, &ApplicationController::generatorTypeChanged,
+	// Keep dialog in sync when generator mode changes externally
+	connect(this->applicationController, &ApplicationController::psfModeChanged,
 		this->settingsDialog, &SettingsDialog::updateGeneratorType);
-	connect(this->applicationController, &ApplicationController::psfModelChanged,
-		this->settingsDialog, &SettingsDialog::updatePSFModel);
 
 	this->settingsDialog->show();
 }
@@ -586,21 +584,15 @@ void MainWindow::connectPSFGenerationWidget() {
 	connect(this->applicationController, &ApplicationController::psfParameterDescriptorsChanged,
 			genWidget, &PSFGenerationWidget::setParameterDescriptors);
 
-	// PSF mode switching (composite: generator type + PSF model)
+	// Generator switching (single API)
 	connect(genWidget, &PSFGenerationWidget::psfModeChangeRequested,
-			this->applicationController, &ApplicationController::setPSFMode);
+			this->applicationController, &ApplicationController::switchGenerator);
 	connect(this->applicationController, &ApplicationController::psfModeChanged,
 			genWidget, &PSFGenerationWidget::setPSFMode);
-	connect(this->applicationController, &ApplicationController::generatorTypeChanged,
-			genWidget, &PSFGenerationWidget::setGeneratorType);
 
-	// Inline RW settings → ApplicationController
-	connect(genWidget, &PSFGenerationWidget::rwSettingsChanged,
-			this->applicationController, &ApplicationController::applyRWSettings);
-
-	// PSF model changes → show/hide inline RW settings + switch preview
-	connect(this->applicationController, &ApplicationController::psfModelChanged,
-			genWidget, &PSFGenerationWidget::onPSFModelChanged);
+	// Inline settings → ApplicationController
+	connect(genWidget, &PSFGenerationWidget::inlineSettingsChanged,
+			this->applicationController, &ApplicationController::applyInlineSettings);
 
 	LOG_DEBUG() << "PSFGenerationWidget signal connections established";
 }

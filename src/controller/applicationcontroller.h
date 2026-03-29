@@ -73,12 +73,11 @@ public slots:
 	// PSF settings
 	void applyPSFSettings(const PSFSettings& settings);
 
-	// Generator type / PSF mode switching
-	void setGeneratorType(const QString& typeName);
-	void setPSFMode(const QString& modeName);
+	// Generator switching (single API — replaces setGeneratorType/setPSFMode)
+	void switchGenerator(const QString& typeName);
 
-	// Richards-Wolf settings (inline widget)
-	void applyRWSettings(const QVariantMap& rwSettings);
+	// Inline settings (e.g. RW settings widget)
+	void applyInlineSettings(const QVariantMap& settings);
 
 	// Deconvolution settings - slots for GUI widgets
 	void setDeconvolutionAlgorithm(int algorithm);
@@ -233,9 +232,7 @@ signals:
 	void psfUpdated(af::array psf);
 	void psfUpdatedForPatch(af::array psf, int patchX, int patchY);
 	void psfParameterDescriptorsChanged(QVector<WavefrontParameter> descriptors);
-	void generatorTypeChanged(QString typeName);
 	void psfModeChanged(QString modeName);
-	void psfModelChanged(int model);
 
 	// Deconvolution results
 	void deconvolutionCompleted();

@@ -19,6 +19,10 @@ RWSettingsWidget::RWSettingsWidget(QWidget* parent)
 	QVector<NumericSettingDescriptor> descriptors = rwCalc.getSettingsDescriptors();
 
 	for (const NumericSettingDescriptor& desc : descriptors) {
+		// Skip settings configured in the settings dialog
+		if (desc.key == QStringLiteral("phase_scale")) {
+			continue;
+		}
 		if (desc.decimals == 0) {
 			QSpinBox* spin = new QSpinBox(this);
 			spin->setKeyboardTracking(false);

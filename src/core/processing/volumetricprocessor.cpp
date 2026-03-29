@@ -1,6 +1,7 @@
 #include "volumetricprocessor.h"
 #include "controller/imagesession.h"
 #include "core/psf/psfmodule.h"
+#include "core/psf/ipsfgenerator.h"
 #include "core/psf/psffilemanager.h"
 #include "data/wavefrontparametertable.h"
 #include "utils/logging.h"
@@ -66,8 +67,29 @@ af::array VolumetricProcessor::assemble3DPSF(PSFModule* psfModule,
 {
 	if (numFrames == 0) return af::array();
 
-	// 3D microscopy mode: the PSF is already a 3D volume from Richards-Wolf
-	if (psfModule->getPSFModel() == PSFModule::MICROSCOPY_3D) {
+	// 3D generator mode: resolve per-patch 3D PSF (frame 0 is canonical slot)
+	if (psfModule->getGenerator()->is3D()) {
+		// Priority 1: per-patch 3D override (loaded PSF file)
+		if (psfFileManager != nullptr && psfFileManager->hasOverride(0, patchIdx)) {
+			return psfFileManager->getOverride(0, patchIdx);
+		}
+
+		// Priority 2: custom PSF folder
+		if (psfFileManager != nullptr && psfFileManager->isCustomFolderMode()) {
+			af::array psf = psfFileManager->loadPSFFromFolder(0, patchIdx);
+			if (!psf.isempty()) {
+				psfFileManager->storeOverride(0, patchIdx, psf);
+				return psf;
+			}
+		}
+
+		// Priority 3: compute from stored coefficients
+		QVector<double> coeffs = paramTable->getCoefficients(0, patchIdx);
+		if (!coeffs.isEmpty()) {
+			return psfModule->computePSFFromCoefficients(coeffs);
+		}
+
+		// Fallback: use the currently cached PSF
 		return psfModule->getCurrentPSF();
 	}
 

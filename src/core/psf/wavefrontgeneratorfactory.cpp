@@ -9,7 +9,7 @@ IWavefrontGenerator* WavefrontGeneratorFactory::create(const QString& typeName, 
 		return new DeformableMirrorGenerator(parent);
 	}
 	// Default: Zernike
-	return new ZernikeGenerator(2, 21, parent);
+	return new ZernikeGenerator(parent);
 }
 
 QStringList WavefrontGeneratorFactory::availableTypeNames()

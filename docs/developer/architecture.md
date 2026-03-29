@@ -16,7 +16,8 @@ WavePSF follows a layered MVC pattern. GUI widgets never call business logic dir
 │  ImageSession │ PSFModule │ OptimizationWorker    │
 ├──────────────────────────────────────────────────┤
 │  ImageData / ImageDataAccessor                   │
-│  IWavefrontGenerator · PSFCalculator · Deconvolver│
+│  IPSFGenerator · ComposedPSFGenerator · Deconvolver│
+│  IWavefrontGenerator · IPSFPropagator             │
 │  WavefrontParameterTable · TableInterpolator      │
 └──────────────────────────────────────────────────┘
 ```
@@ -42,10 +43,9 @@ GUI Widgets ←signal/slot→ ApplicationController ←direct calls→ Business 
 - **`InputDataReader`** — loads ENVI HSI and TIFF files (libtiff backend by default)
 
 ### PSF Pipeline
-- **`IWavefrontGenerator`** — interface; implemented by `ZernikeGenerator` and `DeformableMirrorGenerator`. Exposes `WavefrontParameter` descriptors so the GUI can build controls dynamically.
-- **`PSFCalculator`** — converts a wavefront phase array to a PSF via FFT (ArrayFire)
+- **`IPSFGenerator`** — top-level interface for PSF generation. `ComposedPSFGenerator` implements it by combining an `IWavefrontGenerator` (phase from coefficients) with an `IPSFPropagator` (phase → PSF intensity). `PSFGeneratorFactory` creates generators by type name. See [psf_generator_architecture.md](psf_generator_architecture.md).
 - **`Deconvolver`** — applies one of 5 algorithms (Richardson-Lucy, Landweber, Tikhonov, Wiener, Convolution) to a patch
-- **`PSFModule`** — orchestrates the above three; owned by `ApplicationController`
+- **`PSFModule`** — orchestrates generator + deconvolver; owned by `ApplicationController`
 
 ### Optimization
 - **`IOptimizer`** — interface for optimization algorithms
@@ -70,7 +70,7 @@ All ArrayFire compute happens on the main thread except during optimization. Qt 
 
 ## Extension Points
 
-- **New wavefront generator**: implement `IWavefrontGenerator`, register in `WavefrontGeneratorFactory`
+- **New PSF generator**: implement `IWavefrontGenerator` and/or `IPSFPropagator`, register in `PSFGeneratorFactory`. See [psf_generator_architecture.md](psf_generator_architecture.md).
 - **New optimizer**: implement `IOptimizer`, add to algorithm selection in `OptimizationWidget`
 - **New deconvolution algorithm**: extend `Deconvolver::DeconvolutionAlgo` enum and add a case in `deconvolve()`
 - **New settings-aware widget**: implement `getName()` / `getSettings()` / `setSettings()`, register in `MainWindow::loadSettings()` / `saveSettings()`. See [settings_usage_guide.md](settings_usage_guide.md).

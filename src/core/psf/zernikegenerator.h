@@ -22,7 +22,7 @@ public:
 	static constexpr const char* KEY_RANGE_MIN       = "min";
 	static constexpr const char* KEY_RANGE_MAX       = "max";
 
-	explicit ZernikeGenerator(int minNollIndex = 2, int maxNollIndex = 21, QObject* parent = nullptr);
+	explicit ZernikeGenerator(QObject* parent = nullptr);
 	~ZernikeGenerator() override;
 
 	// IWavefrontGenerator interface

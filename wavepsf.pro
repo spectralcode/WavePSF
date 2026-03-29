@@ -53,6 +53,8 @@ SOURCES += \
 	$$SOURCEDIR/core/psf/richardswolfcalculator.cpp \
 	$$SOURCEDIR/core/psf/apertureutils.cpp \
 	$$SOURCEDIR/core/psf/deconvolver.cpp \
+	$$SOURCEDIR/core/psf/composedpsfgenerator.cpp \
+	$$SOURCEDIR/core/psf/psfgeneratorfactory.cpp \
 	$$SOURCEDIR/core/psf/psfmodule.cpp \
 	$$SOURCEDIR/gui/psfcontrol/coefficienteditorwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/wavefrontplotwidget.cpp \
@@ -123,6 +125,10 @@ HEADERS += \
 	$$SOURCEDIR/core/psf/richardswolfcalculator.h \
 	$$SOURCEDIR/core/psf/apertureutils.h \
 	$$SOURCEDIR/core/psf/deconvolver.h \
+	$$SOURCEDIR/core/psf/ipsfpropagator.h \
+	$$SOURCEDIR/core/psf/ipsfgenerator.h \
+	$$SOURCEDIR/core/psf/composedpsfgenerator.h \
+	$$SOURCEDIR/core/psf/psfgeneratorfactory.h \
 	$$SOURCEDIR/core/psf/psfmodule.h \
 	$$SOURCEDIR/gui/psfcontrol/coefficienteditorwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/wavefrontplotwidget.h \

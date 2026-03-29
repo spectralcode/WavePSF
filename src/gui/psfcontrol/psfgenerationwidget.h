@@ -36,16 +36,13 @@ public slots:
 	void updateWavefront(af::array wavefront);
 	void updatePSF(af::array psf);
 	void setPSFSettings(const PSFSettings& settings);
-	void setGeneratorType(const QString& typeName);
 	void setPSFMode(const QString& modeName);
-	void onPSFModelChanged(int model);
 
 signals:
 	void coefficientChanged(int id, double value);
 	void resetRequested();
-	void generatorTypeChangeRequested(QString typeName);
 	void psfModeChangeRequested(QString modeName);
-	void rwSettingsChanged(QVariantMap rwSettings);
+	void inlineSettingsChanged(QVariantMap settings);
 
 private:
 	QComboBox* generatorTypeCombo;

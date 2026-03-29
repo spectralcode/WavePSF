@@ -2,13 +2,14 @@
 #define IWAVEFRONTGENERATOR_H
 
 #include <QString>
+#include <QStringList>
 #include <QVector>
 #include <QVariantMap>
 #include <arrayfire.h>
 #include "wavefrontparameter.h"
 
-// Descriptor for a single numeric configuration setting.
-// Used by SettingsDialog to auto-build spinbox UI for any component
+// Descriptor for a single configuration setting.
+// Used by SettingsDialog to auto-build UI for any component
 // (wavefront generators, PSF calculators, etc.).
 struct NumericSettingDescriptor {
 	QString key;          // serialization key (must match serializeSettings/deserializeSettings)
@@ -19,6 +20,7 @@ struct NumericSettingDescriptor {
 	double step;
 	double defaultValue;
 	int decimals;         // 0 = QSpinBox (integer), >0 = QDoubleSpinBox with N decimal places
+	QStringList options;  // if non-empty: render as QComboBox (index = stored integer value)
 };
 
 class IWavefrontGenerator

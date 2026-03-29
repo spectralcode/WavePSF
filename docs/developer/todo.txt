@@ -128,4 +128,12 @@
 
 - maybe add volume viewer
 
-- maybe move set custom psf folder and use custom psf folder from PSF menu to PSF Generator groupb box in the Generator drop down. maybe call it "custom psf" or "from file"
+- maybe move "set custom psf folder" and "use custom psf folder" from PSF menu to PSF Generator groupb box in the Generator drop down. maybe call it "custom psf" or "from file"
+
+- add confocal psf approximation in 3d microscopy psf generator. --> psf^2
+
+- maybe add multi volume/channel support
+
+[done] add 3d psf microscopy settings tab to dialog just like zernike and deformable mirror generator
+
+[done] fix bug: iterations spin box in deconvolution tab needs to be per algorithm and not global

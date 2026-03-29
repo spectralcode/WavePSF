@@ -5,13 +5,14 @@
 #include <QVector>
 #include <QVariantMap>
 #include <arrayfire.h>
+#include "ipsfpropagator.h"
 #include "iwavefrontgenerator.h"
 
 // Vectorial Cartesian Richards-Wolf PSF calculator for high-NA microscopy.
 // Supports unpolarized (fluorescence) and linearly polarized illumination.
 // Takes a wavefront phase map (from any IWavefrontGenerator) and produces
 // a 3D PSF by computing E-field components via 2D FFT per z-plane.
-class RichardsWolfCalculator : public QObject
+class RichardsWolfCalculator : public QObject, public IPSFPropagator
 {
 	Q_OBJECT
 public:
@@ -21,9 +22,15 @@ public:
 
 	explicit RichardsWolfCalculator(QObject* parent = nullptr);
 
-	// Compute PSF from wavefront phase map.
-	// Returns 3D af::array [H, W, nZPlanes] or 2D [H, W] if nZPlanes == 1.
-	af::array computePSF(const af::array& wavefront, int gridSize);
+	// IPSFPropagator
+	af::array computePSF(const af::array& wavefront, int gridSize) override;
+	bool is3D() const override { return true; }
+	QVariantMap serializeSettings() const override;
+	void deserializeSettings(const QVariantMap& settings) override;
+	QVector<NumericSettingDescriptor> getSettingsDescriptors() const override;
+	void applyInlineSettings(const QVariantMap& settings) override;
+	void setNumOutputPlanes(int numPlanes) override;
+	void invalidateCache() override;
 
 	// Phase scaling (same convention as PSFCalculator — converts generator output to radians)
 	void setPhaseScale(double value);
@@ -52,13 +59,6 @@ public:
 	double getXyStepNm() const;
 	void setScalingMode(ScalingMode mode);
 	ScalingMode getScalingMode() const;
-
-	// Settings descriptors for auto-UI in SettingsDialog
-	QVector<NumericSettingDescriptor> getSettingsDescriptors() const;
-	QVariantMap serializeSettings() const;
-	void deserializeSettings(const QVariantMap& settings);
-
-	void invalidateCache();
 
 private:
 	void buildCoordinateCache(int gridSize);

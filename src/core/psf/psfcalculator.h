@@ -2,9 +2,13 @@
 #define PSFCALCULATOR_H
 
 #include <QObject>
+#include <QVector>
+#include <QVariantMap>
 #include <arrayfire.h>
+#include "ipsfpropagator.h"
+#include "iwavefrontgenerator.h"
 
-class PSFCalculator : public QObject
+class PSFCalculator : public QObject, public IPSFPropagator
 {
 	Q_OBJECT
 public:
@@ -15,16 +19,23 @@ public:
 
 	af::array computePSF(const af::array& wavefront);
 
+	// IPSFPropagator
+	af::array computePSF(const af::array& wavefront, int gridSize) override;
+	QVariantMap serializeSettings() const override;
+	void deserializeSettings(const QVariantMap& settings) override;
+	QVector<NumericSettingDescriptor> getSettingsDescriptors() const override;
+	int getApertureGeometry() const override;
+	double getApertureRadius() const override;
+	void invalidateCache() override;
+
 	void setPhaseScale(double phaseScale);
 	double getPhaseScale() const;
 	void setApertureRadius(double radius);
-	double getApertureRadius() const;
 	void setNormalizationMode(NormalizationMode mode);
 	NormalizationMode getNormalizationMode() const;
 	void setPaddingFactor(int factor);
 	int getPaddingFactor() const;
 	void setApertureGeometry(int geometry);
-	int getApertureGeometry() const;
 
 private:
 	double phaseScale;

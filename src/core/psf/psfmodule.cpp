@@ -1,39 +1,29 @@
 #include "psfmodule.h"
-#include "zernikegenerator.h"
-#include "wavefrontgeneratorfactory.h"
-#include "psfcalculator.h"
-#include "richardswolfcalculator.h"
+#include "ipsfgenerator.h"
+#include "psfgeneratorfactory.h"
 #include "deconvolver.h"
 #include "utils/afdevicemanager.h"
 #include "utils/logging.h"
 
-namespace {
-const QString MODE_ZERNIKE       = QStringLiteral("Zernike");
-const QString MODE_DM            = QStringLiteral("Deformable Mirror");
-const QString MODE_3D_MICROSCOPY = QStringLiteral("3D PSF Microscopy");
-}
-
 
 PSFModule::PSFModule(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent)
-	, psfModel(SCALAR_FOURIER)
 	, gridSize(128)
 	, usingExternalPSF(false)
 {
 	connect(afDeviceManager, &AFDeviceManager::aboutToChangeDevice,
 			this, &PSFModule::clearCachedArrays);
-	// Pre-populate allGeneratorSettings with defaults from every known generator type.
+
+	// Pre-populate allGeneratorSettings with defaults from every known mode.
 	// This ensures SettingsDialog always finds a non-empty map for any type,
 	// even before it has been used or saved to INI.
-	for (const QString& typeName : WavefrontGeneratorFactory::availableTypeNames()) {
-		IWavefrontGenerator* gen = WavefrontGeneratorFactory::create(typeName, nullptr);
+	for (const QString& typeName : PSFGeneratorFactory::availableTypeNames()) {
+		IPSFGenerator* gen = PSFGeneratorFactory::create(typeName, nullptr);
 		this->allGeneratorSettings[typeName] = gen->serializeSettings();
 		delete gen;
 	}
 
-	this->generator = new ZernikeGenerator(2, 21, this);
-	this->calculator = new PSFCalculator(1.0, 1.0, this);
-	this->rwCalculator = new RichardsWolfCalculator(this);
+	this->generator = PSFGeneratorFactory::create(QStringLiteral("Zernike"), this);
 	this->deconvolver = new Deconvolver(128, this);
 
 	connect(this->deconvolver, &Deconvolver::error, this, &PSFModule::error);
@@ -56,7 +46,7 @@ QVector<WavefrontParameter> PSFModule::getParameterDescriptors() const
 
 af::array PSFModule::getCurrentWavefront() const
 {
-	return this->currentWavefront;
+	return this->generator->getLastWavefront();
 }
 
 af::array PSFModule::getCurrentPSF() const
@@ -72,19 +62,14 @@ bool PSFModule::isUsingExternalPSF() const
 	return this->usingExternalPSF;
 }
 
-PSFModule::PSFModel PSFModule::getPSFModel() const
+IPSFGenerator* PSFModule::getGenerator() const
 {
-	return this->psfModel;
-}
-
-RichardsWolfCalculator* PSFModule::getRWCalculator() const
-{
-	return this->rwCalculator;
+	return this->generator;
 }
 
 QStringList PSFModule::availablePSFModes()
 {
-	return { MODE_ZERNIKE, MODE_DM, MODE_3D_MICROSCOPY };
+	return PSFGeneratorFactory::availableTypeNames();
 }
 
 af::array PSFModule::focalSlice(const af::array& psf)
@@ -100,32 +85,9 @@ PSFSettings PSFModule::getPSFSettings() const
 {
 	PSFSettings s;
 	s.generatorTypeName = this->generator->typeName();
-	s.generatorSettings = this->generator->serializeSettings();
-
-	// Populate Zernike convenience fields for UI compatibility
-	ZernikeGenerator* zg = dynamic_cast<ZernikeGenerator*>(this->generator);
-	if (zg) {
-		s.nollIndexSpec = ZernikeGenerator::formatNollIndexSpec(zg->getNollIndices());
-		s.globalMinCoefficient = zg->getGlobalMinValue();
-		s.globalMaxCoefficient = zg->getGlobalMaxValue();
-		s.coefficientStep = zg->getStepValue();
-		s.coefficientRangeOverrides = zg->getRangeOverrides();
-	}
 	s.gridSize = this->gridSize;
-	s.phaseScale = this->calculator->getPhaseScale();
-	s.apertureRadius = this->calculator->getApertureRadius();
-	s.normalizationMode = static_cast<int>(this->calculator->getNormalizationMode());
-	s.paddingFactor = this->calculator->getPaddingFactor();
-	s.apertureGeometry = this->calculator->getApertureGeometry();
-
-	// PSF model and Richards-Wolf settings
-	s.psfModel = static_cast<int>(this->psfModel);
-	s.rwSettings = this->rwCalculator->serializeSettings();
-
-	// Include settings for all known generator types (active generator is always current)
 	s.allGeneratorSettings = this->allGeneratorSettings;
-	s.allGeneratorSettings[s.generatorTypeName] = s.generatorSettings;
-
+	s.allGeneratorSettings[s.generatorTypeName] = this->generator->serializeSettings();
 	return s;
 }
 
@@ -203,19 +165,21 @@ bool PSFModule::is3DAlgorithm() const
 	return this->deconvolver->is3DAlgorithm();
 }
 
-void PSFModule::setGeneratorType(const QString& typeName)
+void PSFModule::switchGenerator(const QString& typeName)
 {
 	if (this->generator->typeName() == typeName) {
 		return;
 	}
 
-	// Cache outgoing generator's settings before destroying it
+	// Clear external PSF override on mode switch (avoid stale override)
+	this->usingExternalPSF = false;
+	this->externalPSF = af::array();
+
+	// Cache outgoing generator settings
 	this->allGeneratorSettings[this->generator->typeName()] =
 		this->generator->serializeSettings();
-
 	delete this->generator;
-	this->generator = dynamic_cast<IWavefrontGenerator*>(
-		WavefrontGeneratorFactory::create(typeName, this));
+	this->generator = PSFGeneratorFactory::create(typeName, this);
 
 	// Restore from cache if previously used
 	QVariantMap cached = this->allGeneratorSettings.value(typeName);
@@ -223,94 +187,41 @@ void PSFModule::setGeneratorType(const QString& typeName)
 		this->generator->deserializeSettings(cached);
 	}
 
-	emit generatorTypeChanged(typeName);
+	emit generatorChanged(typeName);
 	emit parameterDescriptorsChanged(this->generator->getParameterDescriptors());
 	this->regeneratePipeline();
 }
 
-void PSFModule::setPSFMode(const QString& modeName)
-{
-	PSFModel newModel = SCALAR_FOURIER;
-	QString generatorType;
-
-	if (modeName == MODE_3D_MICROSCOPY) {
-		newModel = MICROSCOPY_3D;
-		generatorType = MODE_ZERNIKE;
-	} else {
-		// "Zernike" or "Deformable Mirror" → scalar model, generator matches mode name
-		generatorType = modeName;
-	}
-
-	// Switch generator type if needed (handles caching internally)
-	this->setGeneratorType(generatorType);
-
-	// Switch PSF model
-	if (this->psfModel != newModel) {
-		this->psfModel = newModel;
-		emit psfModelChanged(static_cast<int>(newModel));
-		this->regeneratePipeline();
-	}
-
-	emit psfModeChanged(modeName);
-}
-
 void PSFModule::applyPSFSettings(const PSFSettings& settings)
 {
-	// Merge saved settings on top of pre-populated defaults.
-	// Using merge (not replace) preserves defaults for types not yet saved to INI.
+	// Merge saved per-type settings on top of pre-populated defaults
 	for (auto it = settings.allGeneratorSettings.constBegin();
 		 it != settings.allGeneratorSettings.constEnd(); ++it) {
 		this->allGeneratorSettings[it.key()] = it.value();
 	}
 
-	// Switch generator type if needed
-	if (this->generator->typeName() != settings.generatorTypeName) {
+	// Validate mode name
+	QString modeName = settings.generatorTypeName;
+	if (!PSFGeneratorFactory::availableTypeNames().contains(modeName)) {
+		modeName = QStringLiteral("Zernike");
+	}
+
+	// Switch generator if needed
+	if (this->generator->typeName() != modeName) {
+		this->allGeneratorSettings[this->generator->typeName()] =
+			this->generator->serializeSettings();
 		delete this->generator;
-		this->generator = dynamic_cast<IWavefrontGenerator*>(
-			WavefrontGeneratorFactory::create(settings.generatorTypeName, this));
-		emit generatorTypeChanged(settings.generatorTypeName);
+		this->generator = PSFGeneratorFactory::create(modeName, this);
+		emit generatorChanged(modeName);
 	}
 
-	// Apply generator-specific settings
-	if (!settings.generatorSettings.isEmpty()) {
-		this->generator->deserializeSettings(settings.generatorSettings);
-	}
-
-	// Also apply Zernike convenience fields when the generator is Zernike
-	ZernikeGenerator* zg = dynamic_cast<ZernikeGenerator*>(this->generator);
-	bool indicesChanged = false;
-	if (zg) {
-		QVector<int> newIndices = ZernikeGenerator::parseNollIndexSpec(settings.nollIndexSpec);
-		if (zg->getNollIndices() != newIndices) {
-			zg->setNollIndices(newIndices);
-			indicesChanged = true;
-		}
-		zg->setGlobalRange(settings.globalMinCoefficient, settings.globalMaxCoefficient);
-		zg->setStepValue(settings.coefficientStep);
-		zg->clearAllParameterRanges();
-		for (auto it = settings.coefficientRangeOverrides.constBegin();
-			 it != settings.coefficientRangeOverrides.constEnd(); ++it) {
-			zg->setParameterRange(it.key(), it.value().first, it.value().second);
-		}
+	// Apply settings from cache
+	QVariantMap cached = this->allGeneratorSettings.value(modeName);
+	if (!cached.isEmpty()) {
+		this->generator->deserializeSettings(cached);
 	}
 
 	this->gridSize = settings.gridSize;
-	this->calculator->setPhaseScale(settings.phaseScale);
-	this->calculator->setApertureRadius(settings.apertureRadius);
-	this->calculator->setApertureGeometry(settings.apertureGeometry);
-	this->calculator->setNormalizationMode(
-		static_cast<PSFCalculator::NormalizationMode>(settings.normalizationMode));
-	this->calculator->setPaddingFactor(settings.paddingFactor);
-
-	// PSF model and Richards-Wolf settings
-	PSFModel newModel = static_cast<PSFModel>(settings.psfModel);
-	if (this->psfModel != newModel) {
-		this->psfModel = newModel;
-		emit psfModelChanged(static_cast<int>(newModel));
-	}
-	if (!settings.rwSettings.isEmpty()) {
-		this->rwCalculator->deserializeSettings(settings.rwSettings);
-	}
 
 	// Only re-broadcast descriptors if they actually changed
 	QVector<WavefrontParameter> newDescriptors = this->generator->getParameterDescriptors();
@@ -319,22 +230,20 @@ void PSFModule::applyPSFSettings(const PSFSettings& settings)
 		emit parameterDescriptorsChanged(newDescriptors);
 	}
 
-	// Regenerate pipeline
 	this->regeneratePipeline();
-
-	if (indicesChanged) {
-		emit nollIndicesChanged();
-	}
 }
 
-void PSFModule::applyRWSettings(const QVariantMap& rwSettings)
+void PSFModule::applyInlineSettings(const QVariantMap& settings)
 {
-	if (!rwSettings.isEmpty()) {
-		this->rwCalculator->deserializeSettings(rwSettings);
+	if (!settings.isEmpty()) {
+		this->generator->applyInlineSettings(settings);
 	}
-	if (this->psfModel == MICROSCOPY_3D) {
-		this->regeneratePipeline();
-	}
+	this->regeneratePipeline();
+}
+
+void PSFModule::setNumOutputPlanes(int numPlanes)
+{
+	this->generator->setNumOutputPlanes(numPlanes);
 }
 
 void PSFModule::setDeconvolutionAlgorithm(int algorithm)
@@ -383,24 +292,15 @@ af::array PSFModule::computePSFFromCoefficients(const QVector<double>& coefficie
 {
 	QVector<double> saved = this->generator->getAllCoefficients();
 	this->generator->setAllCoefficients(coefficients);
-	af::array wavefront = this->generator->generateWavefront(this->gridSize);
-	af::array psf;
-	if (this->psfModel == MICROSCOPY_3D) {
-		psf = this->rwCalculator->computePSF(wavefront, this->gridSize);
-	} else {
-		psf = this->calculator->computePSF(wavefront);
-	}
+	af::array psf = this->generator->generatePSF(this->gridSize);
 	this->generator->setAllCoefficients(saved);
 	return psf;
 }
 
 void PSFModule::clearCachedArrays()
 {
-	this->currentWavefront = af::array();
 	this->currentPSF = af::array();
 	this->externalPSF = af::array();
-	this->calculator->setApertureRadius(this->calculator->getApertureRadius()); // resets cachedGridSize
-	this->rwCalculator->invalidateCache();
 	this->generator->invalidateCache();
 }
 
@@ -408,14 +308,9 @@ void PSFModule::regeneratePipeline()
 {
 	this->usingExternalPSF = false;
 	try {
-		this->currentWavefront = this->generator->generateWavefront(this->gridSize);
-		emit wavefrontUpdated(this->currentWavefront);
-
-		if (this->psfModel == MICROSCOPY_3D) {
-			this->currentPSF = this->rwCalculator->computePSF(
-				this->currentWavefront, this->gridSize);
-		} else {
-			this->currentPSF = this->calculator->computePSF(this->currentWavefront);
+		this->currentPSF = this->generator->generatePSF(this->gridSize);
+		if (this->generator->hasWavefront()) {
+			emit wavefrontUpdated(this->generator->getLastWavefront());
 		}
 		emit psfUpdated(this->currentPSF);
 	} catch (af::exception& e) {

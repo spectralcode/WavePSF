@@ -4,7 +4,7 @@
 #include "data/imagedata.h"
 #include "data/wavefrontparametertable.h"
 #include "core/psf/psfmodule.h"
-#include "core/psf/richardswolfcalculator.h"
+#include "core/psf/ipsfgenerator.h"
 #include "core/psf/psffilemanager.h"
 #include "core/optimization/optimizationjobbuilder.h"
 #include "core/processing/batchprocessor.h"
@@ -248,7 +248,7 @@ void ApplicationController::applyPSFSettings(const PSFSettings& settings)
 	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
 }
 
-void ApplicationController::setGeneratorType(const QString& typeName)
+void ApplicationController::switchGenerator(const QString& typeName)
 {
 	if (this->psfModule == nullptr) {
 		return;
@@ -266,7 +266,7 @@ void ApplicationController::setGeneratorType(const QString& typeName)
 	}
 
 	// Switch generator (PSFModule handles caching generator settings internally)
-	this->psfModule->setGeneratorType(typeName);
+	this->psfModule->switchGenerator(typeName);
 
 	// Restore or create parameter table for the new type
 	if (this->cachedParameterTables.contains(typeName)) {
@@ -276,32 +276,19 @@ void ApplicationController::setGeneratorType(const QString& typeName)
 		this->resizeParameterTable();
 	}
 
+	// Sync z-planes for 3D generators
+	this->syncNumZPlanesWithInput();
+
 	// Load coefficients for current patch from the restored/fresh table
 	this->loadCoefficientsForCurrentPatch();
 
 	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
 }
 
-void ApplicationController::setPSFMode(const QString& modeName)
-{
-	if (this->psfModule == nullptr) {
-		return;
-	}
-	this->storeCurrentCoefficients();
-
-	// PSFModule::setPSFMode handles both generator type switching and PSF model switching
-	this->psfModule->setPSFMode(modeName);
-
-	this->syncNumZPlanesWithInput();
-	this->loadCoefficientsForCurrentPatch();
-
-	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
-}
-
-void ApplicationController::applyRWSettings(const QVariantMap& rwSettings)
+void ApplicationController::applyInlineSettings(const QVariantMap& settings)
 {
 	if (this->psfModule != nullptr) {
-		this->psfModule->applyRWSettings(rwSettings);
+		this->psfModule->applyInlineSettings(settings);
 	}
 }
 
@@ -689,12 +676,9 @@ void ApplicationController::connectPSFModuleSignals()
 		});
 		connect(this->psfModule, &PSFModule::parameterDescriptorsChanged,
 				this, &ApplicationController::psfParameterDescriptorsChanged);
-		connect(this->psfModule, &PSFModule::generatorTypeChanged,
-				this, &ApplicationController::generatorTypeChanged);
-		connect(this->psfModule, &PSFModule::psfModeChanged,
+
+		connect(this->psfModule, &PSFModule::generatorChanged,
 				this, &ApplicationController::psfModeChanged);
-		connect(this->psfModule, &PSFModule::psfModelChanged,
-				this, &ApplicationController::psfModelChanged);
 
 		// When Noll indices change, parameter table must be cleared and resized
 		connect(this->psfModule, &PSFModule::nollIndicesChanged, this, [this]() {
@@ -732,8 +716,8 @@ void ApplicationController::connectDeconvolutionSignals()
 
 int ApplicationController::coefficientFrame() const
 {
-	// In 3D microscopy mode, coefficients are frame-independent (shared wavefront)
-	if (this->psfModule != nullptr && this->psfModule->getPSFModel() == PSFModule::MICROSCOPY_3D) {
+	// In 3D generator mode, coefficients are frame-independent (shared wavefront)
+	if (this->psfModule != nullptr && this->psfModule->getGenerator()->is3D()) {
 		return 0;
 	}
 	return this->getCurrentFrame();
@@ -790,17 +774,13 @@ void ApplicationController::loadCoefficientsForCurrentPatch()
 void ApplicationController::syncNumZPlanesWithInput()
 {
 	if (this->psfModule == nullptr ||
-		this->psfModule->getPSFModel() != PSFModule::MICROSCOPY_3D ||
+		!this->psfModule->getGenerator()->is3D() ||
 		!this->hasInputData()) {
 		return;
 	}
-	RichardsWolfCalculator* rwCalc = this->psfModule->getRWCalculator();
 	int inputFrames = this->getInputFrames();
-	if (rwCalc->getNumZPlanes() != inputFrames) {
-		rwCalc->setNumZPlanes(inputFrames);
-		this->psfModule->applyRWSettings(QVariantMap());
-		emit psfSettingsUpdated(this->psfModule->getPSFSettings());
-	}
+	this->psfModule->setNumOutputPlanes(inputFrames);
+	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
 }
 
 void ApplicationController::resizeParameterTable()

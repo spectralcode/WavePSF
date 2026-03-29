@@ -137,6 +137,72 @@ void PSFCalculator::buildApertureCache(int gridSize)
 		this->apertureRadius);
 }
 
+af::array PSFCalculator::computePSF(const af::array& wavefront, int gridSize)
+{
+	Q_UNUSED(gridSize);
+	return this->computePSF(wavefront);
+}
+
+namespace {
+	const QString KEY_PHASE_SCALE        = QStringLiteral("phase_scale");
+	const QString KEY_APERTURE_RADIUS    = QStringLiteral("aperture_radius");
+	const QString KEY_NORMALIZATION_MODE = QStringLiteral("normalization_mode");
+	const QString KEY_PADDING_FACTOR     = QStringLiteral("padding_factor");
+	const QString KEY_APERTURE_GEOMETRY  = QStringLiteral("aperture_geometry");
+}
+
+QVariantMap PSFCalculator::serializeSettings() const
+{
+	QVariantMap map;
+	map[KEY_PHASE_SCALE]        = this->phaseScale;
+	map[KEY_APERTURE_RADIUS]    = this->apertureRadius;
+	map[KEY_NORMALIZATION_MODE] = static_cast<int>(this->normMode);
+	map[KEY_PADDING_FACTOR]     = this->paddingFactor;
+	map[KEY_APERTURE_GEOMETRY]  = this->apertureGeometry;
+	return map;
+}
+
+void PSFCalculator::deserializeSettings(const QVariantMap& settings)
+{
+	if (settings.contains(KEY_PHASE_SCALE))
+		this->setPhaseScale(settings.value(KEY_PHASE_SCALE).toDouble());
+	if (settings.contains(KEY_APERTURE_RADIUS))
+		this->setApertureRadius(settings.value(KEY_APERTURE_RADIUS).toDouble());
+	if (settings.contains(KEY_NORMALIZATION_MODE))
+		this->setNormalizationMode(static_cast<NormalizationMode>(settings.value(KEY_NORMALIZATION_MODE).toInt()));
+	if (settings.contains(KEY_PADDING_FACTOR))
+		this->setPaddingFactor(settings.value(KEY_PADDING_FACTOR).toInt());
+	if (settings.contains(KEY_APERTURE_GEOMETRY))
+		this->setApertureGeometry(settings.value(KEY_APERTURE_GEOMETRY).toInt());
+}
+
+QVector<NumericSettingDescriptor> PSFCalculator::getSettingsDescriptors() const
+{
+	return {
+		{KEY_PHASE_SCALE,        tr("Phase Scale"),        tr("Phase scale in rad per wavefront unit.\n"
+		                                                      "The wavefront is multiplied by this value as first step of PSF calculation.\n"
+		                                                      "Default value: 1.0."),
+		 0.001, 10000.0, 1.0,  this->phaseScale, 3, {}},
+		{KEY_APERTURE_RADIUS,    tr("Aperture Radius"),    tr("Normalized pupil aperture radius [0, 1].\nDefines the active area of the wavefront."),
+		 0.01,  1.0,     0.01, this->apertureRadius, 3, {}},
+		{KEY_PADDING_FACTOR,     tr("Padding Factor"),     tr("Zero-padding factor for the FFT.\n"
+		                                                      "Higher values produce smoother PSFs by oversampling\n"
+		                                                      "the diffraction pattern before cropping back to grid size.\n"
+		                                                      "Increases computation time."),
+		 1,     8,       1,    static_cast<double>(this->paddingFactor), 0, {}},
+		{KEY_NORMALIZATION_MODE, tr("Normalization"),       tr("How the PSF intensity values are normalized."),
+		 0,     2,       1,    static_cast<double>(this->normMode), 0, {tr("Sum"), tr("Peak"), tr("None")}},
+		{KEY_APERTURE_GEOMETRY,  tr("Aperture Geometry"),   tr("Shape of the pupil aperture mask."),
+		 0,     2,       1,    static_cast<double>(this->apertureGeometry), 0, {tr("Circle"), tr("Rectangle"), tr("Triangle")}}
+	};
+}
+
+void PSFCalculator::invalidateCache()
+{
+	this->cachedGridSize = 0;
+	this->cachedApertureMask = af::array();
+}
+
 af::array PSFCalculator::fftshift2D(const af::array& input)
 {
 	int rows = input.dims(0);

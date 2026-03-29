@@ -20,6 +20,9 @@ namespace {
 	// Key names
 	const QString KEY_ALGORITHM             = QStringLiteral("algorithm");
 	const QString KEY_ITERATIONS            = QStringLiteral("iterations");
+	const QString KEY_ITERATIONS_RL         = QStringLiteral("iterations_rl");
+	const QString KEY_ITERATIONS_LW         = QStringLiteral("iterations_landweber");
+	const QString KEY_ITERATIONS_RL3D       = QStringLiteral("iterations_rl3d");
 	const QString KEY_RELAXATION_FACTOR     = QStringLiteral("relaxation_factor");
 	const QString KEY_REGULARIZATION_FACTOR = QStringLiteral("regularization_factor");
 	const QString KEY_NOISE_TO_SIGNAL       = QStringLiteral("noise_to_signal_factor");
@@ -30,6 +33,9 @@ namespace {
 	// Default values
 	const int    DEF_ALGORITHM             = 0;
 	const int    DEF_ITERATIONS            = 128;
+	const int    DEF_ITERATIONS_RL         = 128;
+	const int    DEF_ITERATIONS_LW         = 128;
+	const int    DEF_ITERATIONS_RL3D       = 16;
 	const double DEF_RELAXATION_FACTOR     = 0.65;
 	const double DEF_REGULARIZATION_FACTOR = 0.005;
 	const double DEF_NOISE_TO_SIGNAL       = 0.01;
@@ -40,8 +46,11 @@ namespace {
 
 
 DeconvolutionSettingsWidget::DeconvolutionSettingsWidget(QWidget* parent)
-	: QWidget(parent)
+	: QWidget(parent), previousAlgorithm(DEF_ALGORITHM)
 {
+	this->iterationsPerAlgorithm[Deconvolver::RICHARDSON_LUCY]    = DEF_ITERATIONS_RL;
+	this->iterationsPerAlgorithm[Deconvolver::LANDWEBER]          = DEF_ITERATIONS_LW;
+	this->iterationsPerAlgorithm[Deconvolver::RICHARDSON_LUCY_3D] = DEF_ITERATIONS_RL3D;
 	this->setupUI();
 }
 
@@ -151,7 +160,10 @@ void DeconvolutionSettingsWidget::setupUI()
 			this, &DeconvolutionSettingsWidget::onAlgorithmChanged);
 
 	connect(this->iterationsSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
-			this, &DeconvolutionSettingsWidget::iterationsChanged);
+			this, [this](int value) {
+				this->iterationsPerAlgorithm[this->algorithmComboBox->currentIndex()] = value;
+				emit this->iterationsChanged(value);
+			});
 
 	connect(this->relaxationFactorSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
 			this, [this](double value) { emit this->relaxationFactorChanged(static_cast<float>(value)); });
@@ -180,8 +192,20 @@ void DeconvolutionSettingsWidget::setupUI()
 
 void DeconvolutionSettingsWidget::onAlgorithmChanged(int index)
 {
+	// Save iterations for the previous algorithm
+	this->iterationsPerAlgorithm[this->previousAlgorithm] = this->iterationsSpinBox->value();
+
+	// Load iterations for the new algorithm
+	if (this->iterationsPerAlgorithm.contains(index)) {
+		this->iterationsSpinBox->blockSignals(true);
+		this->iterationsSpinBox->setValue(this->iterationsPerAlgorithm.value(index));
+		this->iterationsSpinBox->blockSignals(false);
+	}
+
+	this->previousAlgorithm = index;
 	this->updateParameterVisibility(index);
 	emit algorithmChanged(index);
+	emit iterationsChanged(this->iterationsSpinBox->value());
 }
 
 void DeconvolutionSettingsWidget::updateParameterVisibility(int algorithmIndex)
@@ -240,6 +264,9 @@ QVariantMap DeconvolutionSettingsWidget::getSettings() const
 	QVariantMap settings;
 	settings.insert(KEY_ALGORITHM,             this->algorithmComboBox->currentIndex());
 	settings.insert(KEY_ITERATIONS,            this->iterationsSpinBox->value());
+	settings.insert(KEY_ITERATIONS_RL,         this->iterationsPerAlgorithm.value(Deconvolver::RICHARDSON_LUCY, DEF_ITERATIONS_RL));
+	settings.insert(KEY_ITERATIONS_LW,         this->iterationsPerAlgorithm.value(Deconvolver::LANDWEBER, DEF_ITERATIONS_LW));
+	settings.insert(KEY_ITERATIONS_RL3D,       this->iterationsPerAlgorithm.value(Deconvolver::RICHARDSON_LUCY_3D, DEF_ITERATIONS_RL3D));
 	settings.insert(KEY_RELAXATION_FACTOR,     this->relaxationFactorSpinBox->value());
 	settings.insert(KEY_REGULARIZATION_FACTOR, this->regularizationFactorSpinBox->value());
 	settings.insert(KEY_NOISE_TO_SIGNAL,       this->noiseToSignalFactorSpinBox->value());
@@ -251,8 +278,14 @@ QVariantMap DeconvolutionSettingsWidget::getSettings() const
 
 void DeconvolutionSettingsWidget::setSettings(const QVariantMap& settings)
 {
+	int fallback = settings.value(KEY_ITERATIONS, DEF_ITERATIONS).toInt();
+	this->iterationsPerAlgorithm[Deconvolver::RICHARDSON_LUCY]    = settings.value(KEY_ITERATIONS_RL,   fallback).toInt();
+	this->iterationsPerAlgorithm[Deconvolver::LANDWEBER]          = settings.value(KEY_ITERATIONS_LW,   fallback).toInt();
+	this->iterationsPerAlgorithm[Deconvolver::RICHARDSON_LUCY_3D] = settings.value(KEY_ITERATIONS_RL3D, fallback).toInt();
 	this->algorithmComboBox->setCurrentIndex(      settings.value(KEY_ALGORITHM,             DEF_ALGORITHM).toInt());
-	this->iterationsSpinBox->setValue(             settings.value(KEY_ITERATIONS,            DEF_ITERATIONS).toInt());
+	int currentAlgo = this->algorithmComboBox->currentIndex();
+	this->previousAlgorithm = currentAlgo;
+	this->iterationsSpinBox->setValue(this->iterationsPerAlgorithm.value(currentAlgo, fallback));
 	this->relaxationFactorSpinBox->setValue(       settings.value(KEY_RELAXATION_FACTOR,     DEF_RELAXATION_FACTOR).toDouble());
 	this->regularizationFactorSpinBox->setValue(   settings.value(KEY_REGULARIZATION_FACTOR, DEF_REGULARIZATION_FACTOR).toDouble());
 	this->noiseToSignalFactorSpinBox->setValue(    settings.value(KEY_NOISE_TO_SIGNAL,        DEF_NOISE_TO_SIGNAL).toDouble());

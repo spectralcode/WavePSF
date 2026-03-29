@@ -82,7 +82,7 @@ PSFGenerationWidget::PSFGenerationWidget(QWidget* parent)
 	connect(this->coeffEditor, &CoefficientEditorWidget::resetRequested,
 			this, &PSFGenerationWidget::resetRequested);
 	connect(this->rwSettingsWidget, &RWSettingsWidget::settingChanged,
-			this, &PSFGenerationWidget::rwSettingsChanged);
+			this, &PSFGenerationWidget::inlineSettingsChanged);
 }
 
 PSFGenerationWidget::~PSFGenerationWidget()
@@ -146,38 +146,29 @@ void PSFGenerationWidget::setPSFSettings(const PSFSettings& settings)
 {
 	this->currentSettings = settings;
 
-	// Determine the mode name for the combo box
-	QString modeName;
-	if (settings.psfModel == 1) {
-		modeName = QStringLiteral("3D PSF Microscopy");
-	} else {
-		modeName = settings.generatorTypeName;
-	}
-
 	// Sync combo box without triggering signal
 	this->generatorTypeCombo->blockSignals(true);
-	int idx = this->generatorTypeCombo->findText(modeName);
+	int idx = this->generatorTypeCombo->findText(settings.generatorTypeName);
 	if (idx >= 0) {
 		this->generatorTypeCombo->setCurrentIndex(idx);
 	}
 	this->generatorTypeCombo->blockSignals(false);
 
-	// Forward aperture settings to wavefront plot
-	this->wavefrontPlot->setAperture(settings.apertureGeometry, settings.apertureRadius);
+	// Read aperture and RW settings from the active generator's composed settings
+	QVariantMap activeSettings = settings.allGeneratorSettings.value(settings.generatorTypeName);
+	QVariantMap propSettings = activeSettings.value(QStringLiteral("propagator_settings")).toMap();
 
-	// Update inline RW settings and visibility
-	this->rwSettingsWidget->setSettings(settings.rwSettings);
-	this->onPSFModelChanged(settings.psfModel);
-}
+	int apertureGeometry = propSettings.value(QStringLiteral("aperture_geometry"), 0).toInt();
+	double apertureRadius = propSettings.value(QStringLiteral("aperture_radius"), 1.0).toDouble();
+	this->wavefrontPlot->setAperture(apertureGeometry, apertureRadius);
 
-void PSFGenerationWidget::setGeneratorType(const QString& typeName)
-{
-	this->generatorTypeCombo->blockSignals(true);
-	int idx = this->generatorTypeCombo->findText(typeName);
-	if (idx >= 0) {
-		this->generatorTypeCombo->setCurrentIndex(idx);
+	// Show/hide RW settings widget and switch 2D/3D preview
+	bool is3D = (settings.generatorTypeName == QStringLiteral("3D PSF Microscopy"));
+	this->rwSettingsWidget->setVisible(is3D);
+	this->psfPreviewStack->setCurrentIndex(is3D ? 1 : 0);
+	if (is3D) {
+		this->rwSettingsWidget->setSettings(propSettings);
 	}
-	this->generatorTypeCombo->blockSignals(false);
 }
 
 void PSFGenerationWidget::setPSFMode(const QString& modeName)
@@ -188,11 +179,4 @@ void PSFGenerationWidget::setPSFMode(const QString& modeName)
 		this->generatorTypeCombo->setCurrentIndex(idx);
 	}
 	this->generatorTypeCombo->blockSignals(false);
-}
-
-void PSFGenerationWidget::onPSFModelChanged(int model)
-{
-	bool is3D = (model == 1);
-	this->rwSettingsWidget->setVisible(is3D);
-	this->psfPreviewStack->setCurrentIndex(is3D ? 1 : 0);
 }

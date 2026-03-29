@@ -2,6 +2,7 @@
 #define DECONVOLUTIONSETTINGSWIDGET_H
 
 #include <QWidget>
+#include <QMap>
 #include <QVariantMap>
 
 class QComboBox;
@@ -44,6 +45,8 @@ private:
 
 	QComboBox* algorithmComboBox;
 	QSpinBox* iterationsSpinBox;
+	QMap<int, int> iterationsPerAlgorithm;
+	int previousAlgorithm;
 	QDoubleSpinBox* relaxationFactorSpinBox;
 	QDoubleSpinBox* regularizationFactorSpinBox;
 	QDoubleSpinBox* noiseToSignalFactorSpinBox;
