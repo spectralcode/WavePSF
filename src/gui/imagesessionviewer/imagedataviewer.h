@@ -81,6 +81,8 @@ public slots:
 	void rotate90();
 	void flipH();
 	void flipV();
+	void setYPositionLineY(int y);
+	void setYPositionLineVisible(bool visible);
 
 private:
 	void setupUI();
@@ -143,6 +145,7 @@ signals:
 	void viewActivated();
 	void viewTransformChanged(QTransform transform, QPointF centerInScene);
 	void navigatePatch(int dx, int dy);
+	void yPositionLineDragged(int y);
 };
 
 #endif // IMAGEDATAVIEWER_H

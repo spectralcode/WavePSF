@@ -455,6 +455,7 @@ void DataCrossSectionWidget::connectSignals()
 	connect(this->ySlider, &QSlider::valueChanged, this, [this](int yIndex) {
 		this->updatePanel(this->inputPanel, this->inputData, yIndex);
 		this->updatePanel(this->outputPanel, this->outputData, yIndex);
+		emit yPositionChanged(yIndex);
 	});
 }
 
@@ -495,6 +496,16 @@ void DataCrossSectionWidget::refreshPanels()
 	int yIndex = this->ySlider->value();
 	this->updatePanel(this->inputPanel, this->inputData, yIndex);
 	this->updatePanel(this->outputPanel, this->outputData, yIndex);
+}
+
+void DataCrossSectionWidget::setYPosition(int y)
+{
+	this->ySlider->setValue(y);
+}
+
+int DataCrossSectionWidget::currentYPosition() const
+{
+	return this->ySlider->value();
 }
 
 void DataCrossSectionWidget::clearPanel(Panel& panel)

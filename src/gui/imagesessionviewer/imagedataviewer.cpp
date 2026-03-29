@@ -440,6 +440,7 @@ void ImageDataViewer::connectSignals()
 	connect(this->frameView, &GraphicsView::pressed, this, &ImageDataViewer::viewActivated);
 	connect(this->frameView, &GraphicsView::viewTransformChanged, this, &ImageDataViewer::viewTransformChanged);
 	connect(this->frameView, &GraphicsView::navigatePatch, this, &ImageDataViewer::navigatePatch);
+	connect(this->frameView, &GraphicsView::yPositionLineDragged, this, &ImageDataViewer::yPositionLineDragged);
 	connect(this->gtToggleButton, &QToolButton::clicked, this, [this](bool checked) {
 		this->showReference(checked);
 	});
@@ -448,6 +449,8 @@ void ImageDataViewer::connectSignals()
 void ImageDataViewer::rotate90() { this->frameView->rotate90(); }
 void ImageDataViewer::flipH()    { this->frameView->flipH(); }
 void ImageDataViewer::flipV()    { this->frameView->flipV(); }
+void ImageDataViewer::setYPositionLineY(int y)       { this->frameView->setYPositionLineY(y); }
+void ImageDataViewer::setYPositionLineVisible(bool v) { this->frameView->setYPositionLineVisible(v); }
 
 void ImageDataViewer::applyViewTransform(QTransform t, QPointF center) {
 	this->frameView->applyViewTransform(t, center);

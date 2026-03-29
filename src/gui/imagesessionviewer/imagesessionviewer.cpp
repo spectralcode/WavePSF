@@ -337,11 +337,16 @@ void ImageSessionViewer::setCrossSectionVisible(bool visible)
 	if (this->crossSectionVisible == visible) return;
 	this->crossSectionVisible = visible;
 	this->crossSectionWidget->setVisible(visible);
+	this->inputViewer->setYPositionLineVisible(visible);
+	this->outputViewer->setYPositionLineVisible(visible);
 	// keep splitter proportions reasonable when showing/hiding
 	if (visible) {
 		this->rightSplitter->setStretchFactor(0, 3);
 		this->rightSplitter->setStretchFactor(1, 1);
 		this->crossSectionWidget->refreshPanels();
+		int y = this->crossSectionWidget->currentYPosition();
+		this->inputViewer->setYPositionLineY(y);
+		this->outputViewer->setYPositionLineY(y);
 	}
 	emit crossSectionVisibilityChanged(visible);
 }
@@ -557,6 +562,16 @@ void ImageSessionViewer::connectSignals()
 	        this, &ImageSessionViewer::viewerTransformChanged);
 	connect(this->outputViewer, &ImageDataViewer::viewTransformChanged,
 	        this, &ImageSessionViewer::viewerTransformChanged);
+
+	// Y position sync: cross-section ↔ viewers
+	connect(this->crossSectionWidget, &DataCrossSectionWidget::yPositionChanged,
+	        this->inputViewer, &ImageDataViewer::setYPositionLineY);
+	connect(this->crossSectionWidget, &DataCrossSectionWidget::yPositionChanged,
+	        this->outputViewer, &ImageDataViewer::setYPositionLineY);
+	connect(this->inputViewer, &ImageDataViewer::yPositionLineDragged,
+	        this->crossSectionWidget, &DataCrossSectionWidget::setYPosition);
+	connect(this->outputViewer, &ImageDataViewer::yPositionLineDragged,
+	        this->crossSectionWidget, &DataCrossSectionWidget::setYPosition);
 }
 
 void ImageSessionViewer::updateFrameControls()

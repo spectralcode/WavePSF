@@ -10,6 +10,8 @@
 #include <QApplication>
 #include <QScrollBar>
 #include <QPainter>
+#include <QGraphicsLineItem>
+#include <cmath>
 #include "utils/supportedfilechecker.h"
 
 GraphicsView::GraphicsView(QWidget* parent) : QGraphicsView(parent)
@@ -38,6 +40,14 @@ GraphicsView::GraphicsView(QWidget* parent) : QGraphicsView(parent)
 	this->scene->addItem(grid);
 	connect(this->grid, &RectItemGroup::selectionChanged, this, &GraphicsView::rectangleSelectionChanged);
 	connect(this->grid, &RectItemGroup::gridGenerated, this, &GraphicsView::gridGenerated);
+
+	this->yPositionLine = new QGraphicsLineItem();
+	this->yPositionLine->setPen(QPen(Qt::red, 1));
+	this->yPositionLine->setVisible(false);
+	this->scene->addItem(this->yPositionLine);
+	this->draggingYLine = false;
+
+	this->viewport()->setMouseTracking(true);
 
 	this->acceptFileDrops = false;
 	this->isHighlightedForDrop = false;
@@ -110,6 +120,16 @@ void GraphicsView::mouseDoubleClickEvent(QMouseEvent* event) {
 
 void GraphicsView::mousePressEvent(QMouseEvent* event) {
 	emit pressed();
+	if (event->button() == Qt::LeftButton && this->yPositionLine->isVisible()) {
+		QPointF scenePos = mapToScene(event->pos());
+		qreal lineY = this->yPositionLine->line().y1();
+		if (std::abs(scenePos.y() - lineY) <= 3.0) {
+			this->draggingYLine = true;
+			this->viewport()->setCursor(Qt::SplitVCursor);
+			event->accept();
+			return;
+		}
+	}
 	if (event->button() == Qt::MiddleButton) {
 		this->mousePosX = event->x();
 		this->mousePosY = event->y();
@@ -128,6 +148,15 @@ void GraphicsView::mouseMoveEvent(QMouseEvent* event) {
 	QPointF currentPosition = mapToScene(event->pos());
 	emit mouseMoved(static_cast<int>(currentPosition.x()), static_cast<int>(currentPosition.y()));
 
+	if (this->draggingYLine && (event->buttons() & Qt::LeftButton)) {
+		QPointF scenePos = mapToScene(event->pos());
+		int y = qBound(0, static_cast<int>(scenePos.y()), this->frameHeight - 1);
+		this->setYPositionLineY(y);
+		emit yPositionLineDragged(y);
+		event->accept();
+		return;
+	}
+
 	if (event->buttons() & Qt::MiddleButton) {
 		const QPoint delta = event->pos() - QPoint(this->mousePosX, this->mousePosY);
 		this->horizontalScrollBar()->setValue(this->horizontalScrollBar()->value() - delta.x());
@@ -141,6 +170,27 @@ void GraphicsView::mouseMoveEvent(QMouseEvent* event) {
 	}
 
 	QGraphicsView::mouseMoveEvent(event);
+
+	if (this->yPositionLine->isVisible() && !(event->buttons())) {
+		QPointF scenePos = mapToScene(event->pos());
+		qreal lineY = this->yPositionLine->line().y1();
+		bool nearLine = (std::abs(scenePos.y() - lineY) <= 3.0);
+		if (nearLine) {
+			this->viewport()->setCursor(Qt::SplitVCursor);
+		} else if (this->viewport()->cursor().shape() == Qt::SplitVCursor) {
+			this->viewport()->unsetCursor();
+		}
+	}
+}
+
+void GraphicsView::mouseReleaseEvent(QMouseEvent* event) {
+	if (event->button() == Qt::LeftButton && this->draggingYLine) {
+		this->draggingYLine = false;
+		this->viewport()->unsetCursor();
+		event->accept();
+		return;
+	}
+	QGraphicsView::mouseReleaseEvent(event);
 }
 
 void GraphicsView::keyPressEvent(QKeyEvent* event) {
@@ -229,24 +279,19 @@ void GraphicsView::keyReleaseEvent(QKeyEvent* event) {
 }
 
 void GraphicsView::wheelEvent(QWheelEvent* event) {
-	if (event->modifiers() & Qt::ControlModifier) {
-		//wheel-based zoom about the cursor position
-		double angle = event->angleDelta().y();
-		double factor = qPow(1.0015, angle);
+	//wheel-based zoom about the cursor position
+	double angle = event->angleDelta().y();
+	double factor = qPow(1.0015, angle);
 
-		QPoint targetViewportPos = event->pos();
-		QPointF targetScenePos = mapToScene(event->pos());
+	QPoint targetViewportPos = event->pos();
+	QPointF targetScenePos = mapToScene(event->pos());
 
-		this->scale(factor, factor);
-		this->centerOn(targetScenePos);
+	this->scale(factor, factor);
+	this->centerOn(targetScenePos);
 
-		QPointF deltaViewportPos = targetViewportPos - QPointF(viewport()->width() / 2.0, viewport()->height() / 2.0);
-		QPointF viewportCenter = mapFromScene(targetScenePos) - deltaViewportPos;
-		this->centerOn(mapToScene(viewportCenter.toPoint()));
-		return;
-	}
-
-	QGraphicsView::wheelEvent(event);
+	QPointF deltaViewportPos = targetViewportPos - QPointF(viewport()->width() / 2.0, viewport()->height() / 2.0);
+	QPointF viewportCenter = mapFromScene(targetScenePos) - deltaViewportPos;
+	this->centerOn(mapToScene(viewportCenter.toPoint()));
 }
 
 void GraphicsView::contextMenuEvent(QContextMenuEvent* event) {
@@ -444,6 +489,11 @@ void GraphicsView::displayFrame(QImage frame) {
 		this->ensureVisible(this->inputItem);
 		this->centerOn(this->scene->itemsBoundingRect().center());
 	}
+
+	if (this->yPositionLine->isVisible()) {
+		qreal lineY = this->yPositionLine->line().y1();
+		this->yPositionLine->setLine(0, lineY, width, lineY);
+	}
 }
 
 void GraphicsView::generateRects(const PatchLayout& layout) {
@@ -466,6 +516,15 @@ void GraphicsView::highlightMultipleRects(const QVector<int>& rectIds) {
 void GraphicsView::setAxisOverlayVisible(bool visible) {
 	this->axisOverlayVisible = visible;
 	this->viewport()->update();
+}
+
+void GraphicsView::setYPositionLineY(int y) {
+	qreal lineY = static_cast<qreal>(y) + 0.5;
+	this->yPositionLine->setLine(0, lineY, this->frameWidth, lineY);
+}
+
+void GraphicsView::setYPositionLineVisible(bool visible) {
+	this->yPositionLine->setVisible(visible);
 }
 
 void GraphicsView::paintEvent(QPaintEvent* event) {

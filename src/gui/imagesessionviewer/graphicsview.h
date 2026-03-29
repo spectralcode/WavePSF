@@ -31,9 +31,12 @@ private:
 	bool syncInProgress;
 	bool syncActive;
 	bool axisOverlayVisible;
+	QGraphicsLineItem* yPositionLine;
+	bool draggingYLine;
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
 	void mousePressEvent(QMouseEvent* event) override;
 	void mouseMoveEvent(QMouseEvent* event) override;
+	void mouseReleaseEvent(QMouseEvent* event) override;
 	void keyPressEvent(QKeyEvent* event) override;
 	void keyReleaseEvent(QKeyEvent* event) override;
 	void wheelEvent(QWheelEvent* event) override;
@@ -68,6 +71,8 @@ public slots:
 	void applyViewTransform(QTransform transform, QPointF centerInScene);
 	void setSyncActive(bool active);
 	void setAxisOverlayVisible(bool visible);
+	void setYPositionLineY(int y);
+	void setYPositionLineVisible(bool visible);
 
 signals:
 	void info(QString);
@@ -85,6 +90,7 @@ signals:
 	void fileDropRequested(const QString& filePath);
 	void viewTransformChanged(QTransform transform, QPointF centerInScene);
 	void navigatePatch(int dx, int dy);
+	void yPositionLineDragged(int y);
 };
 
 #endif // GRAPHICSVIEW_H

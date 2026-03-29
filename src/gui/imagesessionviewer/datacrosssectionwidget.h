@@ -24,13 +24,16 @@ public:
 	void setDisplaySettings(bool autoRange, double minValue, double maxValue);
 	void setFrameLineVisible(bool visible);
 	bool isFrameLineVisible() const { return this->showFrameLine; }
+	int currentYPosition() const;
 
 public slots:
 	void setCurrentFrame(int frame);
+	void setYPosition(int y);
 	void refreshPanels();
 
 signals:
 	void frameChangeRequested(int frame);
+	void yPositionChanged(int yIndex);
 
 private:
 	struct Panel {
