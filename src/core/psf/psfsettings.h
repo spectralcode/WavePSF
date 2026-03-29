@@ -30,6 +30,12 @@ struct PSFSettings {
 	int normalizationMode = 0;      // 0=Sum, 1=Peak, 2=None
 	int paddingFactor = 1;          // FFT zero-padding factor (1=none, 2, 4, 8)
 	int apertureGeometry = 0;       // 0=Circle, 1=Rectangle, 2=Triangle
+
+	// --- PSF model selection ---
+	int psfModel = 0;              // 0=ScalarFourier, 1=Microscopy3D
+
+	// --- Richards-Wolf calculator settings (used when psfModel == 1) ---
+	QVariantMap rwSettings;
 };
 
 // Parse 0-based index spec string into sorted list of indices

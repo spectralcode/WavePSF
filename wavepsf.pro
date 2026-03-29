@@ -50,12 +50,16 @@ SOURCES += \
 	$$SOURCEDIR/core/psf/deformablemirror/deformablemirrorgenerator.cpp \
 	$$SOURCEDIR/core/psf/wavefrontgeneratorfactory.cpp \
 	$$SOURCEDIR/core/psf/psfcalculator.cpp \
+	$$SOURCEDIR/core/psf/richardswolfcalculator.cpp \
 	$$SOURCEDIR/core/psf/apertureutils.cpp \
 	$$SOURCEDIR/core/psf/deconvolver.cpp \
 	$$SOURCEDIR/core/psf/psfmodule.cpp \
 	$$SOURCEDIR/gui/psfcontrol/coefficienteditorwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/wavefrontplotwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/psfpreviewwidget.cpp \
+	$$SOURCEDIR/gui/psfcontrol/psf3dpreviewwidget.cpp \
+	$$SOURCEDIR/gui/psfcontrol/sliceviewerwidget.cpp \
+	$$SOURCEDIR/gui/psfcontrol/rwsettingswidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/psfgenerationwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/processingcontrolwidget.cpp \
 	$$SOURCEDIR/gui/psfcontrol/deconvolutionsettingswidget.cpp \
@@ -116,12 +120,16 @@ HEADERS += \
 	$$SOURCEDIR/core/psf/deformablemirror/deformablemirrorgenerator.h \
 	$$SOURCEDIR/core/psf/wavefrontgeneratorfactory.h \
 	$$SOURCEDIR/core/psf/psfcalculator.h \
+	$$SOURCEDIR/core/psf/richardswolfcalculator.h \
 	$$SOURCEDIR/core/psf/apertureutils.h \
 	$$SOURCEDIR/core/psf/deconvolver.h \
 	$$SOURCEDIR/core/psf/psfmodule.h \
 	$$SOURCEDIR/gui/psfcontrol/coefficienteditorwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/wavefrontplotwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/psfpreviewwidget.h \
+	$$SOURCEDIR/gui/psfcontrol/psf3dpreviewwidget.h \
+	$$SOURCEDIR/gui/psfcontrol/sliceviewerwidget.h \
+	$$SOURCEDIR/gui/psfcontrol/rwsettingswidget.h \
 	$$SOURCEDIR/gui/psfcontrol/psfgenerationwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/processingcontrolwidget.h \
 	$$SOURCEDIR/gui/psfcontrol/deconvolutionsettingswidget.h \

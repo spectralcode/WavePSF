@@ -18,6 +18,8 @@ namespace {
 	const QString KEY_NORMALIZATION_MODE          = QStringLiteral("normalization_mode");
 	const QString KEY_PADDING_FACTOR              = QStringLiteral("padding_factor");
 	const QString KEY_APERTURE_GEOMETRY           = QStringLiteral("aperture_geometry");
+	const QString KEY_PSF_MODEL                  = QStringLiteral("psf_model");
+	const QString KEY_RW_SETTINGS                = QStringLiteral("rw_settings");
 	const QString KEY_RANGE_MIN                   = QStringLiteral("min");
 	const QString KEY_RANGE_MAX                   = QStringLiteral("max");
 }
@@ -128,6 +130,8 @@ QVariantMap serializePSFSettings(const PSFSettings& settings)
 	map[KEY_NORMALIZATION_MODE]     = settings.normalizationMode;
 	map[KEY_PADDING_FACTOR]         = settings.paddingFactor;
 	map[KEY_APERTURE_GEOMETRY]      = settings.apertureGeometry;
+	map[KEY_PSF_MODEL]              = settings.psfModel;
+	map[KEY_RW_SETTINGS]            = settings.rwSettings;
 
 	// Serialize range overrides
 	QVariantMap overrides;
@@ -167,6 +171,8 @@ PSFSettings deserializePSFSettings(const QVariantMap& map)
 	s.normalizationMode    = map.value(KEY_NORMALIZATION_MODE,     s.normalizationMode).toInt();
 	s.paddingFactor        = map.value(KEY_PADDING_FACTOR,         s.paddingFactor).toInt();
 	s.apertureGeometry     = map.value(KEY_APERTURE_GEOMETRY,      s.apertureGeometry).toInt();
+	s.psfModel             = map.value(KEY_PSF_MODEL,              s.psfModel).toInt();
+	s.rwSettings           = map.value(KEY_RW_SETTINGS).toMap();
 
 	// Deserialize range overrides
 	if (map.contains(KEY_COEFFICIENT_RANGE_OVERRIDES)) {

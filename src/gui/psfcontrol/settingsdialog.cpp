@@ -119,6 +119,9 @@ PSFSettings SettingsDialog::getSettings() const
 	s.normalizationMode = this->normalizationCombo->currentIndex();
 	s.paddingFactor = this->paddingFactorCombo->currentText().split(" ").first().toInt();
 
+	// Preserve PSF model from current state
+	s.psfModel = this->initialSettings.psfModel;
+
 	return s;
 }
 
@@ -161,6 +164,11 @@ void SettingsDialog::updateGeneratorType(const QString& typeName)
 {
 	this->currentGeneratorTypeName = typeName;
 	this->updateValidationState();
+}
+
+void SettingsDialog::updatePSFModel(int model)
+{
+	this->initialSettings.psfModel = model;
 }
 
 void SettingsDialog::onApplyClicked()
@@ -229,7 +237,7 @@ void SettingsDialog::setupUI()
 	// Auto-generate GroupBoxes for all descriptor-based generators
 	for (const QString& typeName : WavefrontGeneratorFactory::availableTypeNames()) {
 		IWavefrontGenerator* gen = WavefrontGeneratorFactory::create(typeName, nullptr);
-		QVector<WavefrontGeneratorSetting> descriptors = gen->getSettingsDescriptors();
+		QVector<NumericSettingDescriptor> descriptors = gen->getSettingsDescriptors();
 		delete gen;
 		if (descriptors.isEmpty()) continue;
 		this->buildGeneratorSettingsGroup(typeName, descriptors, wavefrontTab);
@@ -240,7 +248,9 @@ void SettingsDialog::setupUI()
 
 	// --- PSF Calculation tab ---
 	QWidget* psfTab = new QWidget(tabWidget);
-	QFormLayout* psfLayout = new QFormLayout(psfTab);
+	QVBoxLayout* psfMainLayout = new QVBoxLayout(psfTab);
+	QFormLayout* psfLayout = new QFormLayout();
+	psfMainLayout->addLayout(psfLayout);
 
 	this->gridSizeCombo = new QComboBox(psfTab);
 	this->gridSizeCombo->addItems({QStringLiteral("64"), QStringLiteral("128"), QStringLiteral("256"), QStringLiteral("512"), QStringLiteral("768"), QStringLiteral("1024")});
@@ -547,7 +557,7 @@ void SettingsDialog::rebuildOverrideTable(const QVector<int>& indices)
 }
 
 void SettingsDialog::buildGeneratorSettingsGroup(const QString& typeName,
-                                                     const QVector<WavefrontGeneratorSetting>& descriptors,
+                                                     const QVector<NumericSettingDescriptor>& descriptors,
                                                      QWidget* parent)
 {
 	QGroupBox* group = new QGroupBox(typeName, parent);
@@ -556,7 +566,7 @@ void SettingsDialog::buildGeneratorSettingsGroup(const QString& typeName,
 	auto emitSettings = [this]() { emit settingsApplied(this->getSettings()); };
 	QMap<QString, QWidget*> widgets;
 
-	for (const WavefrontGeneratorSetting& desc : descriptors) {
+	for (const NumericSettingDescriptor& desc : descriptors) {
 		if (desc.decimals == 0) {
 			QSpinBox* spin = new QSpinBox(group);
 			spin->setRange(static_cast<int>(desc.minValue), static_cast<int>(desc.maxValue));

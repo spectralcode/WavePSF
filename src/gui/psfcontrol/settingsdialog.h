@@ -43,6 +43,7 @@ signals:
 
 public slots:
 	void updateGeneratorType(const QString& typeName);
+	void updatePSFModel(int model);
 
 private slots:
 	void onNollIndicesChanged();
@@ -58,7 +59,7 @@ private:
 	// Builds a QGroupBox with auto-generated spinboxes from generator settings descriptors.
 	// Stores created widgets in generatorSettingWidgets[typeName].
 	void buildGeneratorSettingsGroup(const QString& typeName,
-	                                 const QVector<WavefrontGeneratorSetting>& descriptors,
+	                                 const QVector<NumericSettingDescriptor>& descriptors,
 	                                 QWidget* parent);
 	QVariantMap readGeneratorSettingsWidgets(const QString& typeName) const;
 	void populateGeneratorSettingsWidgets(const QString& typeName, const QVariantMap& gs);

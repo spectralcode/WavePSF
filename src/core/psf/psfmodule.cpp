@@ -2,13 +2,21 @@
 #include "zernikegenerator.h"
 #include "wavefrontgeneratorfactory.h"
 #include "psfcalculator.h"
+#include "richardswolfcalculator.h"
 #include "deconvolver.h"
 #include "utils/afdevicemanager.h"
 #include "utils/logging.h"
 
+namespace {
+const QString MODE_ZERNIKE       = QStringLiteral("Zernike");
+const QString MODE_DM            = QStringLiteral("Deformable Mirror");
+const QString MODE_3D_MICROSCOPY = QStringLiteral("3D PSF Microscopy");
+}
+
 
 PSFModule::PSFModule(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent)
+	, psfModel(SCALAR_FOURIER)
 	, gridSize(128)
 	, usingExternalPSF(false)
 {
@@ -25,6 +33,7 @@ PSFModule::PSFModule(AFDeviceManager* afDeviceManager, QObject* parent)
 
 	this->generator = new ZernikeGenerator(2, 21, this);
 	this->calculator = new PSFCalculator(1.0, 1.0, this);
+	this->rwCalculator = new RichardsWolfCalculator(this);
 	this->deconvolver = new Deconvolver(128, this);
 
 	connect(this->deconvolver, &Deconvolver::error, this, &PSFModule::error);
@@ -63,6 +72,30 @@ bool PSFModule::isUsingExternalPSF() const
 	return this->usingExternalPSF;
 }
 
+PSFModule::PSFModel PSFModule::getPSFModel() const
+{
+	return this->psfModel;
+}
+
+RichardsWolfCalculator* PSFModule::getRWCalculator() const
+{
+	return this->rwCalculator;
+}
+
+QStringList PSFModule::availablePSFModes()
+{
+	return { MODE_ZERNIKE, MODE_DM, MODE_3D_MICROSCOPY };
+}
+
+af::array PSFModule::focalSlice(const af::array& psf)
+{
+	if (psf.numdims() > 2 && psf.dims(2) > 1) {
+		int centerZ = static_cast<int>(psf.dims(2)) / 2;
+		return psf(af::span, af::span, centerZ);
+	}
+	return psf;
+}
+
 PSFSettings PSFModule::getPSFSettings() const
 {
 	PSFSettings s;
@@ -84,6 +117,10 @@ PSFSettings PSFModule::getPSFSettings() const
 	s.normalizationMode = static_cast<int>(this->calculator->getNormalizationMode());
 	s.paddingFactor = this->calculator->getPaddingFactor();
 	s.apertureGeometry = this->calculator->getApertureGeometry();
+
+	// PSF model and Richards-Wolf settings
+	s.psfModel = static_cast<int>(this->psfModel);
+	s.rwSettings = this->rwCalculator->serializeSettings();
 
 	// Include settings for all known generator types (active generator is always current)
 	s.allGeneratorSettings = this->allGeneratorSettings;
@@ -110,7 +147,11 @@ void PSFModule::setCoefficient(int id, double value)
 
 void PSFModule::setAllCoefficients(const QVector<double>& coefficients)
 {
+	bool wasExternal = this->usingExternalPSF;
 	this->usingExternalPSF = false;
+	if (!wasExternal && this->generator->getAllCoefficients() == coefficients) {
+		return;
+	}
 	this->generator->setAllCoefficients(coefficients);
 	this->regeneratePipeline();
 }
@@ -144,7 +185,7 @@ void PSFModule::setGridSize(int size)
 
 af::array PSFModule::deconvolve(const af::array& input)
 {
-	af::array psf = this->getCurrentPSF();
+	af::array psf = PSFModule::focalSlice(this->getCurrentPSF());
 	if (psf.isempty()) {
 		emit error(tr("No PSF available for deconvolution."));
 		return af::array();
@@ -185,6 +226,32 @@ void PSFModule::setGeneratorType(const QString& typeName)
 	emit generatorTypeChanged(typeName);
 	emit parameterDescriptorsChanged(this->generator->getParameterDescriptors());
 	this->regeneratePipeline();
+}
+
+void PSFModule::setPSFMode(const QString& modeName)
+{
+	PSFModel newModel = SCALAR_FOURIER;
+	QString generatorType;
+
+	if (modeName == MODE_3D_MICROSCOPY) {
+		newModel = MICROSCOPY_3D;
+		generatorType = MODE_ZERNIKE;
+	} else {
+		// "Zernike" or "Deformable Mirror" → scalar model, generator matches mode name
+		generatorType = modeName;
+	}
+
+	// Switch generator type if needed (handles caching internally)
+	this->setGeneratorType(generatorType);
+
+	// Switch PSF model
+	if (this->psfModel != newModel) {
+		this->psfModel = newModel;
+		emit psfModelChanged(static_cast<int>(newModel));
+		this->regeneratePipeline();
+	}
+
+	emit psfModeChanged(modeName);
 }
 
 void PSFModule::applyPSFSettings(const PSFSettings& settings)
@@ -235,6 +302,16 @@ void PSFModule::applyPSFSettings(const PSFSettings& settings)
 		static_cast<PSFCalculator::NormalizationMode>(settings.normalizationMode));
 	this->calculator->setPaddingFactor(settings.paddingFactor);
 
+	// PSF model and Richards-Wolf settings
+	PSFModel newModel = static_cast<PSFModel>(settings.psfModel);
+	if (this->psfModel != newModel) {
+		this->psfModel = newModel;
+		emit psfModelChanged(static_cast<int>(newModel));
+	}
+	if (!settings.rwSettings.isEmpty()) {
+		this->rwCalculator->deserializeSettings(settings.rwSettings);
+	}
+
 	// Only re-broadcast descriptors if they actually changed
 	QVector<WavefrontParameter> newDescriptors = this->generator->getParameterDescriptors();
 	if (newDescriptors != this->cachedDescriptors) {
@@ -247,6 +324,16 @@ void PSFModule::applyPSFSettings(const PSFSettings& settings)
 
 	if (indicesChanged) {
 		emit nollIndicesChanged();
+	}
+}
+
+void PSFModule::applyRWSettings(const QVariantMap& rwSettings)
+{
+	if (!rwSettings.isEmpty()) {
+		this->rwCalculator->deserializeSettings(rwSettings);
+	}
+	if (this->psfModel == MICROSCOPY_3D) {
+		this->regeneratePipeline();
 	}
 }
 
@@ -297,7 +384,12 @@ af::array PSFModule::computePSFFromCoefficients(const QVector<double>& coefficie
 	QVector<double> saved = this->generator->getAllCoefficients();
 	this->generator->setAllCoefficients(coefficients);
 	af::array wavefront = this->generator->generateWavefront(this->gridSize);
-	af::array psf = this->calculator->computePSF(wavefront);
+	af::array psf;
+	if (this->psfModel == MICROSCOPY_3D) {
+		psf = this->rwCalculator->computePSF(wavefront, this->gridSize);
+	} else {
+		psf = this->calculator->computePSF(wavefront);
+	}
 	this->generator->setAllCoefficients(saved);
 	return psf;
 }
@@ -308,6 +400,7 @@ void PSFModule::clearCachedArrays()
 	this->currentPSF = af::array();
 	this->externalPSF = af::array();
 	this->calculator->setApertureRadius(this->calculator->getApertureRadius()); // resets cachedGridSize
+	this->rwCalculator->invalidateCache();
 	this->generator->invalidateCache();
 }
 
@@ -318,7 +411,12 @@ void PSFModule::regeneratePipeline()
 		this->currentWavefront = this->generator->generateWavefront(this->gridSize);
 		emit wavefrontUpdated(this->currentWavefront);
 
-		this->currentPSF = this->calculator->computePSF(this->currentWavefront);
+		if (this->psfModel == MICROSCOPY_3D) {
+			this->currentPSF = this->rwCalculator->computePSF(
+				this->currentWavefront, this->gridSize);
+		} else {
+			this->currentPSF = this->calculator->computePSF(this->currentWavefront);
+		}
 		emit psfUpdated(this->currentPSF);
 	} catch (af::exception& e) {
 		emit error(tr("PSF pipeline error: ") + QString(e.what()));

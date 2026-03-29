@@ -66,6 +66,12 @@ af::array VolumetricProcessor::assemble3DPSF(PSFModule* psfModule,
 {
 	if (numFrames == 0) return af::array();
 
+	// 3D microscopy mode: the PSF is already a 3D volume from Richards-Wolf
+	if (psfModule->getPSFModel() == PSFModule::MICROSCOPY_3D) {
+		return psfModule->getCurrentPSF();
+	}
+
+	// Scalar mode: stack per-frame 2D PSFs into a 3D volume
 	af::array firstPSF = resolve2DPSF(psfModule, paramTable, psfFileManager, 0, patchIdx);
 	if (firstPSF.isempty()) return af::array();
 

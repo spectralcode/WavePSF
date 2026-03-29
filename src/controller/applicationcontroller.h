@@ -73,8 +73,12 @@ public slots:
 	// PSF settings
 	void applyPSFSettings(const PSFSettings& settings);
 
-	// Generator type switching
+	// Generator type / PSF mode switching
 	void setGeneratorType(const QString& typeName);
+	void setPSFMode(const QString& modeName);
+
+	// Richards-Wolf settings (inline widget)
+	void applyRWSettings(const QVariantMap& rwSettings);
 
 	// Deconvolution settings - slots for GUI widgets
 	void setDeconvolutionAlgorithm(int algorithm);
@@ -159,9 +163,11 @@ private:
 	void initializeOptimizationThread();
 
 	// Parameter table orchestration
+	int coefficientFrame() const;
 	void storeCurrentCoefficients();
 	void loadCoefficientsForCurrentPatch();
 	void resizeParameterTable();
+	void syncNumZPlanesWithInput();
 
 	// Core components
 	AFDeviceManager* afDeviceManager;
@@ -228,6 +234,8 @@ signals:
 	void psfUpdatedForPatch(af::array psf, int patchX, int patchY);
 	void psfParameterDescriptorsChanged(QVector<WavefrontParameter> descriptors);
 	void generatorTypeChanged(QString typeName);
+	void psfModeChanged(QString modeName);
+	void psfModelChanged(int model);
 
 	// Deconvolution results
 	void deconvolutionCompleted();

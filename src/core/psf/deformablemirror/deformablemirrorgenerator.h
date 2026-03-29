@@ -18,7 +18,7 @@ public:
 	QString typeName() const override;
 	QVariantMap serializeSettings() const override;
 	void deserializeSettings(const QVariantMap& settings) override;
-	QVector<WavefrontGeneratorSetting> getSettingsDescriptors() const override;
+	QVector<NumericSettingDescriptor> getSettingsDescriptors() const override;
 	QVector<WavefrontParameter> getParameterDescriptors() const override;
 	void setCoefficient(int id, double value) override;
 	double getCoefficient(int id) const override;

@@ -4,6 +4,7 @@
 #include "data/imagedata.h"
 #include "data/wavefrontparametertable.h"
 #include "core/psf/psfmodule.h"
+#include "core/psf/richardswolfcalculator.h"
 #include "core/psf/psffilemanager.h"
 #include "core/optimization/optimizationjobbuilder.h"
 #include "core/processing/batchprocessor.h"
@@ -279,6 +280,29 @@ void ApplicationController::setGeneratorType(const QString& typeName)
 	this->loadCoefficientsForCurrentPatch();
 
 	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
+}
+
+void ApplicationController::setPSFMode(const QString& modeName)
+{
+	if (this->psfModule == nullptr) {
+		return;
+	}
+	this->storeCurrentCoefficients();
+
+	// PSFModule::setPSFMode handles both generator type switching and PSF model switching
+	this->psfModule->setPSFMode(modeName);
+
+	this->syncNumZPlanesWithInput();
+	this->loadCoefficientsForCurrentPatch();
+
+	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
+}
+
+void ApplicationController::applyRWSettings(const QVariantMap& rwSettings)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->applyRWSettings(rwSettings);
+	}
 }
 
 // Deconvolution settings forwarding
@@ -600,6 +624,8 @@ void ApplicationController::handleInputDataChanged()
 	// Resize parameter table to match new data dimensions
 	this->resizeParameterTable();
 
+	this->syncNumZPlanesWithInput();
+
 	// Reset psfModule and UI sliders to the new dataset's patch (0,0) values,
 	// preventing stale coefficients from the previous file's active patch from
 	// being written back on the next storeCurrentCoefficients() call.
@@ -665,6 +691,10 @@ void ApplicationController::connectPSFModuleSignals()
 				this, &ApplicationController::psfParameterDescriptorsChanged);
 		connect(this->psfModule, &PSFModule::generatorTypeChanged,
 				this, &ApplicationController::generatorTypeChanged);
+		connect(this->psfModule, &PSFModule::psfModeChanged,
+				this, &ApplicationController::psfModeChanged);
+		connect(this->psfModule, &PSFModule::psfModelChanged,
+				this, &ApplicationController::psfModelChanged);
 
 		// When Noll indices change, parameter table must be cleared and resized
 		connect(this->psfModule, &PSFModule::nollIndicesChanged, this, [this]() {
@@ -700,6 +730,15 @@ void ApplicationController::connectDeconvolutionSignals()
 	}
 }
 
+int ApplicationController::coefficientFrame() const
+{
+	// In 3D microscopy mode, coefficients are frame-independent (shared wavefront)
+	if (this->psfModule != nullptr && this->psfModule->getPSFModel() == PSFModule::MICROSCOPY_3D) {
+		return 0;
+	}
+	return this->getCurrentFrame();
+}
+
 void ApplicationController::storeCurrentCoefficients()
 {
 	if (this->parameterTable == nullptr || this->psfModule == nullptr || this->imageSession == nullptr) {
@@ -708,7 +747,7 @@ void ApplicationController::storeCurrentCoefficients()
 	if (!this->hasInputData()) {
 		return;
 	}
-	int frame = this->getCurrentFrame();
+	int frame = this->coefficientFrame();
 	int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
 	this->parameterTable->setCoefficients(frame, patchIdx, this->psfModule->getAllCoefficients());
 }
@@ -722,7 +761,7 @@ void ApplicationController::loadCoefficientsForCurrentPatch()
 		return;
 	}
 
-	int frame = this->getCurrentFrame();
+	int frame = this->coefficientFrame();
 	int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
 
 	// Check per-patch external PSF override (from one-shot "Load PSF from File")
@@ -745,6 +784,22 @@ void ApplicationController::loadCoefficientsForCurrentPatch()
 	if (!coeffs.isEmpty()) {
 		this->psfModule->setAllCoefficients(coeffs);
 		emit coefficientsLoaded(coeffs);
+	}
+}
+
+void ApplicationController::syncNumZPlanesWithInput()
+{
+	if (this->psfModule == nullptr ||
+		this->psfModule->getPSFModel() != PSFModule::MICROSCOPY_3D ||
+		!this->hasInputData()) {
+		return;
+	}
+	RichardsWolfCalculator* rwCalc = this->psfModule->getRWCalculator();
+	int inputFrames = this->getInputFrames();
+	if (rwCalc->getNumZPlanes() != inputFrames) {
+		rwCalc->setNumZPlanes(inputFrames);
+		this->psfModule->applyRWSettings(QVariantMap());
+		emit psfSettingsUpdated(this->psfModule->getPSFSettings());
 	}
 }
 

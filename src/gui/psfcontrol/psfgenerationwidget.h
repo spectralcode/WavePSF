@@ -11,7 +11,10 @@
 class CoefficientEditorWidget;
 class WavefrontPlotWidget;
 class PSFPreviewWidget;
+class PSF3DPreviewWidget;
+class RWSettingsWidget;
 class QComboBox;
+class QStackedWidget;
 
 class PSFGenerationWidget : public QGroupBox
 {
@@ -34,17 +37,24 @@ public slots:
 	void updatePSF(af::array psf);
 	void setPSFSettings(const PSFSettings& settings);
 	void setGeneratorType(const QString& typeName);
+	void setPSFMode(const QString& modeName);
+	void onPSFModelChanged(int model);
 
 signals:
 	void coefficientChanged(int id, double value);
 	void resetRequested();
 	void generatorTypeChangeRequested(QString typeName);
+	void psfModeChangeRequested(QString modeName);
+	void rwSettingsChanged(QVariantMap rwSettings);
 
 private:
 	QComboBox* generatorTypeCombo;
 	CoefficientEditorWidget* coeffEditor;
 	WavefrontPlotWidget* wavefrontPlot;
 	PSFPreviewWidget* psfPreview;
+	PSF3DPreviewWidget* psf3DPreview;
+	QStackedWidget* psfPreviewStack;
+	RWSettingsWidget* rwSettingsWidget;
 	PSFSettings currentSettings;
 };
 

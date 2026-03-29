@@ -69,7 +69,7 @@ void DeformableMirrorGenerator::deserializeSettings(const QVariantMap& settings)
 	this->setActuatorGrid(rows, cols);
 }
 
-QVector<WavefrontGeneratorSetting> DeformableMirrorGenerator::getSettingsDescriptors() const
+QVector<NumericSettingDescriptor> DeformableMirrorGenerator::getSettingsDescriptors() const
 {
 	return {
 		{ KEY_ACTUATOR_ROWS,        "Actuator Rows",

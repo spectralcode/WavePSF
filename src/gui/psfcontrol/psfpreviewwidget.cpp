@@ -47,6 +47,12 @@ void PSFPreviewWidget::updateImage(af::array psf)
 {
 	if (psf.isempty()) return;
 
+	// Extract focal plane if PSF is 3D
+	if (psf.numdims() > 2 && psf.dims(2) > 1) {
+		int centerZ = static_cast<int>(psf.dims(2)) / 2;
+		psf = psf(af::span, af::span, centerZ);
+	}
+
 	int rows = psf.dims(0);
 	int cols = psf.dims(1);
 

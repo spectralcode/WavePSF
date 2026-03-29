@@ -281,6 +281,12 @@ void PSFGridWidget::updateSinglePSF(af::array psf, int patchX, int patchY)
 		return;
 	}
 
+	// Extract focal plane if PSF is 3D
+	if (psf.numdims() > 2 && psf.dims(2) > 1) {
+		int centerZ = static_cast<int>(psf.dims(2)) / 2;
+		psf = psf(af::span, af::span, centerZ);
+	}
+
 	int cellSize = this->lastResult.cellSize;
 
 	// Center-crop (same logic as PSFGridGenerator::generate)

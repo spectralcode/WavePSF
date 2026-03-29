@@ -7,10 +7,10 @@
 #include <arrayfire.h>
 #include "wavefrontparameter.h"
 
-// Descriptor for a single numeric generator configuration setting.
-// Used by SettingsDialog to auto-build UI for generator-specific settings.
-// Mirrors the OptimizerParameter pattern used in IOptimizer.
-struct WavefrontGeneratorSetting {
+// Descriptor for a single numeric configuration setting.
+// Used by SettingsDialog to auto-build spinbox UI for any component
+// (wavefront generators, PSF calculators, etc.).
+struct NumericSettingDescriptor {
 	QString key;          // serialization key (must match serializeSettings/deserializeSettings)
 	QString name;         // UI label
 	QString tooltip;      // UI help text
@@ -34,7 +34,7 @@ public:
 	// Returns descriptors for simple numeric generator settings.
 	// SettingsDialog auto-builds UI from these — no dialog changes needed for new generators.
 	// Default: empty list (used by generators with fully custom UI, e.g. ZernikeGenerator).
-	virtual QVector<WavefrontGeneratorSetting> getSettingsDescriptors() const { return {}; }
+	virtual QVector<NumericSettingDescriptor> getSettingsDescriptors() const { return {}; }
 
 	virtual QVector<WavefrontParameter> getParameterDescriptors() const = 0;
 	virtual void setCoefficient(int id, double value) = 0;
