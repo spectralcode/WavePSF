@@ -167,7 +167,7 @@ bool SliceViewerWidget::eventFilter(QObject* obj, QEvent* event)
 void SliceViewerWidget::resizeEvent(QResizeEvent* event)
 {
 	QWidget::resizeEvent(event);
-	this->fitToView();
+	//this->fitToView();
 }
 
 void SliceViewerWidget::showEvent(QShowEvent* event)
