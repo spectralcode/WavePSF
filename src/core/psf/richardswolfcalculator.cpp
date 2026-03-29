@@ -99,8 +99,18 @@ af::array RichardsWolfCalculator::computePSF(const af::array& wavefront, int gri
 
 	// Resample via interpolation whenever requested spacing differs from actual
 	bool needsResample = false;
+	float resampleRatio = 1.0f;
+	int cropSize = computeSize;
 	if (this->xyStepNm > 0.0) {
 		needsResample = (std::abs(this->xyStepNm - actualXyStepNm) > RESAMPLE_TOLERANCE_NM);
+		if (needsResample) {
+			resampleRatio = static_cast<float>(this->xyStepNm / actualXyStepNm);
+			if (resampleRatio > 1.0f && fftSize > computeSize) {
+				// Keep more FFT pixels so resampling doesn't go out of bounds
+				cropSize = std::min(fftSize,
+					static_cast<int>(std::ceil(computeSize * resampleRatio)) + 2);
+			}
+		}
 	}
 
 	// 2. Build complex pupil from wavefront phase.
@@ -147,9 +157,9 @@ af::array RichardsWolfCalculator::computePSF(const af::array& wavefront, int gri
 		E = af::fft2(pZ * defocusPhase, fftSize, fftSize);
 		intensity += af::real(E * af::conjg(E));
 		intensity = af::shift(intensity, fftSize / 2, fftSize / 2);
-		if (fftSize > computeSize) {
-			int off = (fftSize - computeSize) / 2;
-			af::seq crop(off, off + computeSize - 1);
+		if (fftSize > cropSize) {
+			int off = (fftSize - cropSize) / 2;
+			af::seq crop(off, off + cropSize - 1);
 			intensity = intensity(crop, crop);
 		}
 		return intensity;
@@ -167,12 +177,12 @@ af::array RichardsWolfCalculator::computePSF(const af::array& wavefront, int gri
 	// Build resampling coordinate arrays for XY pixel size adjustment
 	af::array srcRow, srcCol;
 	if (needsResample) {
-		float ratio = static_cast<float>(this->xyStepNm / actualXyStepNm);
-		float center = (computeSize - 1) / 2.0f;
+		float srcCenter = (cropSize - 1) / 2.0f;
+		float dstCenter = (computeSize - 1) / 2.0f;
 		af::array idx = af::range(af::dim4(computeSize, computeSize), 0).as(f32);
 		af::array idy = af::range(af::dim4(computeSize, computeSize), 1).as(f32);
-		srcRow = center + (idx - center) * ratio;
-		srcCol = center + (idy - center) * ratio;
+		srcRow = srcCenter + (idx - dstCenter) * resampleRatio;
+		srcCol = srcCenter + (idy - dstCenter) * resampleRatio;
 	}
 
 	auto resampleSlice = [&](const af::array& slice) -> af::array {
