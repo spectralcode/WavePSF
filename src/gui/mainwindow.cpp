@@ -15,6 +15,7 @@
 #include "gui/shortcutsdialog.h"
 #include "gui/recentfilesmenu.h"
 #include "gui/viewertoolbar.h"
+#include "controller/imagesession.h"
 
 
 #include <QFileDialog>
@@ -65,6 +66,7 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	  openImageDataAction(nullptr), openGroundTruthAction(nullptr),
 	  saveParametersAction(nullptr), loadParametersAction(nullptr), saveOutputAction(nullptr),
 	  deconvolveAllAction(nullptr),
+	  toggleCrossSectionAction(nullptr), crossSectionDock(nullptr),
 	  viewerToolBar(nullptr),
 	  sessionViewer(nullptr),
 	  psfGenerationWidget(nullptr), processingControlWidget(nullptr),
@@ -325,6 +327,20 @@ void MainWindow::setupViewMenu() {
 	        this->psfGridDock, &QDockWidget::setVisible);
 	connect(this->psfGridDock, &QDockWidget::visibilityChanged,
 	        this->togglePSFGridAction, &QAction::setChecked);
+
+	// Cross-Section Viewer dock
+	this->toggleCrossSectionAction = new QAction("Cross-Section Viewer", this);
+	this->toggleCrossSectionAction->setCheckable(true);
+	this->viewMenu->addAction(this->toggleCrossSectionAction);
+
+	this->crossSectionDock = new CrossSectionDock(this);
+	this->addDockWidget(Qt::BottomDockWidgetArea, this->crossSectionDock);
+	this->crossSectionDock->hide();
+
+	connect(this->toggleCrossSectionAction, &QAction::toggled,
+	        this->crossSectionDock, &QDockWidget::setVisible);
+	connect(this->crossSectionDock, &QDockWidget::visibilityChanged,
+	        this->toggleCrossSectionAction, &QAction::setChecked);
 }
 
 void MainWindow::setupExtrasMenu() {
@@ -507,6 +523,28 @@ void MainWindow::connectImageSessionViewer() {
 				this->applicationController, &ApplicationController::navigatePatch);
 
 		LOG_DEBUG() << "ImageSessionViewer signal connections established";
+	}
+
+	// Cross-Section Viewer dock connections
+	if (this->crossSectionDock != nullptr) {
+		auto* csWidget = this->crossSectionDock->crossSectionWidget();
+
+		connect(this->applicationController, &ApplicationController::imageSessionChanged,
+				csWidget, [csWidget](ImageSession* session) {
+			if (session && session->hasInputData()) {
+				csWidget->setInputData(session->getInputData());
+			} else {
+				csWidget->setInputData(nullptr);
+			}
+			if (session && session->hasOutputData()) {
+				csWidget->setOutputData(session->getOutputData());
+			} else {
+				csWidget->setOutputData(nullptr);
+			}
+		});
+
+		connect(this->applicationController, &ApplicationController::frameChanged,
+				csWidget, &DataCrossSectionWidget::setCurrentFrame);
 	}
 }
 

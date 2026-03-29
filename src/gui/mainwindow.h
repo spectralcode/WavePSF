@@ -12,6 +12,7 @@
 #include "stylemanager.h"
 #include "gui/messageconsole/messageconsoledock.h"
 #include "gui/psfgridview/psfgriddock.h"
+#include "gui/imagesessionviewer/crosssectiondock.h"
 #include "gui/viewertoolbar.h"
 #include "core/psf/psfsettings.h"
 
@@ -141,7 +142,9 @@ private:
 	// View actions
 	QAction* toggleMessageConsoleAction;
 	QAction* togglePSFGridAction;
+	QAction* toggleCrossSectionAction;
 	PSFGridDock* psfGridDock;
+	CrossSectionDock* crossSectionDock;
 
 	// Viewer toolbar
 	ViewerToolBar* viewerToolBar;

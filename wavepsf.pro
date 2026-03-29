@@ -43,6 +43,7 @@ SOURCES += \
 	$$SOURCEDIR/gui/imagesessionviewer/imagedataviewer.cpp \
 	$$SOURCEDIR/gui/imagesessionviewer/imagesessionviewer.cpp \
 	$$SOURCEDIR/gui/imagesessionviewer/imagerenderworker.cpp \
+	$$SOURCEDIR/gui/imagesessionviewer/datacrosssectionwidget.cpp \
 	$$SOURCEDIR/utils/supportedfilechecker.cpp \
 	$$SOURCEDIR/gui/messageconsole/messagerouter.cpp \
 	$$SOURCEDIR/gui/messageconsole/messageconsolewidget.cpp \
@@ -113,6 +114,8 @@ HEADERS += \
 	$$SOURCEDIR/gui/imagesessionviewer/imagedataviewer.h \
 	$$SOURCEDIR/gui/imagesessionviewer/imagesessionviewer.h \
 	$$SOURCEDIR/gui/imagesessionviewer/imagerenderworker.h \
+	$$SOURCEDIR/gui/imagesessionviewer/datacrosssectionwidget.h \
+	$$SOURCEDIR/gui/imagesessionviewer/crosssectiondock.h \
 	$$SOURCEDIR/utils/supportedfilechecker.h \
 	$$SOURCEDIR/gui/messageconsole/messagerouter.h \
 	$$SOURCEDIR/gui/messageconsole/messageconsoledock.h \
