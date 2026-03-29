@@ -15,6 +15,7 @@ public:
 
 public slots:
 	void updatePSF(af::array psf3D);
+	void setFrameIndex(int frame);
 
 private:
 	void renderXYSlice(int zIndex);
@@ -27,6 +28,7 @@ private:
 	float volumeMaxVal;
 	bool normalizePerSlice;
 	bool logScale;
+	bool syncToDataFrame;
 	SliceViewerWidget* xyPanel;
 	SliceViewerWidget* xzPanel;
 };

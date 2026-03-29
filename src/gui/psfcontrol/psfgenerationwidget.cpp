@@ -162,9 +162,13 @@ void PSFGenerationWidget::updateWavefront(af::array wavefront)
 
 void PSFGenerationWidget::updatePSF(af::array psf)
 {
-	if (psf.numdims() > 2 && psf.dims(2) > 1) {
+	bool isFileMode = (this->currentSettings.generatorTypeName == QStringLiteral("From File"));
+	bool is3D = (psf.numdims() > 2 && psf.dims(2) > 1);
+	if (isFileMode || is3D) {
+		this->psfPreviewStack->setCurrentIndex(1);
 		this->psf3DPreview->updatePSF(psf);
 	} else {
+		this->psfPreviewStack->setCurrentIndex(0);
 		this->psfPreview->updateImage(psf);
 	}
 }
@@ -189,10 +193,9 @@ void PSFGenerationWidget::setPSFSettings(const PSFSettings& settings)
 	double apertureRadius = propSettings.value(QStringLiteral("aperture_radius"), 1.0).toDouble();
 	this->wavefrontPlot->setAperture(apertureGeometry, apertureRadius);
 
-	// Show/hide RW settings widget and switch 2D/3D preview
+	// Show/hide RW settings widget (preview stack is switched in updatePSF() based on data)
 	bool is3D = (settings.generatorTypeName == QStringLiteral("3D PSF Microscopy"));
 	this->rwSettingsWidget->setVisible(is3D);
-	this->psfPreviewStack->setCurrentIndex(is3D ? 1 : 0);
 	if (is3D) {
 		this->rwSettingsWidget->setSettings(propSettings);
 	}
@@ -212,6 +215,11 @@ void PSFGenerationWidget::setPSFMode(const QString& modeName)
 		this->generatorTypeCombo->setCurrentIndex(idx);
 	}
 	this->generatorTypeCombo->blockSignals(false);
+}
+
+void PSFGenerationWidget::setCurrentFrame(int frame)
+{
+	this->psf3DPreview->setFrameIndex(frame);
 }
 
 void PSFGenerationWidget::browseForFolder()

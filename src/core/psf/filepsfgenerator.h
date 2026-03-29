@@ -3,7 +3,6 @@
 
 #include <QObject>
 #include <QMap>
-#include <QPair>
 #include <arrayfire.h>
 #include "ipsfgenerator.h"
 
@@ -39,7 +38,7 @@ private:
 	void loadSingleFile(const QString& filePath);
 
 	QString sourcePath;
-	QMap<QPair<int,int>, af::array> psfCache;
+	QMap<int, af::array> patchVolumes;
 	af::array singlePSF;
 	bool singleMode;
 	bool volumetric;

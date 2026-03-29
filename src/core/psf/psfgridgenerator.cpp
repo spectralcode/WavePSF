@@ -29,8 +29,8 @@ PSFGridResult PSFGridGenerator::generate(
 			QVector<double> coeffs = parameterTable->getCoefficients(frame, patchIdx);
 			af::array psf = psfModule->computePSFFromCoefficients(coeffs);
 
-			// Extract focal plane if PSF is 3D
-			psf = PSFModule::focalSlice(psf);
+			// Extract frame-specific slice if PSF is 3D
+			psf = PSFModule::extractFrame(psf, frame);
 
 			// Center-crop
 			int psfSize = static_cast<int>(psf.dims(0));

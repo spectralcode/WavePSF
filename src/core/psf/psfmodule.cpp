@@ -65,13 +65,19 @@ QStringList PSFModule::availablePSFModes()
 	return PSFGeneratorFactory::availableTypeNames();
 }
 
-af::array PSFModule::focalSlice(const af::array& psf)
+af::array PSFModule::extractFrame(const af::array& psf, int frame)
 {
 	if (psf.numdims() > 2 && psf.dims(2) > 1) {
-		int centerZ = static_cast<int>(psf.dims(2)) / 2;
-		return psf(af::span, af::span, centerZ);
+		int maxZ = static_cast<int>(psf.dims(2)) - 1;
+		int z = qBound(0, frame, maxZ);
+		return psf(af::span, af::span, z);
 	}
 	return psf;
+}
+
+int PSFModule::getCurrentFrame() const
+{
+	return this->currentFrame;
 }
 
 PSFSettings PSFModule::getPSFSettings() const
@@ -136,7 +142,7 @@ void PSFModule::setGridSize(int size)
 
 af::array PSFModule::deconvolve(const af::array& input)
 {
-	af::array psf = PSFModule::focalSlice(this->getCurrentPSF());
+	af::array psf = PSFModule::extractFrame(this->getCurrentPSF(), this->currentFrame);
 	if (psf.isempty()) {
 		emit error(tr("No PSF available for deconvolution."));
 		return af::array();

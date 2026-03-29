@@ -14,6 +14,7 @@ PSF3DPreviewWidget::PSF3DPreviewWidget(QWidget* parent)
 	, volumeMaxVal(0.0f)
 	, normalizePerSlice(true)
 	, logScale(true)
+	, syncToDataFrame(false)
 {
 	QVBoxLayout* mainLayout = new QVBoxLayout(this);
 	mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -51,12 +52,21 @@ PSF3DPreviewWidget::PSF3DPreviewWidget(QWidget* parent)
 	connect(saveVolumeAction, &QAction::triggered,
 			this, &PSF3DPreviewWidget::saveVolume);
 
+	QAction* syncFrameAction = new QAction(tr("Sync to Data Frame"), this);
+	syncFrameAction->setCheckable(true);
+	syncFrameAction->setChecked(false);
+	connect(syncFrameAction, &QAction::toggled, this, [this](bool checked) {
+		this->syncToDataFrame = checked;
+	});
+
 	this->xyPanel->addContextMenuAction(normalizeAction);
 	this->xyPanel->addContextMenuAction(logScaleAction);
 	this->xyPanel->addContextMenuAction(saveVolumeAction);
+	this->xyPanel->addContextMenuAction(syncFrameAction);
 	this->xzPanel->addContextMenuAction(normalizeAction);
 	this->xzPanel->addContextMenuAction(logScaleAction);
 	this->xzPanel->addContextMenuAction(saveVolumeAction);
+	this->xzPanel->addContextMenuAction(syncFrameAction);
 }
 
 void PSF3DPreviewWidget::updatePSF(af::array psf3D)
@@ -173,6 +183,19 @@ QImage PSF3DPreviewWidget::renderSliceToImage(const af::array& slice2D, float gl
 	}
 
 	return img;
+}
+
+void PSF3DPreviewWidget::setFrameIndex(int frame)
+{
+	if (!this->syncToDataFrame) return;
+	if (this->psfVolume.isempty()) return;
+
+	int maxZ = static_cast<int>(this->psfVolume.dims(2)) - 1;
+	if (maxZ < 1) return;
+
+	int z = qBound(0, frame, maxZ);
+	this->xyPanel->setSliderValue(z);
+	this->renderXYSlice(z);
 }
 
 void PSF3DPreviewWidget::reRenderAll()

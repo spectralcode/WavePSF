@@ -39,6 +39,7 @@ public slots:
 	void updatePSF(af::array psf);
 	void setPSFSettings(const PSFSettings& settings);
 	void setPSFMode(const QString& modeName);
+	void setCurrentFrame(int frame);
 
 signals:
 	void coefficientChanged(int id, double value);

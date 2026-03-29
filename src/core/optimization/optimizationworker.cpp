@@ -80,6 +80,7 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 	deconvolver.setNoiseToSignalFactor(config.deconvNoiseToSignalFactor);
 
 	// Helper: evaluate metric for given coefficients and input/reference
+	int currentJobFrame = 0;
 	auto evaluateMetric = [&](const QVector<double>& coefficients,
 							  const af::array& inputPatch,
 							  const af::array& groundTruthPatch) -> double {
@@ -87,8 +88,9 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 			generator->setAllCoefficients(coefficients);
 			PSFRequest req;
 			req.gridSize = config.psfSettings.gridSize;
-			af::array psf = PSFModule::focalSlice(
-				generator->generatePSF(req));
+			req.frame = currentJobFrame;
+			af::array psf = PSFModule::extractFrame(
+				generator->generatePSF(req), currentJobFrame);
 			af::array deconvolved = deconvolver.deconvolve(inputPatch, psf);
 			if (deconvolved.isempty()) return (std::numeric_limits<double>::max)();
 
@@ -126,6 +128,7 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 		}
 
 		const OptimizationJob& job = config.jobs[jobIdx];
+		currentJobFrame = job.frameNr;
 
 		// Determine start coefficients
 		QVector<double> startCoeffs = job.startCoefficients;

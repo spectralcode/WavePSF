@@ -549,6 +549,10 @@ void MainWindow::connectPSFGenerationWidget() {
 	connect(genWidget, &PSFGenerationWidget::filePSFSourceSelected,
 			this->applicationController, &ApplicationController::setFilePSFSource);
 
+	// Frame changes → PSF preview (for "Sync to Data Frame" feature)
+	connect(this->applicationController, &ApplicationController::frameChanged,
+			genWidget, &PSFGenerationWidget::setCurrentFrame);
+
 	LOG_DEBUG() << "PSFGenerationWidget signal connections established";
 }
 

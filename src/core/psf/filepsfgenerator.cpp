@@ -42,9 +42,8 @@ af::array FilePSFGenerator::generatePSF(const PSFRequest& request)
 		return this->singlePSF;
 	}
 
-	auto key = qMakePair(request.frame, request.patchIdx);
-	if (this->psfCache.contains(key)) {
-		return this->psfCache.value(key);
+	if (this->patchVolumes.contains(request.patchIdx)) {
+		return this->patchVolumes.value(request.patchIdx);
 	}
 
 	return af::array();
@@ -57,7 +56,7 @@ bool FilePSFGenerator::is3D() const
 
 void FilePSFGenerator::invalidateCache()
 {
-	this->psfCache.clear();
+	this->patchVolumes.clear();
 	this->singlePSF = af::array();
 }
 
@@ -117,36 +116,54 @@ void FilePSFGenerator::loadFolder(const QString& folderPath)
 		return;
 	}
 
-	// Load all files, try frame_patchIdx naming convention first
+	// Load all files and group frames by patch index.
+	// frame_patchIdx naming: "0_0.tif" = frame 0 patch 0. Frames stacked as Z per patch.
+	// Plain naming: all files stacked as one volume (patch 0).
+	QMap<int, QMap<int, af::array>> patchFrames; // patchIdx → (frame → array)
+	bool hasFramePatchNaming = false;
+
 	for (const QFileInfo& fi : qAsConst(imageFiles)) {
 		af::array psf = PSFFileManager::loadPSFFromFile(fi.absoluteFilePath());
 		if (psf.isempty()) {
 			continue;
 		}
 
-		// Try to parse "frame_patchIdx" from basename
 		QStringList parts = fi.baseName().split('_');
 		if (parts.size() >= 2) {
 			bool frameOk = false, patchOk = false;
 			int frame = parts[0].toInt(&frameOk);
 			int patchIdx = parts[1].toInt(&patchOk);
 			if (frameOk && patchOk) {
-				this->psfCache[qMakePair(frame, patchIdx)] = psf;
+				patchFrames[patchIdx][frame] = psf;
+				hasFramePatchNaming = true;
 				continue;
 			}
 		}
 
-		// Fallback: use alphabetical index as frame, patchIdx = 0
-		int idx = imageFiles.indexOf(fi);
-		this->psfCache[qMakePair(idx, 0)] = psf;
+		if (!hasFramePatchNaming) {
+			int idx = imageFiles.indexOf(fi);
+			patchFrames[0][idx] = psf;
+		}
 	}
 
-	// Detect 3D from first loaded PSF
-	if (!this->psfCache.isEmpty()) {
-		af::array first = this->psfCache.constBegin().value();
-		this->volumetric = (first.numdims() > 2 && first.dims(2) > 1);
+	// Stack frames into a 3D volume per patch (skip dimension mismatches)
+	int totalSlices = 0;
+	for (auto it = patchFrames.constBegin(); it != patchFrames.constEnd(); ++it) {
+		const QMap<int, af::array>& frames = it.value();
+		af::array volume;
+		for (auto fi = frames.constBegin(); fi != frames.constEnd(); ++fi) {
+			if (volume.isempty()) {
+				volume = fi.value();
+			} else if (fi.value().dims(0) == volume.dims(0) &&
+					   fi.value().dims(1) == volume.dims(1)) {
+				volume = af::join(2, volume, fi.value());
+			}
+		}
+		this->patchVolumes[it.key()] = volume;
+		totalSlices += frames.size();
 	}
 
-	LOG_INFO() << "FilePSFGenerator: loaded" << this->psfCache.size()
-			   << "PSFs from folder:" << folderPath;
+	this->volumetric = true;
+	LOG_INFO() << "FilePSFGenerator: loaded" << totalSlices << "slices into"
+			   << this->patchVolumes.size() << "patch volume(s) from folder:" << folderPath;
 }

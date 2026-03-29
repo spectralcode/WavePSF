@@ -25,8 +25,8 @@ void PSFFileManager::savePSFToFile(const QString& filePath, PSFModule* psfModule
 		return;
 	}
 
-	// Extract focal plane if PSF is 3D (multi-page TIFF deferred to V2)
-	psf = PSFModule::focalSlice(psf);
+	// Extract current frame's slice if PSF is 3D
+	psf = PSFModule::extractFrame(psf, psfModule->getCurrentFrame());
 
 	int height = static_cast<int>(psf.dims(0));  // rows
 	int width = static_cast<int>(psf.dims(1));   // cols

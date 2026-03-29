@@ -31,8 +31,10 @@ public:
 	// Returns mode names for the "PSF Generator" dropdown
 	static QStringList availablePSFModes();
 
-	// Extract focal plane (center z-slice) from a potentially 3D PSF for 2D display/export
-	static af::array focalSlice(const af::array& psf);
+	// Extract frame-specific z-slice from a potentially 3D PSF
+	static af::array extractFrame(const af::array& psf, int frame);
+
+	int getCurrentFrame() const;
 
 public slots:
 	void setCoefficient(int id, double value);
