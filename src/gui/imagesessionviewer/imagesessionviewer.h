@@ -12,6 +12,7 @@
 #include <QTimer>
 #include "controller/imagesession.h"
 #include "datacrosssectionwidget.h"
+#include "displaysettings.h"
 
 // Forward declarations
 class ImageDataViewer;
@@ -31,10 +32,9 @@ public:
 	void addSidebarWidget(QWidget* widget);
 	void addBottomPanel(QWidget* widget);
 
-	// Display range accessors (for settings dialog)
-	bool getAutoRangeEnabled() const;
-	double getDisplayRangeMin() const;
-	double getDisplayRangeMax() const;
+	// Display settings accessors
+	DisplaySettings getDisplaySettings() const;
+	void setDisplaySettings(const DisplaySettings& settings);
 
 public slots:
 	// Session updates from ApplicationController
@@ -44,7 +44,6 @@ public slots:
 	void highlightPatches(const QVector<int>& patchLinearIds);
 	void configurePatchGrid(int cols, int rows, int borderExtension);
 	void refreshOutputViewer();
-	void setDisplaySettings(bool autoRange, double min, double max);
 	void setViewSyncEnabled(bool enabled);
 	void setCrossSectionVisible(bool visible);
 	DataCrossSectionWidget* getCrossSectionWidget() const { return this->crossSectionWidget; }
@@ -100,10 +99,8 @@ private:
 	// Current session reference (not owned)
 	ImageSession* imageSession;
 
-	// Display range settings
-	double displayRangeMin;
-	double displayRangeMax;
-	bool autoRangeEnabled;
+	// Display settings (shared across all viewers)
+	DisplaySettings displaySettings;
 
 	// Main layout
 	QSplitter* mainSplitter;

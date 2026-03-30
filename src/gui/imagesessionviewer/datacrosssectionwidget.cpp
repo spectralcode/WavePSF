@@ -1,5 +1,6 @@
 #include "datacrosssectionwidget.h"
 #include "imagerenderworker.h"
+#include "gui/lut.h"
 #include "data/imagedata.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -31,9 +32,6 @@ DataCrossSectionWidget::DataCrossSectionWidget(QWidget* parent)
 	, outputData(nullptr)
 	, currentFrame(0)
 	, showFrameLine(true)
-	, autoRangeEnabled(true)
-	, manualMinValue(0.0)
-	, manualMaxValue(255.0)
 	, pendingRefresh(false)
 	, draggingFrameLine(false)
 	, draggingPanel(nullptr)
@@ -112,11 +110,9 @@ void DataCrossSectionWidget::setOutputData(const ImageData* data)
 	this->refreshPanels();
 }
 
-void DataCrossSectionWidget::setDisplaySettings(bool autoRange, double minValue, double maxValue)
+void DataCrossSectionWidget::setDisplaySettings(const DisplaySettings& settings)
 {
-	this->autoRangeEnabled = autoRange;
-	this->manualMinValue = minValue;
-	this->manualMaxValue = maxValue;
+	this->displaySettings = settings;
 	this->refreshPanels();
 }
 
@@ -226,10 +222,12 @@ void DataCrossSectionWidget::dispatchPanelRender(Panel& panel, const ImageData* 
 	req.width = data->getWidth();
 	req.height = data->getFrames();
 	req.dataType = data->getDataType();
-	req.useAutoRange = this->autoRangeEnabled;
+	req.useAutoRange = (this->displaySettings.autoRangeMode != AutoRangeMode::Off);
 	req.usePercentile = false;
-	req.manualMin = this->manualMinValue;
-	req.manualMax = this->manualMaxValue;
+	req.manualMin = this->displaySettings.rangeMin;
+	req.manualMax = this->displaySettings.rangeMax;
+	req.logScale = this->displaySettings.logScale;
+	req.colorTable = LUT::get(this->displaySettings.lutName);
 
 	const quint64 id = panel.latestRequestId.fetchAndAddOrdered(1) + 1;
 	panel.latestRequestId.storeRelease(id);

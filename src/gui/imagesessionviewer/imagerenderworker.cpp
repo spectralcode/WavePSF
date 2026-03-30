@@ -4,6 +4,7 @@
 #include <QElapsedTimer>
 #include <algorithm>
 #include <limits>
+#include <cmath>
 #include <omp.h>
 #include <cstring>
 
@@ -99,27 +100,38 @@ void ImageRenderWorker::renderFrame(const RenderRequest& req)
 		return;
 	}
 
+	emit this->dataRangeComputed(minV, maxV, req.requestId);
 
-	QImage img(req.width, req.height, QImage::Format_Grayscale8);
+	// Choose image format: indexed (with color table) or grayscale
+	const bool useColorTable = !req.colorTable.isEmpty();
+	const QImage::Format fmt = useColorTable ? QImage::Format_Indexed8 : QImage::Format_Grayscale8;
+	QImage img(req.width, req.height, fmt);
 	if (img.isNull()) {
 		emit this->frameRendered(QImage(), req.requestId);
 		return;
 	}
+	if (useColorTable) {
+		img.setColorTable(req.colorTable);
+	}
 
-	//check if QImage has padding and set generate temp buffer if it has to copy padded data row by row, otherwise write directly into the QImage using the pointer to the first pixel data (img.bits())
-	const bool hasPadding = img.bytesPerLine() != req.width;	// Grayscale8: 1 byte per pixel
+	// Check if QImage has padding and generate temp buffer if needed
+	const bool hasPadding = img.bytesPerLine() != req.width;	// Indexed8/Grayscale8: 1 byte per pixel
 	QVector<uchar> temp;
 	uchar* dst = hasPadding ? (temp.resize(count), temp.data()) : img.bits();
 
-	//scale typed source into 8-bit destination
+	// Scale typed source into 8-bit destination (linear or log)
 	const bool okScale = this->dispatchByType(req.dataType, srcPtr, count, [&](auto* p, int n) {
-		this->scaleToU8Typed(p, n, minV, maxV, dst, curId);
+		if (req.logScale) {
+			this->scaleToU8LogTyped(p, n, minV, maxV, dst, curId);
+		} else {
+			this->scaleToU8Typed(p, n, minV, maxV, dst, curId);
+		}
 	});
 
 	if (!okScale) {
 		img.fill(0);
 	} else if (hasPadding) {
-		//copy each row into padded scanlines
+		// Copy each row into padded scanlines
 		for (int y = 0; y < req.height; ++y) {
 			std::memcpy(img.scanLine(y), dst + y * req.width, req.width);
 		}
@@ -228,5 +240,21 @@ void ImageRenderWorker::scaleToU8Typed(const T* src, int count, double minV, dou
 	}
 }
 
+template<typename T>
+void ImageRenderWorker::scaleToU8LogTyped(const T* src, int count, double minV, double maxV, uchar* dst, quint64 curId) const
+{
+	if (this->latestIdSource && this->latestIdSource->loadAcquire() != curId) return;
 
+	const double logMin = std::log(1.0 + std::max(0.0, minV));
+	const double logMax = std::log(1.0 + std::max(0.0, maxV));
+	const double logRange = logMax - logMin;
+	const double scale = (logRange > 0.0) ? (255.0 / logRange) : 0.0;
 
+#pragma omp parallel for if(count >= 1048576) schedule(static)
+	for (int i = 0; i < count; ++i) {
+		double v = std::log(1.0 + std::max(0.0, static_cast<double>(src[i])));
+		double sv = (v - logMin) * scale;
+		sv = sv < 0.0 ? 0.0 : (sv > 255.0 ? 255.0 : sv);
+		dst[i] = static_cast<uchar>(sv + 0.5);
+	}
+}

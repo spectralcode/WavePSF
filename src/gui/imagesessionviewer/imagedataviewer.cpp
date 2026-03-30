@@ -8,19 +8,14 @@
 #include <QLabel>
 #include <QImage>
 #include <QtGlobal>
+#include "gui/lut.h"
 #include <QMetaType>
 #include <cstring>
-
-namespace {
-	const double DEFAULT_MIN_VALUE = 0.0;
-	const double DEFAULT_MAX_VALUE = 255.0;
-}
 
 ImageDataViewer::ImageDataViewer(const QString& viewerName, QWidget *parent): QWidget(parent),
 	  imageData(nullptr), referenceImageData(nullptr),
 	  viewerName(viewerName), originalViewerName(viewerName),
 	  mousePosX(-1), mousePosY(-1), currentFrame(-1),
-	  autoRangeEnabled(true), manualMinValue(DEFAULT_MIN_VALUE), manualMaxValue(DEFAULT_MAX_VALUE),
 	  showingReference(false),
 	  renderThread(nullptr), renderWorker(nullptr), latestRequestId(0),
 	  renderBusy(false), hasPending(false)
@@ -118,31 +113,17 @@ int ImageDataViewer::getFrameNr() const
 	return this->currentFrame;
 }
 
-void ImageDataViewer::setAutoRange(bool enabled)
+void ImageDataViewer::setDisplaySettings(const DisplaySettings& settings)
 {
-	this->autoRangeEnabled = enabled;
-	this->updateDisplayRange();
-}
-
-bool ImageDataViewer::isAutoRange() const
-{
-	return this->autoRangeEnabled;
-}
-
-void ImageDataViewer::setDisplayRange(double minValue, double maxValue)
-{
-	this->manualMinValue = minValue;
-	this->manualMaxValue = maxValue;
-	if (!this->autoRangeEnabled) {
-		this->updateDisplayRange();
-	}
-}
-
-void ImageDataViewer::updateDisplayRange()
-{
+	this->displaySettings = settings;
 	if (this->currentFrame >= 0) {
 		this->displayFrame(this->currentFrame);
 	}
+}
+
+DisplaySettings ImageDataViewer::getDisplaySettings() const
+{
+	return this->displaySettings;
 }
 
 void ImageDataViewer::configurePatchGrid(int cols, int rows)
@@ -262,10 +243,12 @@ void ImageDataViewer::dispatchRenderNow()
 	req.width = w;
 	req.height = h;
 	req.dataType = dt;
-	req.useAutoRange = this->autoRangeEnabled;
-	req.usePercentile = false;		// if set to true, auto range calculation will use 2% 98% percentile (this can take some time, so this option is set to false which means that manually set min and max values are used for auto range)
-	req.manualMin = this->manualMinValue;
-	req.manualMax = this->manualMaxValue;
+	req.useAutoRange = (this->displaySettings.autoRangeMode != AutoRangeMode::Off);
+	req.usePercentile = false;
+	req.manualMin = this->displaySettings.rangeMin;
+	req.manualMax = this->displaySettings.rangeMax;
+	req.logScale = this->displaySettings.logScale;
+	req.colorTable = LUT::get(this->displaySettings.lutName);
 
 	copyFrameToBytes(req.frameBytes, framePtr, count, dt);
 

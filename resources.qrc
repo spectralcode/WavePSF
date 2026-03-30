@@ -13,6 +13,12 @@
         <file alias="toolbar/grid.svg">icon/toolbar/grid.svg</file>
         <file alias="toolbar/axis.svg">icon/toolbar/axis.svg</file>
     </qresource>
+    <qresource prefix="/colormaps">
+        <file alias="grayscale.png">colormaps/grayscale.png</file>
+        <file alias="hot.png">colormaps/hot.png</file>
+        <file alias="viridis.png">colormaps/viridis.png</file>
+        <file alias="inferno.png">colormaps/inferno.png</file>
+    </qresource>
     <qresource prefix="/">
         <file alias="LICENSE">LICENSE</file>
         <file>aboutdata/thirdparty_licenses/arrayfire_license.txt</file>

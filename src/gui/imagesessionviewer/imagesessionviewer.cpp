@@ -15,9 +15,11 @@
 
 namespace {
 	const QString SETTINGS_GROUP            = QStringLiteral("image_session_viewer");
-	const QString KEY_AUTO_RANGE_ENABLED    = QStringLiteral("auto_range_enabled");
+	const QString KEY_AUTO_RANGE_MODE       = QStringLiteral("auto_range_mode");
 	const QString KEY_DISPLAY_RANGE_MIN     = QStringLiteral("display_range_min");
 	const QString KEY_DISPLAY_RANGE_MAX     = QStringLiteral("display_range_max");
+	const QString KEY_LOG_SCALE             = QStringLiteral("log_scale");
+	const QString KEY_LUT_NAME              = QStringLiteral("lut_name");
 	const QString KEY_PATCH_GRID_COLS       = QStringLiteral("patch_grid_cols");
 	const QString KEY_PATCH_GRID_ROWS       = QStringLiteral("patch_grid_rows");
 	const QString KEY_PATCH_BORDER_EXT      = QStringLiteral("patch_border_extension");
@@ -25,9 +27,11 @@ namespace {
 	const QString KEY_MAIN_SPLITTER_STATE   = QStringLiteral("main_splitter_state");
 	const QString KEY_SYNC_VIEWS            = QStringLiteral("sync_views");
 
-	const bool   DEF_AUTO_RANGE_ENABLED    = true;
+	const int    DEF_AUTO_RANGE_MODE       = static_cast<int>(AutoRangeMode::PerFrame);
 	const double DEF_DISPLAY_RANGE_MIN     = 0.0;
 	const double DEF_DISPLAY_RANGE_MAX     = 255.0;
+	const bool   DEF_LOG_SCALE             = false;
+	const QString DEF_LUT_NAME             = QStringLiteral("Grayscale");
 	const bool   DEF_SYNC_VIEWS            = false;
 	const int    DEF_PATCH_GRID_COLS       = 6;
 	const int    DEF_PATCH_GRID_ROWS       = 8;
@@ -36,7 +40,6 @@ namespace {
 
 ImageSessionViewer::ImageSessionViewer(QWidget* parent)
 	: QWidget(parent), imageSession(nullptr),
-	  displayRangeMin(0.0), displayRangeMax(255.0), autoRangeEnabled(true),
 	  mainSplitter(nullptr), controlsWidget(nullptr), sidebarLayout(nullptr), rightSplitter(nullptr), viewersWidget(nullptr),
 	  frameControlsGroup(nullptr), frameSlider(nullptr), frameSpinBox(nullptr),
 	  patchSlider(nullptr), patchSpinBox(nullptr),
@@ -79,9 +82,11 @@ QString ImageSessionViewer::getName() const
 QVariantMap ImageSessionViewer::getSettings() const
 {
 	QVariantMap settingsMap;
-	settingsMap.insert(KEY_AUTO_RANGE_ENABLED, this->autoRangeEnabled);
-	settingsMap.insert(KEY_DISPLAY_RANGE_MIN,  this->displayRangeMin);
-	settingsMap.insert(KEY_DISPLAY_RANGE_MAX,  this->displayRangeMax);
+	settingsMap.insert(KEY_AUTO_RANGE_MODE,    static_cast<int>(this->displaySettings.autoRangeMode));
+	settingsMap.insert(KEY_DISPLAY_RANGE_MIN,  this->displaySettings.rangeMin);
+	settingsMap.insert(KEY_DISPLAY_RANGE_MAX,  this->displaySettings.rangeMax);
+	settingsMap.insert(KEY_LOG_SCALE,          this->displaySettings.logScale);
+	settingsMap.insert(KEY_LUT_NAME,           this->displaySettings.lutName);
 	settingsMap.insert(KEY_SYNC_VIEWS,         this->viewSyncEnabled);
 	settingsMap.insert(KEY_PATCH_GRID_COLS,    this->imageSession->getPatchGridCols());
 	settingsMap.insert(KEY_PATCH_GRID_ROWS,    this->imageSession->getPatchGridRows());
@@ -99,15 +104,24 @@ QVariantMap ImageSessionViewer::getSettings() const
 
 void ImageSessionViewer::setSettings(const QVariantMap& settingsMap)
 {
-	const bool   autoRange  = settingsMap.value(KEY_AUTO_RANGE_ENABLED, DEF_AUTO_RANGE_ENABLED).toBool();
-	const double minV       = settingsMap.value(KEY_DISPLAY_RANGE_MIN,  DEF_DISPLAY_RANGE_MIN).toDouble();
-	const double maxV       = settingsMap.value(KEY_DISPLAY_RANGE_MAX,  DEF_DISPLAY_RANGE_MAX).toDouble();
+	DisplaySettings ds;
+	// Backward compat: old settings had "auto_range_enabled" (bool), new uses "auto_range_mode" (int)
+	if (settingsMap.contains(KEY_AUTO_RANGE_MODE)) {
+		ds.autoRangeMode = static_cast<AutoRangeMode>(settingsMap.value(KEY_AUTO_RANGE_MODE, DEF_AUTO_RANGE_MODE).toInt());
+	} else if (settingsMap.contains(QStringLiteral("auto_range_enabled"))) {
+		ds.autoRangeMode = settingsMap.value(QStringLiteral("auto_range_enabled"), true).toBool()
+			? AutoRangeMode::PerFrame : AutoRangeMode::Off;
+	}
+	ds.rangeMin  = settingsMap.value(KEY_DISPLAY_RANGE_MIN, DEF_DISPLAY_RANGE_MIN).toDouble();
+	ds.rangeMax  = settingsMap.value(KEY_DISPLAY_RANGE_MAX, DEF_DISPLAY_RANGE_MAX).toDouble();
+	ds.logScale  = settingsMap.value(KEY_LOG_SCALE,         DEF_LOG_SCALE).toBool();
+	ds.lutName   = settingsMap.value(KEY_LUT_NAME,          DEF_LUT_NAME).toString();
 	const bool   syncViews  = settingsMap.value(KEY_SYNC_VIEWS,         DEF_SYNC_VIEWS).toBool();
 	const int    cols       = settingsMap.value(KEY_PATCH_GRID_COLS,    DEF_PATCH_GRID_COLS).toInt();
 	const int    rows       = settingsMap.value(KEY_PATCH_GRID_ROWS,    DEF_PATCH_GRID_ROWS).toInt();
 	const int    border     = settingsMap.value(KEY_PATCH_BORDER_EXT,   DEF_PATCH_BORDER_EXT).toInt();
 
-	this->setDisplaySettings(autoRange, minV, maxV);
+	this->setDisplaySettings(ds);
 	this->setViewSyncEnabled(syncViews);
 	this->configurePatchGrid(cols, rows, border);
 	emit patchGridConfigurationRequested(cols, rows, border);
@@ -255,27 +269,23 @@ void ImageSessionViewer::setPatchFromSpinBox(int patchId)
 	}
 }
 
-void ImageSessionViewer::setDisplaySettings(bool autoRange, double min, double max)
+void ImageSessionViewer::setDisplaySettings(const DisplaySettings& settings)
 {
-	this->autoRangeEnabled = autoRange;
-	this->displayRangeMin = min;
-	this->displayRangeMax = max;
-
+	this->displaySettings = settings;
 	if (this->inputViewer != nullptr) {
-		this->inputViewer->setAutoRange(autoRange);
-		if (!autoRange) {
-			this->inputViewer->setDisplayRange(min, max);
-		}
+		this->inputViewer->setDisplaySettings(settings);
 	}
 	if (this->outputViewer != nullptr) {
-		this->outputViewer->setAutoRange(autoRange);
-		if (!autoRange) {
-			this->outputViewer->setDisplayRange(min, max);
-		}
+		this->outputViewer->setDisplaySettings(settings);
 	}
 	if (this->crossSectionWidget != nullptr) {
-		this->crossSectionWidget->setDisplaySettings(autoRange, min, max);
+		this->crossSectionWidget->setDisplaySettings(settings);
 	}
+}
+
+DisplaySettings ImageSessionViewer::getDisplaySettings() const
+{
+	return this->displaySettings;
 }
 
 void ImageSessionViewer::setViewSyncEnabled(bool enabled)
@@ -352,20 +362,6 @@ void ImageSessionViewer::setCrossSectionVisible(bool visible)
 	emit crossSectionVisibilityChanged(visible);
 }
 
-bool ImageSessionViewer::getAutoRangeEnabled() const
-{
-	return this->autoRangeEnabled;
-}
-
-double ImageSessionViewer::getDisplayRangeMin() const
-{
-	return this->displayRangeMin;
-}
-
-double ImageSessionViewer::getDisplayRangeMax() const
-{
-	return this->displayRangeMax;
-}
 
 void ImageSessionViewer::handleInputPatchSelected(int patchId)
 {
@@ -648,19 +644,8 @@ void ImageSessionViewer::syncViewersToSession()
 			this->highlightPatch(patchX, patchY);
 		}
 
-		// Apply current display range settings to both viewers
-		if (this->inputViewer != nullptr) {
-			this->inputViewer->setAutoRange(this->autoRangeEnabled);
-			if (!this->autoRangeEnabled) {
-				this->inputViewer->setDisplayRange(this->displayRangeMin, this->displayRangeMax);
-			}
-		}
-		if (this->outputViewer != nullptr) {
-			this->outputViewer->setAutoRange(this->autoRangeEnabled);
-			if (!this->autoRangeEnabled) {
-				this->outputViewer->setDisplayRange(this->displayRangeMin, this->displayRangeMax);
-			}
-		}
+		// Apply current display settings to all viewers
+		this->setDisplaySettings(this->displaySettings);
 	}
 }
 

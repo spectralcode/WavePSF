@@ -11,6 +11,7 @@
 #include <QAtomicInteger>
 #include "graphicsview.h"
 #include "imagerenderworker.h"
+#include "displaysettings.h"
 
 // Forward declaration
 class ImageData;
@@ -36,11 +37,9 @@ public:
 	void setCurrentFrame(int frame);
 	int getFrameNr() const;
 
-	// Display range controls
-	void setAutoRange(bool enabled);
-	bool isAutoRange() const;
-	void setDisplayRange(double minValue, double maxValue);
-	void updateDisplayRange();
+	// Display settings
+	void setDisplaySettings(const DisplaySettings& settings);
+	DisplaySettings getDisplaySettings() const;
 
 	// Patch grid
 	void configurePatchGrid(int cols, int rows);
@@ -115,9 +114,7 @@ private:
 	int mousePosY;
 	int currentFrame;
 
-	bool autoRangeEnabled;
-	double manualMinValue;
-	double manualMaxValue;
+	DisplaySettings displaySettings;
 
 	bool showingReference;
 

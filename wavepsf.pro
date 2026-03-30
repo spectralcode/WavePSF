@@ -90,7 +90,8 @@ SOURCES += \
 	$$SOURCEDIR/gui/plotutils.cpp \
 	$$SOURCEDIR/utils/afdevicemanager.cpp \
 	$$SOURCEDIR/core/psf/psfgridgenerator.cpp \
-	$$SOURCEDIR/gui/psfgridview/psfgridwidget.cpp
+	$$SOURCEDIR/gui/psfgridview/psfgridwidget.cpp \
+	$$SOURCEDIR/gui/lut.cpp
 
 HEADERS += \
 	$$QCUSTOMPLOTDIR/qcustomplot.h \
@@ -169,7 +170,9 @@ HEADERS += \
 	$$SOURCEDIR/utils/afdevicemanager.h \
 	$$SOURCEDIR/core/psf/psfgridgenerator.h \
 	$$SOURCEDIR/gui/psfgridview/psfgriddock.h \
-	$$SOURCEDIR/gui/psfgridview/psfgridwidget.h
+	$$SOURCEDIR/gui/psfgridview/psfgridwidget.h \
+	$$SOURCEDIR/gui/lut.h \
+	$$SOURCEDIR/gui/imagesessionviewer/displaysettings.h
 
 FORMS += \
 	$$SOURCEDIR/gui/mainwindow.ui

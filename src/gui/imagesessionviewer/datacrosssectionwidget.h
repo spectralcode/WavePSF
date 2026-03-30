@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QThread>
 #include <QAtomicInteger>
+#include "displaysettings.h"
 
 class ImageData;
 class ImageRenderWorker;
@@ -24,7 +25,7 @@ public:
 
 	void setInputData(const ImageData* data);
 	void setOutputData(const ImageData* data);
-	void setDisplaySettings(bool autoRange, double minValue, double maxValue);
+	void setDisplaySettings(const DisplaySettings& settings);
 	void setFrameLineVisible(bool visible);
 	bool isFrameLineVisible() const { return this->showFrameLine; }
 	int currentYPosition() const;
@@ -79,9 +80,7 @@ private:
 	const ImageData* outputData;
 	int currentFrame;
 	bool showFrameLine;
-	bool autoRangeEnabled;
-	double manualMinValue;
-	double manualMaxValue;
+	DisplaySettings displaySettings;
 	bool pendingRefresh;
 	bool draggingFrameLine;
 	Panel* draggingPanel;
