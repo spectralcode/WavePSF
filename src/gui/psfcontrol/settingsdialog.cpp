@@ -189,6 +189,7 @@ void SettingsDialog::setupUI()
 	QTabWidget* generatorSubTabs = new QTabWidget(generatorTab);
 
 	for (const QString& typeName : PSFGeneratorFactory::availableTypeNames()) {
+		if (typeName == QStringLiteral("From File")) continue;
 		QWidget* subTabPage = new QWidget(generatorSubTabs);
 		QVBoxLayout* subTabLayout = new QVBoxLayout(subTabPage);
 		subTabLayout->setSpacing(3);
