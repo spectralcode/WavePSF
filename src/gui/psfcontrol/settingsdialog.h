@@ -24,21 +24,16 @@ class SettingsDialog : public QDialog
 	Q_OBJECT
 public:
 	explicit SettingsDialog(const PSFSettings& settings,
-							   bool autoRange, double displayMin, double displayMax,
 							   const QVector<AFBackendInfo>& backends,
 							   int activeBackend, int activeDevice,
 							   QWidget* parent = nullptr);
 
 	PSFSettings getSettings() const;
-	bool getAutoRange() const;
-	double getDisplayMin() const;
-	double getDisplayMax() const;
 	int getSelectedBackend() const;
 	int getSelectedDeviceId() const;
 
 signals:
 	void settingsApplied(PSFSettings settings);
-	void displaySettingsApplied(bool autoRange, double min, double max);
 	void deviceSettingsApplied(int backendId, int deviceId);
 
 public slots:
@@ -84,11 +79,6 @@ private:
 
 	// PSF calculation controls
 	QComboBox* gridSizeCombo;
-
-	// Display controls
-	QCheckBox* displayAutoRangeCheck;
-	QDoubleSpinBox* displayMinSpin;
-	QDoubleSpinBox* displayMaxSpin;
 
 	// Misc controls
 	QComboBox* backendCombo;

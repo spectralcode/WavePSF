@@ -46,7 +46,6 @@ QVariantMap flattenComposedSettings(const QVariantMap& composed)
 
 
 SettingsDialog::SettingsDialog(const PSFSettings& settings,
-							   bool autoRange, double displayMin, double displayMax,
 							   const QVector<AFBackendInfo>& backends,
 							   int activeBackend, int activeDevice,
 							   QWidget* parent)
@@ -60,13 +59,6 @@ SettingsDialog::SettingsDialog(const PSFSettings& settings,
 	this->setWindowTitle(tr("Settings"));
 	this->setupUI();
 	this->populateFromSettings(settings);
-
-	// Populate display settings
-	this->displayAutoRangeCheck->setChecked(autoRange);
-	this->displayMinSpin->setValue(displayMin);
-	this->displayMaxSpin->setValue(displayMax);
-	this->displayMinSpin->setEnabled(!autoRange);
-	this->displayMaxSpin->setEnabled(!autoRange);
 
 	this->updateValidationState();
 
@@ -117,21 +109,6 @@ PSFSettings SettingsDialog::getSettings() const
 	return s;
 }
 
-bool SettingsDialog::getAutoRange() const
-{
-	return this->displayAutoRangeCheck->isChecked();
-}
-
-double SettingsDialog::getDisplayMin() const
-{
-	return this->displayMinSpin->value();
-}
-
-double SettingsDialog::getDisplayMax() const
-{
-	return this->displayMaxSpin->value();
-}
-
 int SettingsDialog::getSelectedBackend() const
 {
 	return this->backendCombo->currentData().toInt();
@@ -152,7 +129,6 @@ void SettingsDialog::onApplyClicked()
 {
 	if (this->validateSettings()) {
 		emit settingsApplied(this->getSettings());
-		emit displaySettingsApplied(this->getAutoRange(), this->getDisplayMin(), this->getDisplayMax());
 		emit deviceSettingsApplied(this->getSelectedBackend(), this->getSelectedDeviceId());
 		this->initialSettings = this->getSettings();
 	}
@@ -226,34 +202,6 @@ void SettingsDialog::setupUI()
 	generatorLayout->addWidget(generatorSubTabs, 1);
 
 	tabWidget->addTab(generatorTab, tr("PSF Generator"));
-
-	// --- Display tab ---
-	QWidget* displayTab = new QWidget(tabWidget);
-	QFormLayout* displayLayout = new QFormLayout(displayTab);
-	displayLayout->setSpacing(3);
-
-	this->displayAutoRangeCheck = new QCheckBox(tr("Auto Range"), displayTab);
-	this->displayAutoRangeCheck->setToolTip(tr("Automatically scale display range to fit the data."));
-	displayLayout->addRow(this->displayAutoRangeCheck);
-
-	this->displayMinSpin = new QDoubleSpinBox(displayTab);
-	this->displayMinSpin->setRange(-99999.0, 99999.0);
-	this->displayMinSpin->setDecimals(2);
-	this->displayMinSpin->setToolTip(tr("Minimum display value for PSF visualization."));
-	displayLayout->addRow(tr("Min:"), this->displayMinSpin);
-
-	this->displayMaxSpin = new QDoubleSpinBox(displayTab);
-	this->displayMaxSpin->setRange(-99999.0, 99999.0);
-	this->displayMaxSpin->setDecimals(2);
-	this->displayMaxSpin->setToolTip(tr("Maximum display value for PSF visualization."));
-	displayLayout->addRow(tr("Max:"), this->displayMaxSpin);
-
-	connect(this->displayAutoRangeCheck, &QCheckBox::toggled, this, [this](bool checked) {
-		this->displayMinSpin->setEnabled(!checked);
-		this->displayMaxSpin->setEnabled(!checked);
-	});
-
-	tabWidget->addTab(displayTab, tr("Display"));
 
 	// --- Device tab ---
 	QWidget* miscTab = new QWidget(tabWidget);

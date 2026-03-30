@@ -382,12 +382,8 @@ void MainWindow::openSettings() {
 		return;
 	}
 
-	const DisplaySettings ds = this->sessionViewer->getDisplaySettings();
 	this->settingsDialog = new SettingsDialog(
 		this->currentPSFSettings,
-		ds.autoRangeMode != AutoRangeMode::Off,
-		ds.rangeMin,
-		ds.rangeMax,
 		this->afDeviceManager->getAvailableBackends(),
 		this->afDeviceManager->getActiveBackendId(),
 		this->afDeviceManager->getActiveDeviceId(),
@@ -396,26 +392,10 @@ void MainWindow::openSettings() {
 
 	connect(this->settingsDialog, &SettingsDialog::settingsApplied,
 			this->applicationController, &ApplicationController::applyPSFSettings);
-	// Bridge old SettingsDialog signal to new DisplaySettings API
-	connect(this->settingsDialog, &SettingsDialog::displaySettingsApplied,
-			this, [this](bool autoRange, double min, double max) {
-		DisplaySettings updated = this->sessionViewer->getDisplaySettings();
-		updated.autoRangeMode = autoRange ? AutoRangeMode::PerFrame : AutoRangeMode::Off;
-		updated.rangeMin = min;
-		updated.rangeMax = max;
-		this->sessionViewer->setDisplaySettings(updated);
-	});
 	connect(this->settingsDialog, &SettingsDialog::deviceSettingsApplied,
 			this->afDeviceManager, &AFDeviceManager::setDevice);
 	connect(this->settingsDialog, &QDialog::accepted, this, [this]() {
 		this->applicationController->applyPSFSettings(this->settingsDialog->getSettings());
-		DisplaySettings updated = this->sessionViewer->getDisplaySettings();
-		updated.autoRangeMode = this->settingsDialog->getAutoRange() ? AutoRangeMode::PerFrame : AutoRangeMode::Off;
-		updated.rangeMin = this->settingsDialog->getDisplayMin();
-		updated.rangeMax = this->settingsDialog->getDisplayMax();
-		this->sessionViewer->setDisplaySettings(updated);
-
-		// Apply device selection
 		this->afDeviceManager->setDevice(
 			this->settingsDialog->getSelectedBackend(),
 			this->settingsDialog->getSelectedDeviceId());
