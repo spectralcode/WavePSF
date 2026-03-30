@@ -2,9 +2,11 @@
 #define DATACROSSSECTIONWIDGET_H
 
 #include <QWidget>
-#include <QImage>
+#include <QThread>
+#include <QAtomicInteger>
 
 class ImageData;
+class ImageRenderWorker;
 class QGraphicsView;
 class QGraphicsScene;
 class QGraphicsPixmapItem;
@@ -18,6 +20,7 @@ class DataCrossSectionWidget : public QWidget
 	Q_OBJECT
 public:
 	explicit DataCrossSectionWidget(QWidget* parent = nullptr);
+	~DataCrossSectionWidget();
 
 	void setInputData(const ImageData* data);
 	void setOutputData(const ImageData* data);
@@ -37,21 +40,27 @@ signals:
 
 private:
 	struct Panel {
-		QGraphicsView* view;
-		QGraphicsScene* scene;
-		QGraphicsPixmapItem* pixmapItem;
-		QGraphicsLineItem* frameLine;
-		QLabel* titleLabel;
+		QGraphicsView* view = nullptr;
+		QGraphicsScene* scene = nullptr;
+		QGraphicsPixmapItem* pixmapItem = nullptr;
+		QGraphicsLineItem* frameLine = nullptr;
+		QLabel* titleLabel = nullptr;
 		QString baseTitle;
-		int lastWidth;
-		int lastHeight;
+		int lastWidth = 0;
+		int lastHeight = 0;
+		// Render infrastructure (matches ImageDataViewer pattern)
+		QThread* renderThread = nullptr;
+		ImageRenderWorker* renderWorker = nullptr;
+		QAtomicInteger<quint64> latestRequestId;
 	};
 
-	Panel createPanel(const QString& title);
+	void initPanel(Panel& panel, const QString& title);
 	void updatePanel(Panel& panel, const ImageData* data, int yIndex);
 	void fitPanelToView(Panel& panel);
 	void updateFrameLine(Panel& panel, int frame, int numFrames);
-	QImage extractXZSlice(const ImageData* data, int yIndex);
+	void dispatchPanelRender(Panel& panel, const ImageData* data, int yIndex);
+	void handlePanelRendered(Panel& panel, const QImage& image, quint64 reqId);
+	QByteArray extractXZSliceBytes(const ImageData* data, int yIndex);
 
 	void setupUI();
 	void connectSignals();

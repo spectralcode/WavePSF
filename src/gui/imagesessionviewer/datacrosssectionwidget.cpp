@@ -1,4 +1,5 @@
 #include "datacrosssectionwidget.h"
+#include "imagerenderworker.h"
 #include "data/imagedata.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -9,6 +10,7 @@
 #include <QSlider>
 #include <QSpinBox>
 #include <QLabel>
+#include <QImage>
 #include <QtGlobal>
 #include <QMenu>
 #include <QContextMenuEvent>
@@ -17,8 +19,10 @@
 #include <QHoverEvent>
 #include <QPen>
 #include <QtMath>
+#include <QMetaObject>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 
 DataCrossSectionWidget::DataCrossSectionWidget(QWidget* parent)
@@ -34,46 +38,64 @@ DataCrossSectionWidget::DataCrossSectionWidget(QWidget* parent)
 	, draggingFrameLine(false)
 	, draggingPanel(nullptr)
 {
+	qRegisterMetaType<RenderRequest>("RenderRequest");
 	this->setupUI();
 	this->connectSignals();
 	this->updateYControls();
 }
 
-DataCrossSectionWidget::Panel DataCrossSectionWidget::createPanel(const QString& title)
+DataCrossSectionWidget::~DataCrossSectionWidget()
 {
-	Panel p;
-	p.lastWidth = 0;
-	p.lastHeight = 0;
-	p.baseTitle = title;
+	auto stopRenderer = [](Panel& p) {
+		if (p.renderThread) {
+			p.renderThread->quit();
+			p.renderThread->wait();
+			p.renderThread = nullptr;
+			p.renderWorker = nullptr;
+		}
+	};
+	stopRenderer(this->inputPanel);
+	stopRenderer(this->outputPanel);
+}
 
-	p.titleLabel = new QLabel(title, this);
+void DataCrossSectionWidget::initPanel(Panel& panel, const QString& title)
+{
+	panel.baseTitle = title;
 
-	p.scene = new QGraphicsScene(this);
-	p.scene->setItemIndexMethod(QGraphicsScene::NoIndex);
+	panel.titleLabel = new QLabel(title, this);
 
-	p.view = new QGraphicsView(p.scene, this);
-	p.view->setCacheMode(QGraphicsView::CacheBackground);
-	p.view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
-	p.view->setRenderHint(QPainter::Antialiasing);
-	p.view->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-	p.view->setDragMode(QGraphicsView::ScrollHandDrag);
-	p.view->setMinimumSize(64, 64);
-	p.view->setMouseTracking(true);
-	p.view->viewport()->setMouseTracking(true);
-	p.view->viewport()->setAttribute(Qt::WA_Hover, true);
+	panel.scene = new QGraphicsScene(this);
+	panel.scene->setItemIndexMethod(QGraphicsScene::NoIndex);
 
-	p.pixmapItem = new QGraphicsPixmapItem();
-	p.scene->addItem(p.pixmapItem);
+	panel.view = new QGraphicsView(panel.scene, this);
+	panel.view->setCacheMode(QGraphicsView::CacheBackground);
+	panel.view->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
+	panel.view->setRenderHint(QPainter::Antialiasing);
+	panel.view->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+	panel.view->setDragMode(QGraphicsView::ScrollHandDrag);
+	panel.view->setMinimumSize(64, 64);
+	panel.view->setMouseTracking(true);
+	panel.view->viewport()->setMouseTracking(true);
+	panel.view->viewport()->setAttribute(Qt::WA_Hover, true);
+
+	panel.pixmapItem = new QGraphicsPixmapItem();
+	panel.scene->addItem(panel.pixmapItem);
 
 	// Frame position indicator line (horizontal, red)
-	p.frameLine = new QGraphicsLineItem();
-	p.frameLine->setPen(QPen(Qt::red, 1));
-	p.frameLine->setVisible(false);
-	p.scene->addItem(p.frameLine);
+	panel.frameLine = new QGraphicsLineItem();
+	panel.frameLine->setPen(QPen(Qt::red, 1));
+	panel.frameLine->setVisible(false);
+	panel.scene->addItem(panel.frameLine);
 
-	p.view->viewport()->installEventFilter(this);
+	panel.view->viewport()->installEventFilter(this);
 
-	return p;
+	// Async render worker (matches ImageDataViewer pattern)
+	panel.renderThread = new QThread(this);
+	panel.renderWorker = new ImageRenderWorker();
+	panel.renderWorker->moveToThread(panel.renderThread);
+	panel.renderWorker->setLatestRequestIdSource(&panel.latestRequestId);
+	connect(panel.renderThread, &QThread::finished, panel.renderWorker, &QObject::deleteLater);
+	panel.renderThread->start();
 }
 
 void DataCrossSectionWidget::setInputData(const ImageData* data)
@@ -135,21 +157,12 @@ void DataCrossSectionWidget::updatePanel(Panel& panel, const ImageData* data, in
 		return;
 	}
 
-	QImage img = this->extractXZSlice(data, clampedY);
-	if (img.isNull()) return;
-
-	panel.pixmapItem->setPixmap(QPixmap::fromImage(img));
-
-	if (panel.lastWidth != img.width() || panel.lastHeight != img.height()) {
-		panel.lastWidth = img.width();
-		panel.lastHeight = img.height();
-		this->fitPanelToView(panel);
-	}
-
+	// Update title and frame line immediately (don't depend on render result)
+	panel.titleLabel->setText(panel.baseTitle + tr(" (y=%1)").arg(clampedY));
 	this->updateFrameLine(panel, qBound(0, this->currentFrame, frames - 1), frames);
 
-	panel.titleLabel->setText(
-		panel.baseTitle + tr(" (y=%1)").arg(clampedY));
+	// Dispatch async render via ImageRenderWorker
+	this->dispatchPanelRender(panel, data, clampedY);
 }
 
 void DataCrossSectionWidget::fitPanelToView(Panel& panel)
@@ -178,95 +191,67 @@ void DataCrossSectionWidget::updateFrameLine(Panel& panel, int frame, int numFra
 	panel.frameLine->setVisible(true);
 }
 
-QImage DataCrossSectionWidget::extractXZSlice(const ImageData* data, int yIndex)
+QByteArray DataCrossSectionWidget::extractXZSliceBytes(const ImageData* data, int yIndex)
 {
-	if (!data) return QImage();
+	if (!data) return QByteArray();
 
-	int width = data->getWidth();
-	int height = data->getHeight();
-	int frames = data->getFrames();
+	const int width = data->getWidth();
+	const int height = data->getHeight();
+	const int frames = data->getFrames();
 	if (yIndex < 0 || yIndex >= height || frames == 0 || width == 0) {
-		return QImage();
+		return QByteArray();
 	}
 
-	size_t bps = data->getBytesPerSample();
-	EnviDataType dtype = data->getDataType();
+	const size_t bps = data->getBytesPerSample();
+	const size_t rowBytes = width * bps;
 
-	// Extract all pixel values at row yIndex across all frames
-	QVector<double> values(frames * width);
-
-	auto readValue = [&](const char* pixPtr) -> double {
-		switch (dtype) {
-			case UNSIGNED_CHAR_8BIT:
-				return *reinterpret_cast<const uint8_t*>(pixPtr);
-			case SIGNED_SHORT_16BIT:
-				return *reinterpret_cast<const int16_t*>(pixPtr);
-			case UNSIGNED_SHORT_16BIT:
-				return *reinterpret_cast<const uint16_t*>(pixPtr);
-			case SIGNED_INT_32BIT:
-				return *reinterpret_cast<const int32_t*>(pixPtr);
-			case UNSIGNED_INT_32BIT:
-				return *reinterpret_cast<const uint32_t*>(pixPtr);
-			case FLOAT_32BIT:
-				return *reinterpret_cast<const float*>(pixPtr);
-			case DOUBLE_64BIT:
-				return *reinterpret_cast<const double*>(pixPtr);
-			case SIGNED_LONG_INT_64BIT:
-				return *reinterpret_cast<const long long*>(pixPtr);
-			case UNSIGNED_LONG_INT_64BIT:
-				return *reinterpret_cast<const unsigned long long*>(pixPtr);
-			case COMPLEX_FLOAT_2X32BIT: {
-				auto c = reinterpret_cast<const float*>(pixPtr);
-				return std::hypot(c[0], c[1]);
-			}
-			case COMPLEX_DOUBLE_2X64BIT: {
-				auto c = reinterpret_cast<const double*>(pixPtr);
-				return std::hypot(c[0], c[1]);
-			}
-			default:
-				return *reinterpret_cast<const float*>(pixPtr);
-		}
-	};
-
+	// Copy raw bytes for row yIndex from each frame — no per-pixel type conversion
+	QByteArray bytes(static_cast<int>(frames * rowBytes), '\0');
+	char* dst = bytes.data();
 	for (int z = 0; z < frames; ++z) {
 		const char* framePtr = static_cast<const char*>(data->getData(z));
-		if (!framePtr) return QImage();
-		const char* rowPtr = framePtr + yIndex * width * bps;
-
-		for (int x = 0; x < width; ++x) {
-			const char* pixPtr = rowPtr + x * bps;
-			values[z * width + x] = readValue(pixPtr);
-		}
+		if (!framePtr) return QByteArray();
+		std::memcpy(dst + z * rowBytes, framePtr + yIndex * rowBytes, rowBytes);
 	}
+	return bytes;
+}
 
-	if (values.isEmpty()) return QImage();
+void DataCrossSectionWidget::dispatchPanelRender(Panel& panel, const ImageData* data, int yIndex)
+{
+	QByteArray sliceBytes = this->extractXZSliceBytes(data, yIndex);
+	if (sliceBytes.isEmpty()) return;
 
-	// Determine display range (match ImageDataViewer behavior: auto-range per slice or manual)
-	double minVal = this->manualMinValue;
-	double maxVal = this->manualMaxValue;
-	if (this->autoRangeEnabled) {
-		minVal = values[0];
-		maxVal = values[0];
-		for (double v : values) {
-			if (v < minVal) minVal = v;
-			if (v > maxVal) maxVal = v;
-		}
+	RenderRequest req;
+	req.frameBytes = sliceBytes;
+	req.width = data->getWidth();
+	req.height = data->getFrames();
+	req.dataType = data->getDataType();
+	req.useAutoRange = this->autoRangeEnabled;
+	req.usePercentile = false;
+	req.manualMin = this->manualMinValue;
+	req.manualMax = this->manualMaxValue;
+
+	const quint64 id = panel.latestRequestId.fetchAndAddOrdered(1) + 1;
+	panel.latestRequestId.storeRelease(id);
+	req.requestId = id;
+
+	QMetaObject::invokeMethod(panel.renderWorker, [worker = panel.renderWorker, req]() {
+		worker->renderFrame(req);
+	}, Qt::QueuedConnection);
+}
+
+void DataCrossSectionWidget::handlePanelRendered(Panel& panel, const QImage& image, quint64 reqId)
+{
+	if (reqId != panel.latestRequestId.loadAcquire()) return;
+	if (image.isNull()) return;
+
+	panel.pixmapItem->setPixmap(QPixmap::fromImage(image));
+
+	if (panel.lastWidth != image.width() || panel.lastHeight != image.height()) {
+		panel.lastWidth = image.width();
+		panel.lastHeight = image.height();
+		this->fitPanelToView(panel);
 	}
-
-	double range = maxVal - minVal;
-	if (range <= 0.0) range = 1.0;
-
-	// Build grayscale QImage: rows = frames (Z), cols = width (X)
-	QImage img(width, frames, QImage::Format_Grayscale8);
-	for (int z = 0; z < frames; ++z) {
-		uchar* scanLine = img.scanLine(z);
-		for (int x = 0; x < width; ++x) {
-			double normalized = (values[z * width + x] - minVal) / range;
-			scanLine[x] = static_cast<uchar>(qBound(0.0, normalized * 255.0, 255.0));
-		}
-	}
-
-	return img;
 }
 
 bool DataCrossSectionWidget::eventFilter(QObject* obj, QEvent* event)
@@ -423,7 +408,7 @@ void DataCrossSectionWidget::setupUI()
 
 	QHBoxLayout* viewersLayout = new QHBoxLayout();
 	auto addPanel = [&](Panel& panel, const QString& title) {
-		panel = this->createPanel(title);
+		this->initPanel(panel, title);
 		QWidget* container = new QWidget(this);
 		QVBoxLayout* layout = new QVBoxLayout(container);
 		layout->setContentsMargins(0, 0, 0, 0);
@@ -433,6 +418,16 @@ void DataCrossSectionWidget::setupUI()
 	};
 	addPanel(this->inputPanel, tr("Input XZ"));
 	addPanel(this->outputPanel, tr("Output XZ"));
+
+	// Connect render completion signals (worker thread → GUI thread)
+	connect(this->inputPanel.renderWorker, &ImageRenderWorker::frameRendered,
+	        this, [this](const QImage& image, quint64 reqId) {
+		this->handlePanelRendered(this->inputPanel, image, reqId);
+	}, Qt::QueuedConnection);
+	connect(this->outputPanel.renderWorker, &ImageRenderWorker::frameRendered,
+	        this, [this](const QImage& image, quint64 reqId) {
+		this->handlePanelRendered(this->outputPanel, image, reqId);
+	}, Qt::QueuedConnection);
 	mainLayout->addLayout(viewersLayout, 1);
 
 	QHBoxLayout* sliderRow = new QHBoxLayout();
