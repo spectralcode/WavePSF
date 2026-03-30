@@ -243,10 +243,11 @@ void ApplicationController::switchGenerator(const QString& typeName)
 	// Sync z-planes for 3D generators
 	this->syncNumZPlanesWithInput();
 
+	// Notify GUI before loading coefficients so preview mode is correct
+	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
+
 	// Load coefficients for current patch from the restored/fresh table
 	this->loadCoefficientsForCurrentPatch();
-
-	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
 }
 
 void ApplicationController::applyInlineSettings(const QVariantMap& settings)
