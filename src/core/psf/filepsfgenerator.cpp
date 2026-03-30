@@ -76,6 +76,9 @@ void FilePSFGenerator::setSource(const QString& path)
 		this->loadSingleFile(path);
 	} else if (info.isDir()) {
 		this->loadFolder(path);
+	} else {
+		LOG_WARNING() << "FilePSFGenerator: source path does not exist:" << path;
+		this->sourcePath.clear();
 	}
 }
 

@@ -205,6 +205,11 @@ void PSFGenerationWidget::setPSFSettings(const PSFSettings& settings)
 	this->coefficientContainer->setVisible(!isFileMode);
 	this->wavefrontContainer->setVisible(!isFileMode);
 	this->fileBrowserWidget->setVisible(isFileMode);
+	if (isFileMode) {
+		QVariantMap fileSettings = settings.allGeneratorSettings.value(QStringLiteral("From File"));
+		QString sourcePath = fileSettings.value(QStringLiteral("source_path")).toString();
+		this->fileSourceLabel->setText(sourcePath.isEmpty() ? tr("No source selected") : sourcePath);
+	}
 }
 
 void PSFGenerationWidget::setPSFMode(const QString& modeName)
