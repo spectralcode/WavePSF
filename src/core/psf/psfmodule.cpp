@@ -108,7 +108,7 @@ void PSFModule::setCoefficient(int id, double value)
 
 void PSFModule::setAllCoefficients(const QVector<double>& coefficients)
 {
-	if (this->generator->getAllCoefficients() == coefficients) {
+	if (this->generator->getAllCoefficients() == coefficients && !this->currentPSF.isempty()) {
 		return;
 	}
 	this->generator->setAllCoefficients(coefficients);
@@ -180,7 +180,7 @@ void PSFModule::switchGenerator(const QString& typeName)
 
 	emit generatorChanged(typeName);
 	emit parameterDescriptorsChanged(this->generator->getParameterDescriptors());
-	this->regeneratePipeline();
+	this->currentPSF = af::array();
 }
 
 void PSFModule::applyPSFSettings(const PSFSettings& settings)
