@@ -82,6 +82,7 @@ private:
 	bool showFrameLine;
 	DisplaySettings displaySettings;
 	bool pendingRefresh;
+	bool initialPositionSet;
 	bool draggingFrameLine;
 	Panel* draggingPanel;
 };

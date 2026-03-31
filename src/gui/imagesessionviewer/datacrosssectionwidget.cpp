@@ -33,6 +33,7 @@ DataCrossSectionWidget::DataCrossSectionWidget(QWidget* parent)
 	, currentFrame(0)
 	, showFrameLine(true)
 	, pendingRefresh(false)
+	, initialPositionSet(false)
 	, draggingFrameLine(false)
 	, draggingPanel(nullptr)
 {
@@ -250,6 +251,15 @@ void DataCrossSectionWidget::handlePanelRendered(Panel& panel, const QImage& ima
 		panel.lastHeight = image.height();
 		this->fitPanelToView(panel);
 	}
+
+	int numFrames = 0;
+	if (&panel == &this->inputPanel && this->inputData) {
+		numFrames = this->inputData->getFrames();
+	} else if (&panel == &this->outputPanel && this->outputData) {
+		numFrames = this->outputData->getFrames();
+	}
+
+	this->updateFrameLine(panel, qBound(0, this->currentFrame, qMax(0, numFrames - 1)), numFrames);
 }
 
 bool DataCrossSectionWidget::eventFilter(QObject* obj, QEvent* event)
@@ -466,14 +476,25 @@ void DataCrossSectionWidget::updateYControls()
 	this->ySpinBox->blockSignals(true);
 	this->ySlider->setEnabled(hasData);
 	this->ySpinBox->setEnabled(hasData);
-	bool rangeChanged = (this->ySlider->maximum() != maxIndex);
 	this->ySlider->setRange(0, maxIndex);
 	this->ySpinBox->setRange(0, maxIndex);
-	int value = rangeChanged ? (maxIndex / 2) : qBound(0, this->ySlider->value(), maxIndex);
+	bool justCentered = false;
+	int value;
+	if (!this->initialPositionSet && hasData) {
+		value = maxIndex / 2;
+		this->initialPositionSet = true;
+		justCentered = true;
+	} else {
+		value = qBound(0, this->ySlider->value(), maxIndex);
+	}
 	this->ySlider->setValue(value);
 	this->ySpinBox->setValue(value);
 	this->ySlider->blockSignals(false);
 	this->ySpinBox->blockSignals(false);
+
+	if (justCentered) {
+		emit yPositionChanged(value);
+	}
 
 	if (!hasData) {
 		this->clearPanel(this->inputPanel);
