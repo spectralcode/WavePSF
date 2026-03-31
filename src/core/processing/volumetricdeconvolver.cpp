@@ -8,7 +8,23 @@ VolumetricDeconvolver::VolumetricDeconvolver(QObject* parent)
 	: QObject(parent)
 	, paddingMode(MIRROR_PAD)
 	, accelerationMode(ACCEL_BIGGS_ANDREWS)
+	, cancelRequested(false)
 {
+}
+
+void VolumetricDeconvolver::requestCancel()
+{
+	this->cancelRequested = true;
+}
+
+void VolumetricDeconvolver::resetCancel()
+{
+	this->cancelRequested = false;
+}
+
+bool VolumetricDeconvolver::wasCancelled() const
+{
+	return this->cancelRequested;
 }
 
 void VolumetricDeconvolver::setPaddingMode(PaddingMode mode)
@@ -237,6 +253,11 @@ af::array VolumetricDeconvolver::deconvolve(const af::array& volume,
 			}
 
 			emit iterationCompleted(i + 1, iterations);
+
+			if (this->cancelRequested) {
+				LOG_INFO() << "3D deconvolution cancelled at iteration" << (i + 1) << "/" << iterations;
+				return af::array();
+			}
 		}
 
 		// Crop back to original volume dimensions

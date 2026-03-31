@@ -33,6 +33,10 @@ public:
 	void setVolumePaddingMode(int mode);
 	void setAccelerationMode(int mode);
 
+	void requestDeconvolutionCancel();
+	void resetDeconvolutionCancel();
+	bool wasDeconvolutionCancelled() const;
+
 	bool is3DAlgorithm() const;
 
 	static QStringList getAlgorithmNames();

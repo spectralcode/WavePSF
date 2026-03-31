@@ -28,6 +28,10 @@ public:
 	void setPaddingMode(PaddingMode mode);
 	void setAccelerationMode(AccelerationMode mode);
 
+	void requestCancel();
+	void resetCancel();
+	bool wasCancelled() const;
+
 	static QStringList getAccelerationModeNames();
 	static QStringList getPaddingModeNames();
 
@@ -50,6 +54,7 @@ private:
 
 	PaddingMode paddingMode;
 	AccelerationMode accelerationMode;
+	bool cancelRequested;
 };
 
 #endif // VOLUMETRICDECONVOLVER_H

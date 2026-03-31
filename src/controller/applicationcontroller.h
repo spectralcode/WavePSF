@@ -92,6 +92,8 @@ public slots:
 	void setDeconvolutionLiveMode(bool enabled);
 	void requestDeconvolution();
 
+	void cancelDeconvolution();
+
 	// Optimization
 	void startOptimization(const OptimizationConfig& uiConfig);
 	void cancelOptimization();

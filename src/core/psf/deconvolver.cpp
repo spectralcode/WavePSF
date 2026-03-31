@@ -139,6 +139,21 @@ void Deconvolver::setAccelerationMode(int mode)
 		static_cast<VolumetricDeconvolver::AccelerationMode>(mode));
 }
 
+void Deconvolver::requestDeconvolutionCancel()
+{
+	this->volumetricDeconvolver->requestCancel();
+}
+
+void Deconvolver::resetDeconvolutionCancel()
+{
+	this->volumetricDeconvolver->resetCancel();
+}
+
+bool Deconvolver::wasDeconvolutionCancelled() const
+{
+	return this->volumetricDeconvolver->wasCancelled();
+}
+
 bool Deconvolver::is3DAlgorithm() const
 {
 	return this->algorithm == RICHARDSON_LUCY_3D;

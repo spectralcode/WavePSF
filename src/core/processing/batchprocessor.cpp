@@ -150,6 +150,9 @@ bool BatchProcessor::executeBatchVolumetricDeconvolution(
 				QString("Patch %1/%2: iteration %3/%4")
 					.arg(patchStep + 1).arg(totalPatches).arg(curIter).arg(totalIter));
 			QApplication::processEvents();
+			if (progressDialog.wasCanceled()) {
+				psfModule->requestDeconvolutionCancel();
+			}
 		});
 
 	// Temporarily unblock signals so iteration progress comes through
@@ -189,9 +192,13 @@ bool BatchProcessor::executeBatchVolumetricDeconvolution(
 				   << subvolume.dims(0) << "x" << subvolume.dims(1) << "x" << subvolume.dims(2)
 				   << "PSF" << psf3D.dims(0) << "x" << psf3D.dims(1) << "x" << psf3D.dims(2);
 
+			psfModule->resetDeconvolutionCancel();
 			af::array result = psfModule->deconvolve(subvolume, psf3D);
 			if (!result.isempty()) {
 				VolumetricProcessor::writeSubvolumeToOutput(imageSession, x, y, result);
+			} else if (psfModule->wasDeconvolutionCancelled()) {
+				LOG_INFO() << "Patch (" << x << "," << y << "): cancelled by user";
+				cancelled = true;
 			} else {
 				LOG_WARNING() << "Patch (" << x << "," << y << "): deconvolution returned empty result";
 			}

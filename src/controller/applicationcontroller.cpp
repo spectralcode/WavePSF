@@ -436,12 +436,16 @@ void ApplicationController::runVolumetricDeconvolutionOnCurrentPatch()
 			   << psf3D.dims(1) << "x" << psf3D.dims(2);
 
 	// Show progress dialog for 3D RL iterations
-	QProgressDialog progress("Preparing 3D deconvolution...", QString(), 0, 0);
-	progress.setWindowTitle("3D Deconvolution");
+	this->psfModule->resetDeconvolutionCancel();
+	QProgressDialog progress(tr("Preparing 3D deconvolution..."), tr("Cancel"), 0, 0);
+	progress.setWindowTitle(tr("3D Deconvolution"));
 	progress.setWindowModality(Qt::ApplicationModal);
 	progress.setMinimumDuration(0);
 	progress.show();
 	QApplication::processEvents();
+
+	connect(&progress, &QProgressDialog::canceled,
+			this, &ApplicationController::cancelDeconvolution);
 
 	QMetaObject::Connection iterConn = connect(this->psfModule,
 		&PSFModule::deconvolutionIterationCompleted,
@@ -462,7 +466,11 @@ void ApplicationController::runVolumetricDeconvolutionOnCurrentPatch()
 	progress.close();
 
 	if (result.isempty()) {
-		LOG_WARNING() << "3D deconv: deconvolution returned empty result";
+		if (this->psfModule->wasDeconvolutionCancelled()) {
+			LOG_INFO() << "3D deconv: cancelled by user";
+		} else {
+			LOG_WARNING() << "3D deconv: deconvolution returned empty result";
+		}
 		return;
 	}
 	LOG_INFO() << "3D deconv: result" << result.dims(0) << "x"
@@ -923,6 +931,11 @@ void ApplicationController::startOptimization(const OptimizationConfig& uiConfig
 	// Worker resets cancelRequested to 0 at the start of runOptimization()
 	emit optimizationStarted();
 	emit runOptimizationOnWorker(config);
+}
+
+void ApplicationController::cancelDeconvolution()
+{
+	this->psfModule->requestDeconvolutionCancel();
 }
 
 void ApplicationController::cancelOptimization()

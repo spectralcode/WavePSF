@@ -279,6 +279,21 @@ void PSFModule::setAccelerationMode(int mode)
 	emit deconvolutionSettingsChanged();
 }
 
+void PSFModule::requestDeconvolutionCancel()
+{
+	this->deconvolver->requestDeconvolutionCancel();
+}
+
+void PSFModule::resetDeconvolutionCancel()
+{
+	this->deconvolver->resetDeconvolutionCancel();
+}
+
+bool PSFModule::wasDeconvolutionCancelled() const
+{
+	return this->deconvolver->wasDeconvolutionCancelled();
+}
+
 af::array PSFModule::computePSFFromCoefficients(const QVector<double>& coefficients)
 {
 	QVector<double> saved = this->generator->getAllCoefficients();

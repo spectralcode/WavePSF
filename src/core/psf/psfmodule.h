@@ -64,6 +64,11 @@ public slots:
 	void setVolumePaddingMode(int mode);
 	void setAccelerationMode(int mode);
 
+	// Cooperative deconvolution cancellation
+	void requestDeconvolutionCancel();
+	void resetDeconvolutionCancel();
+	bool wasDeconvolutionCancelled() const;
+
 	void clearCachedArrays();
 
 signals:
