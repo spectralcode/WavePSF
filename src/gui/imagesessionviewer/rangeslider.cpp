@@ -162,16 +162,29 @@ void RangeSlider::paintEvent(QPaintEvent*)
 				const double binWidth = domainRange / numBins;
 				p.setPen(Qt::NoPen);
 				p.setBrush(QColor(255, 255, 255, 100));
+				QVector<QPoint> envelope;
+				envelope.reserve(numBins);
 				for (int i = 0; i < numBins; ++i) {
-					if (this->histogram.bins[i] == 0) continue;
 					const double binLeft = this->histogram.domainMin + i * binWidth;
 					const double binRight = binLeft + binWidth;
 					const int x1 = valueToX(binLeft);
 					const int x2 = valueToX(binRight);
+					const int xMid = (x1 + x2) / 2;
+					if (this->histogram.bins[i] == 0) {
+						envelope.append(QPoint(xMid, bar.bottom()));
+						continue;
+					}
 					const int spanW = qMax(1, x2 - x1);
 					const double h = std::sqrt(static_cast<double>(this->histogram.bins[i])) / sqrtMax * barH() * 0.8;
 					const int barY = bar.bottom() - static_cast<int>(h);
 					p.drawRect(x1, barY, spanW, static_cast<int>(h));
+					envelope.append(QPoint(xMid, barY));
+				}
+				// Dark envelope polyline for visibility on bright LUTs
+				if (!envelope.isEmpty()) {
+					p.setBrush(Qt::NoBrush);
+					p.setPen(QPen(QColor(0, 0, 0, 140), 1.0));
+					p.drawPolyline(envelope.constData(), envelope.size());
 				}
 			}
 			p.restore();
