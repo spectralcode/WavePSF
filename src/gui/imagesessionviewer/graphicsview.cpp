@@ -136,7 +136,7 @@ void GraphicsView::mousePressEvent(QMouseEvent* event) {
 	if (event->button() == Qt::LeftButton && this->yPositionLine->isVisible()) {
 		if (this->yLineDistancePx(event->pos()) <= LINE_GRAB_TOLERANCE_PX) {
 			this->draggingYLine = true;
-			this->viewport()->setCursor(Qt::SplitVCursor);
+			this->viewport()->setCursor(this->lineCursorShape());
 			event->accept();
 			return;
 		}
@@ -185,9 +185,12 @@ void GraphicsView::mouseMoveEvent(QMouseEvent* event) {
 	if (this->yPositionLine->isVisible() && !(event->buttons())) {
 		bool nearLine = (this->yLineDistancePx(event->pos()) <= LINE_GRAB_TOLERANCE_PX);
 		if (nearLine) {
-			this->viewport()->setCursor(Qt::SplitVCursor);
-		} else if (this->viewport()->cursor().shape() == Qt::SplitVCursor) {
-			this->viewport()->unsetCursor();
+			this->viewport()->setCursor(this->lineCursorShape());
+		} else {
+			Qt::CursorShape cur = this->viewport()->cursor().shape();
+			if (cur == Qt::SplitVCursor || cur == Qt::SplitHCursor) {
+				this->viewport()->unsetCursor();
+			}
 		}
 	}
 }
@@ -208,6 +211,15 @@ qreal GraphicsView::yLineDistancePx(const QPoint& viewPos) const
 	QPointF p1 = mapFromScene(sceneLine.p1());
 	QPointF p2 = mapFromScene(sceneLine.p2());
 	return pointToSegmentDistancePx(QPointF(viewPos), p1, p2);
+}
+
+Qt::CursorShape GraphicsView::lineCursorShape() const
+{
+	QTransform t = this->transform();
+	// Scene-X direction in view space: line is horizontal in scene
+	return (std::abs(t.m12()) > std::abs(t.m11()))
+		? Qt::SplitHCursor   // line appears vertical on screen
+		: Qt::SplitVCursor;  // line appears horizontal on screen
 }
 
 void GraphicsView::keyPressEvent(QKeyEvent* event) {

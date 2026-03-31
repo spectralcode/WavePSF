@@ -44,6 +44,7 @@ private:
 	void contextMenuEvent(QContextMenuEvent* event) override;
 	void scaleView(qreal scaleFactor);
 	qreal yLineDistancePx(const QPoint& viewPos) const;
+	Qt::CursorShape lineCursorShape() const;
 
 	QString getFirstFileFromUrls(const QList<QUrl>& urls) const;
 	void setDropHighlight(bool highlight);
