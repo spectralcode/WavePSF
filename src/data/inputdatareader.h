@@ -70,6 +70,7 @@ public:
 
 	// Main interface
 	ImageData* loadFile(const QString& filePath);
+	ImageData* loadFolder(const QString& folderPath);
 
 private:
 	// ENVI file handling

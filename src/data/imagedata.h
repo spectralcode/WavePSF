@@ -58,6 +58,7 @@ public:
 	QVector<qreal> getWavelengths() const;
 	QString getWavelengthUnit() const;
 	QStringList getFrameNames() const;
+	void setFrameNames(const QStringList& names);
 
 	// Utility
 	QPair<double,double> getGlobalRange() const;

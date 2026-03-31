@@ -175,6 +175,13 @@ QStringList ImageData::getFrameNames() const
 	return this->frameNames;
 }
 
+void ImageData::setFrameNames(const QStringList& names)
+{
+	if (names.size() == this->frames) {
+		this->frameNames = names;
+	}
+}
+
 QPair<double,double> ImageData::getGlobalRange() const
 {
 	if (!this->globalRangeDirty) {

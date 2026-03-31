@@ -51,6 +51,7 @@ private slots:
 
 	// File operations
 	void openImageData();
+	void openImageFolder();
 	void openGroundTruth();
 	void saveParameters();
 	void loadParameters();
@@ -101,6 +102,7 @@ private:
 	QSize windowSize;
 	QPoint windowPosition;
 	QString lastOpenDirInput;
+	QString lastOpenDirFolder;
 	QString lastOpenDirGroundTruth;
 	QString lastNameFilterInput;
 	QString lastNameFilterGroundTruth;
@@ -122,6 +124,7 @@ private:
 
 	// File actions
 	QAction* openImageDataAction;
+	QAction* openImageFolderAction;
 	QAction* openGroundTruthAction;
 	QAction* saveParametersAction;
 	QAction* loadParametersAction;

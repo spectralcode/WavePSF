@@ -60,6 +60,34 @@ bool ApplicationController::openInputFile(const QString& filePath)
 	return this->loadFileToSession(filePath, false);
 }
 
+bool ApplicationController::openInputFolder(const QString& folderPath)
+{
+	if (this->inputDataReader == nullptr || this->imageSession == nullptr) {
+		LOG_ERROR() << "Components not initialized";
+		return false;
+	}
+
+	try {
+		LOG_INFO() << tr("Attempting to load folder: ") << folderPath;
+		ImageData* imageData = this->inputDataReader->loadFolder(folderPath);
+		if (imageData == nullptr) {
+			LOG_WARNING() << "Failed to load image data from folder:" << folderPath;
+			return false;
+		}
+
+		this->imageSession->setInputData(imageData);
+		LOG_INFO() << "Input folder loaded successfully:" << folderPath;
+		return true;
+
+	} catch (const QString& error) {
+		LOG_WARNING() << "Exception during folder loading:" << error << "folder:" << folderPath;
+		return false;
+	} catch (...) {
+		LOG_WARNING() << "Unknown exception during folder loading:" << folderPath;
+		return false;
+	}
+}
+
 bool ApplicationController::openGroundTruthFile(const QString& filePath)
 {
 	return this->loadFileToSession(filePath, true);
@@ -559,6 +587,15 @@ void ApplicationController::requestOpenInputFile(const QString& filePath)
 		emit inputFileLoaded(filePath);
 	} else {
 		emit fileLoadError(filePath, "Failed to load input file");
+	}
+}
+
+void ApplicationController::requestOpenInputFolder(const QString& folderPath)
+{
+	if (this->openInputFolder(folderPath)) {
+		emit inputFileLoaded(folderPath);
+	} else {
+		emit fileLoadError(folderPath, "Failed to load image folder");
 	}
 }
 

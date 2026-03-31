@@ -55,6 +55,7 @@ public:
 public slots:
 	// File loading with error handling
 	void requestOpenInputFile(const QString& filePath);
+	void requestOpenInputFolder(const QString& folderPath);
 	void requestOpenGroundTruthFile(const QString& filePath);
 
 	// Session state management - slots for GUI widgets
@@ -146,6 +147,7 @@ private slots:
 private:
 	// File operations
 	bool openInputFile(const QString& filePath);
+	bool openInputFolder(const QString& folderPath);
 	bool openGroundTruthFile(const QString& filePath);
 
 	void initializeComponents();

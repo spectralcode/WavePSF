@@ -41,7 +41,8 @@ namespace {
 	const QString KEY_WINDOW_SIZE      = QStringLiteral("window_size");
 	const QString KEY_WINDOW_POSITION  = QStringLiteral("window_position");
 	const QString KEY_WINDOW_MAXIMIZED = QStringLiteral("window_maximized");
-	const QString KEY_LAST_OPEN_DIR_INPUT = QStringLiteral("last_open_dir_input");
+	const QString KEY_LAST_OPEN_DIR_INPUT  = QStringLiteral("last_open_dir_input");
+	const QString KEY_LAST_OPEN_DIR_FOLDER = QStringLiteral("last_open_dir_folder");
 	const QString KEY_LAST_OPEN_DIR_GT    = QStringLiteral("last_open_dir_ground_truth");
 	const QString KEY_LAST_OPEN_DIR_COEFF  = QStringLiteral("last_open_dir_coefficients");
 	const QString KEY_LAST_OPEN_DIR_OUTPUT = QStringLiteral("last_open_dir_output");
@@ -162,6 +163,13 @@ void MainWindow::setupFileMenu() {
 	this->openImageDataAction->setStatusTip("Open hyperspectral or RGB image data");
 	connect(this->openImageDataAction, &QAction::triggered, this, &MainWindow::openImageData);
 	this->fileMenu->addAction(this->openImageDataAction);
+
+	// Open Image Folder action
+	this->openImageFolderAction = new QAction("Open Image &Folder...", this);
+	this->openImageFolderAction->setShortcut(QKeySequence("Ctrl+Shift+O"));
+	this->openImageFolderAction->setStatusTip("Open folder of images as multi-frame stack");
+	connect(this->openImageFolderAction, &QAction::triggered, this, &MainWindow::openImageFolder);
+	this->fileMenu->addAction(this->openImageFolderAction);
 
 	// Open Ground Truth action
 	this->openGroundTruthAction = new QAction("Open &Ground Truth...", this);
@@ -746,6 +754,23 @@ void MainWindow::openImageData() {
 	}
 }
 
+void MainWindow::openImageFolder() {
+	const QString initialDir = this->lastOpenDirFolder.isEmpty()
+		? QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+		: this->lastOpenDirFolder;
+
+	const QString folderPath = QFileDialog::getExistingDirectory(
+		this,
+		"Open Image Folder",
+		initialDir
+	);
+
+	if (!folderPath.isEmpty()) {
+		this->lastOpenDirFolder = folderPath;
+		this->applicationController->requestOpenInputFolder(folderPath);
+	}
+}
+
 void MainWindow::openGroundTruth() {
 	if (!this->applicationController->hasInputData()) {
 		//NOTIFY_NOTICE("Please open image data first before loading ground truth.");
@@ -881,7 +906,8 @@ void MainWindow::loadSettings() {
 
 	this->windowSize         = settings.value(KEY_WINDOW_SIZE,     QSize(1200, 800)).toSize();
 	this->windowPosition     = settings.value(KEY_WINDOW_POSITION,  QPoint(100, 100)).toPoint();
-	this->lastOpenDirInput   = settings.value(KEY_LAST_OPEN_DIR_INPUT, QString()).toString();
+	this->lastOpenDirInput   = settings.value(KEY_LAST_OPEN_DIR_INPUT,  QString()).toString();
+	this->lastOpenDirFolder  = settings.value(KEY_LAST_OPEN_DIR_FOLDER, QString()).toString();
 	this->lastOpenDirGroundTruth    = settings.value(KEY_LAST_OPEN_DIR_GT,   QString()).toString();
 	this->lastNameFilterInput       = settings.value(KEY_LAST_FILTER_INPUT,  QString()).toString();
 	this->lastNameFilterGroundTruth = settings.value(KEY_LAST_FILTER_GT,     QString()).toString();
@@ -936,7 +962,8 @@ void MainWindow::saveSettings() {
 	settings[KEY_WINDOW_SIZE]      = this->windowSize;
 	settings[KEY_WINDOW_POSITION]  = this->windowPosition;
 	settings[KEY_WINDOW_MAXIMIZED] = this->isMaximized();
-	settings[KEY_LAST_OPEN_DIR_INPUT] = this->lastOpenDirInput;
+	settings[KEY_LAST_OPEN_DIR_INPUT]  = this->lastOpenDirInput;
+	settings[KEY_LAST_OPEN_DIR_FOLDER] = this->lastOpenDirFolder;
 	settings[KEY_LAST_OPEN_DIR_GT]    = this->lastOpenDirGroundTruth;
 	settings[KEY_LAST_FILTER_INPUT]   = this->lastNameFilterInput;
 	settings[KEY_LAST_FILTER_GT]      = this->lastNameFilterGroundTruth;

@@ -14,6 +14,7 @@
 #include <QDebug>
 #include <QImage>
 #include <QImageReader>
+#include <QCollator>
 #include <cstring>
 #include "utils/supportedfilechecker.h"
 #include "omp.h"
@@ -605,4 +606,126 @@ void InputDataReader::copyArrayFireDataToBuffer(const af::array& afData, void* b
 	} catch (const af::exception& e) {
 		LOG_WARNING() << ": ArrayFire exception during buffer copy:" << e.what();
 	}
+}
+
+ImageData* InputDataReader::loadFolder(const QString& folderPath)
+{
+	QDir dir(folderPath);
+	if (!dir.exists()) {
+		LOG_WARNING() << "Folder does not exist:" << folderPath;
+		return nullptr;
+	}
+
+	// Collect image files
+	QStringList filters;
+	filters << "*.tif" << "*.tiff" << "*.png" << "*.jpg" << "*.jpeg" << "*.bmp";
+	QFileInfoList fileInfoList = dir.entryInfoList(filters, QDir::Files | QDir::Readable);
+
+	if (fileInfoList.isEmpty()) {
+		LOG_WARNING() << "No supported image files found in folder:" << folderPath;
+		return nullptr;
+	}
+
+	// Natural sort so 1, 2, 10 sorts correctly instead of 1, 10, 2
+	QCollator collator;
+	collator.setNumericMode(true);
+	std::sort(fileInfoList.begin(), fileInfoList.end(), [&collator](const QFileInfo& a, const QFileInfo& b) {
+		return collator.compare(a.fileName(), b.fileName()) < 0;
+	});
+
+	// Single file → delegate to loadFile()
+	if (fileInfoList.size() == 1) {
+		return this->loadFile(fileInfoList.first().absoluteFilePath());
+	}
+
+	// Load first file to get reference dimensions
+	ImageData* firstImage = this->loadStandardImage(fileInfoList.first().absoluteFilePath());
+	if (firstImage == nullptr) {
+		LOG_WARNING() << "Failed to load first image in folder:" << fileInfoList.first().absoluteFilePath();
+		return nullptr;
+	}
+
+	if (firstImage->getFrames() != 1) {
+		LOG_WARNING() << "First image in folder is multi-frame — folder stacking requires single-frame images";
+		delete firstImage;
+		return nullptr;
+	}
+
+	int width = firstImage->getWidth();
+	int height = firstImage->getHeight();
+	EnviDataType dataType = firstImage->getDataType();
+	size_t bytesPerSample = firstImage->getBytesPerSample();
+	size_t frameBytes = static_cast<size_t>(width) * height * bytesPerSample;
+	int totalFiles = fileInfoList.size();
+
+	// Allocate contiguous buffer for all frames
+	void* buffer = malloc(frameBytes * totalFiles);
+	if (buffer == nullptr) {
+		LOG_WARNING() << "Failed to allocate buffer for folder stack (" << frameBytes * totalFiles << " bytes)";
+		delete firstImage;
+		return nullptr;
+	}
+
+	// Copy first frame into buffer
+	std::memcpy(buffer, firstImage->getData(0), frameBytes);
+	delete firstImage;
+
+	QStringList frameNames;
+	frameNames << fileInfoList.first().baseName();
+	int loadedFrames = 1;
+
+	// Load remaining files
+	for (int i = 1; i < totalFiles; i++) {
+		emit progressChanged(static_cast<int>(100.0 * i / totalFiles));
+
+		ImageData* img = this->loadStandardImage(fileInfoList[i].absoluteFilePath());
+		if (img == nullptr) {
+			LOG_WARNING() << "Skipping unreadable file:" << fileInfoList[i].fileName();
+			continue;
+		}
+
+		if (img->getFrames() != 1) {
+			LOG_WARNING() << "Skipping multi-frame file:" << fileInfoList[i].fileName();
+			delete img;
+			continue;
+		}
+
+		if (img->getWidth() != width || img->getHeight() != height || img->getDataType() != dataType) {
+			LOG_WARNING() << "Skipping file with mismatched dimensions/type:" << fileInfoList[i].fileName();
+			delete img;
+			continue;
+		}
+
+		char* dst = static_cast<char*>(buffer) + static_cast<size_t>(loadedFrames) * frameBytes;
+		std::memcpy(dst, img->getData(0), frameBytes);
+		delete img;
+
+		frameNames << fileInfoList[i].baseName();
+		loadedFrames++;
+	}
+
+	emit progressChanged(100);
+
+	if (loadedFrames == 0) {
+		LOG_WARNING() << "No valid single-frame images found in folder:" << folderPath;
+		free(buffer);
+		return nullptr;
+	}
+
+	// Shrink buffer if some files were skipped
+	if (loadedFrames < totalFiles) {
+		void* shrunk = realloc(buffer, frameBytes * loadedFrames);
+		if (shrunk != nullptr) {
+			buffer = shrunk;
+		}
+	}
+
+	QVector<qreal> emptyWavelengths;
+	ImageData* result = new ImageData(buffer, width, height, loadedFrames, dataType, emptyWavelengths, QString(), this);
+	result->setFrameNames(frameNames);
+
+	LOG_INFO() << "Loaded folder as stack:" << loadedFrames << "frames from" << totalFiles << "files in" << folderPath;
+	emit fileLoaded(folderPath);
+
+	return result;
 }
