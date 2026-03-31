@@ -245,6 +245,16 @@ HistogramMode DisplayControlBar::getHistogramMode() const
 	return this->histogramMode;
 }
 
+void DisplayControlBar::setSliderExpanded(bool expanded)
+{
+	this->rangeSlider->setExpanded(expanded);
+}
+
+bool DisplayControlBar::isSliderExpanded() const
+{
+	return this->rangeSlider->isExpanded();
+}
+
 void DisplayControlBar::contextMenuEvent(QContextMenuEvent* event)
 {
 	QMenu menu(this);
@@ -265,6 +275,11 @@ void DisplayControlBar::contextMenuEvent(QContextMenuEvent* event)
 	histOff->setChecked(this->histogramMode == HistogramMode::Off);
 	histInput->setChecked(this->histogramMode == HistogramMode::InputFrame);
 	histOutput->setChecked(this->histogramMode == HistogramMode::OutputFrame);
+
+	menu.addSeparator();
+	QAction* enlargedSlider = menu.addAction(tr("Enlarged Slider"));
+	enlargedSlider->setCheckable(true);
+	enlargedSlider->setChecked(this->rangeSlider->isExpanded());
 
 	QAction* chosen = menu.exec(event->globalPos());
 	if (chosen == inputFrame) {
@@ -301,6 +316,8 @@ void DisplayControlBar::contextMenuEvent(QContextMenuEvent* event)
 		this->setHistogramMode(HistogramMode::InputFrame);
 	} else if (chosen == histOutput) {
 		this->setHistogramMode(HistogramMode::OutputFrame);
+	} else if (chosen == enlargedSlider) {
+		this->rangeSlider->setExpanded(!this->rangeSlider->isExpanded());
 	}
 }
 

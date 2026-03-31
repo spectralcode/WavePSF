@@ -20,6 +20,8 @@ public:
 	void setHistogram(const HistogramData& hist);
 	void clearHistogram();
 	void setIntegerMode(bool intMode);
+	void setExpanded(bool expanded);
+	bool isExpanded() const { return this->expanded; }
 
 	double low() const { return this->lowValue; }
 	double high() const { return this->highValue; }
@@ -54,6 +56,7 @@ private:
 	QVector<QRgb> lutColors;
 	HistogramData histogram;
 	bool integerMode;
+	bool expanded;
 
 	enum DragTarget { None, Low, High, Both };
 	DragTarget dragging;
@@ -62,9 +65,9 @@ private:
 	QLineEdit* activeEditor;
 	DragTarget editTarget;
 
+	int barH() const { return this->expanded ? 40 : 12; }
+	int handleH() const { return this->expanded ? 44 : 18; }
 	static const int HANDLE_W = 8;
-	static const int HANDLE_H = 18;
-	static const int BAR_H = 12;
 	static const int MARGIN = HANDLE_W / 2 + 2;
 };
 

@@ -30,6 +30,8 @@ public:
 	void clearOutputHistogram();
 	void setHistogramMode(HistogramMode mode);
 	HistogramMode getHistogramMode() const;
+	void setSliderExpanded(bool expanded);
+	bool isSliderExpanded() const;
 
 signals:
 	void settingsChanged(const DisplaySettings& settings);

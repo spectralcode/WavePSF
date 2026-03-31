@@ -15,6 +15,7 @@ RangeSlider::RangeSlider(QWidget* parent)
 	, integerMode(true)
 	, dragging(None)
 	, dragOffset(0.0)
+	, expanded(false)
 	, activeEditor(nullptr)
 	, editTarget(None)
 {
@@ -65,6 +66,14 @@ void RangeSlider::setIntegerMode(bool intMode)
 	update();
 }
 
+void RangeSlider::setExpanded(bool exp)
+{
+	if (this->expanded == exp) return;
+	this->expanded = exp;
+	updateGeometry();
+	update();
+}
+
 QString RangeSlider::formatValue(double v) const
 {
 	if (this->integerMode) {
@@ -75,8 +84,8 @@ QString RangeSlider::formatValue(double v) const
 
 QRect RangeSlider::barRect() const
 {
-	int y = (height() - BAR_H) / 2;
-	return QRect(MARGIN, y, width() - 2 * MARGIN, BAR_H);
+	int y = (height() - barH()) / 2;
+	return QRect(MARGIN, y, width() - 2 * MARGIN, barH());
 }
 
 int RangeSlider::valueToX(double value) const
@@ -113,12 +122,12 @@ void RangeSlider::paintEvent(QPaintEvent*)
 
 	// Fill region left of low handle with clamped first color
 	if (xLow > bar.left()) {
-		p.fillRect(QRect(bar.left(), bar.top(), xLow - bar.left(), BAR_H), QColor(firstColor));
+		p.fillRect(QRect(bar.left(), bar.top(), xLow - bar.left(), barH()), QColor(firstColor));
 	}
 
 	// Fill region right of high handle with clamped last color
 	if (xHigh < bar.right()) {
-		p.fillRect(QRect(xHigh, bar.top(), bar.right() - xHigh + 1, BAR_H), QColor(lastColor));
+		p.fillRect(QRect(xHigh, bar.top(), bar.right() - xHigh + 1, barH()), QColor(lastColor));
 	}
 
 	// Draw LUT gradient only between the two handles
@@ -133,7 +142,7 @@ void RangeSlider::paintEvent(QPaintEvent*)
 				strip.setPixel(x, 0, qRgb(idx, idx, idx));
 			}
 		}
-		QPixmap gradPx = QPixmap::fromImage(strip.scaled(gradientWidth, BAR_H, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+		QPixmap gradPx = QPixmap::fromImage(strip.scaled(gradientWidth, barH(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
 		p.drawPixmap(xLow, bar.top(), gradPx);
 	}
 
@@ -160,7 +169,7 @@ void RangeSlider::paintEvent(QPaintEvent*)
 					const int x1 = valueToX(binLeft);
 					const int x2 = valueToX(binRight);
 					const int spanW = qMax(1, x2 - x1);
-					const double h = std::sqrt(static_cast<double>(this->histogram.bins[i])) / sqrtMax * BAR_H * 0.8;
+					const double h = std::sqrt(static_cast<double>(this->histogram.bins[i])) / sqrtMax * barH() * 0.8;
 					const int barY = bar.bottom() - static_cast<int>(h);
 					p.drawRect(x1, barY, spanW, static_cast<int>(h));
 				}
@@ -176,8 +185,8 @@ void RangeSlider::paintEvent(QPaintEvent*)
 
 	// Draw handles
 	auto drawHandle = [&](int cx, bool active) {
-		int hy = (height() - HANDLE_H) / 2;
-		QRect hr(cx - HANDLE_W / 2, hy, HANDLE_W, HANDLE_H);
+		int hy = (height() - handleH()) / 2;
+		QRect hr(cx - HANDLE_W / 2, hy, HANDLE_W, handleH());
 		p.setPen(QPen(active ? palette().highlight().color() : palette().dark().color(), 1));
 		p.setBrush(palette().button());
 		p.drawRoundedRect(hr, 2, 2);
@@ -414,10 +423,10 @@ bool RangeSlider::isNearHandle(int x) const
 
 QSize RangeSlider::sizeHint() const
 {
-	return QSize(200, HANDLE_H + 4);
+	return QSize(200, handleH() + 4);
 }
 
 QSize RangeSlider::minimumSizeHint() const
 {
-	return QSize(80, HANDLE_H + 4);
+	return QSize(80, handleH() + 4);
 }
