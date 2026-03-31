@@ -51,8 +51,8 @@ PSFGenerationWidget::PSFGenerationWidget(QWidget* parent)
 
 	// Browse buttons at top
 	QHBoxLayout* fbButtonLayout = new QHBoxLayout();
-	QPushButton* browseFolderBtn = new QPushButton(tr("Browse Folder..."), this);
-	QPushButton* browseFileBtn = new QPushButton(tr("Browse File..."), this);
+	QPushButton* browseFolderBtn = new QPushButton(tr("Open Folder..."), this);
+	QPushButton* browseFileBtn = new QPushButton(tr("Open File..."), this);
 	fbButtonLayout->addWidget(browseFolderBtn);
 	fbButtonLayout->addWidget(browseFileBtn);
 	fbButtonLayout->addStretch();
