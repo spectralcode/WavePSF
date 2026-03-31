@@ -92,6 +92,14 @@ void PSFPreviewWidget::updateImage(af::array psf)
 	}
 }
 
+void PSFPreviewWidget::clearPreview()
+{
+	this->pixmapItem->setPixmap(QPixmap());
+	this->currentImage = QImage();
+	this->lastWidth = 0;
+	this->lastHeight = 0;
+}
+
 bool PSFPreviewWidget::eventFilter(QObject* obj, QEvent* event)
 {
 	if (obj != this->view->viewport()) {

@@ -248,6 +248,12 @@ void ApplicationController::switchGenerator(const QString& typeName)
 
 	// Load coefficients for current patch from the restored/fresh table
 	this->loadCoefficientsForCurrentPatch();
+
+	// Ensure a PSF is generated even when no input data is loaded
+	// (loadCoefficientsForCurrentPatch early-returns without input data)
+	if (this->psfModule->getCurrentPSF().isempty()) {
+		this->psfModule->refreshPSF();
+	}
 }
 
 void ApplicationController::applyInlineSettings(const QVariantMap& settings)

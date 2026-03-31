@@ -16,6 +16,7 @@ public:
 public slots:
 	void updatePSF(af::array psf3D);
 	void setFrameIndex(int frame);
+	void clearPreview();
 
 private:
 	void renderXYSlice(int zIndex);

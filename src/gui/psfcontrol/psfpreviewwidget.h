@@ -18,6 +18,7 @@ public:
 
 public slots:
 	void updateImage(af::array psf);
+	void clearPreview();
 
 protected:
 	bool eventFilter(QObject* obj, QEvent* event) override;

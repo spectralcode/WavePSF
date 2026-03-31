@@ -198,6 +198,23 @@ void PSF3DPreviewWidget::setFrameIndex(int frame)
 	this->renderXYSlice(z);
 }
 
+void PSF3DPreviewWidget::clearPreview()
+{
+	this->psfVolume = af::array();
+	this->volumeMaxVal = 0.0f;
+
+	this->xyPanel->setImage(QImage());
+	this->xzPanel->setImage(QImage());
+
+	this->xyPanel->setSliderRange(0, 0);
+	this->xzPanel->setSliderRange(0, 0);
+	this->xyPanel->setSliderValue(0);
+	this->xzPanel->setSliderValue(0);
+
+	this->xyPanel->setTitle(tr("XY Slice"));
+	this->xzPanel->setTitle(tr("XZ Section"));
+}
+
 void PSF3DPreviewWidget::reRenderAll()
 {
 	if (this->psfVolume.isempty()) return;

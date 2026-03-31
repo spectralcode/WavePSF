@@ -16,6 +16,7 @@ class RWSettingsWidget;
 class QComboBox;
 class QLabel;
 class QPushButton;
+class QSplitter;
 class QStackedWidget;
 
 class PSFGenerationWidget : public QGroupBox
@@ -60,6 +61,7 @@ private:
 	RWSettingsWidget* rwSettingsWidget;
 	QWidget* fileBrowserWidget;
 	QLabel* fileSourceLabel;
+	QSplitter* contentSplitter;
 	QWidget* coefficientContainer;
 	QWidget* wavefrontContainer;
 	PSFSettings currentSettings;

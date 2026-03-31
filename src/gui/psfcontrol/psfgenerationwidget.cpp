@@ -63,18 +63,20 @@ PSFGenerationWidget::PSFGenerationWidget(QWidget* parent)
 	connect(browseFolderBtn, &QPushButton::clicked, this, &PSFGenerationWidget::browseForFolder);
 	connect(browseFileBtn, &QPushButton::clicked, this, &PSFGenerationWidget::browseForFile);
 
-	// Content: coefficients (left) | wavefront + PSF (right)
-	QHBoxLayout* contentLayout = new QHBoxLayout();
+	// Content: top row (coefficients + wavefront) | bottom (PSF preview)
+	this->contentSplitter = new QSplitter(Qt::Vertical, this);
+
+	// Top row: coefficients (left) + wavefront (right)
+	QWidget* topRow = new QWidget(this);
+	QHBoxLayout* topRowLayout = new QHBoxLayout(topRow);
+	topRowLayout->setContentsMargins(0, 0, 0, 0);
 
 	this->coefficientContainer = new QWidget(this);
 	QVBoxLayout* coeffLayout = new QVBoxLayout(this->coefficientContainer);
 	coeffLayout->setContentsMargins(0, 0, 0, 0);
 	this->coeffEditor = new CoefficientEditorWidget(this);
 	coeffLayout->addWidget(this->coeffEditor);
-	contentLayout->addWidget(this->coefficientContainer, 1);
-
-	// Right column: wavefront plot (top) + PSF preview (bottom), resizable via splitter
-	QSplitter* rightSplitter = new QSplitter(Qt::Vertical, this);
+	topRowLayout->addWidget(this->coefficientContainer, 1);
 
 	this->wavefrontContainer = new QWidget(this);
 	QVBoxLayout* wfLayout = new QVBoxLayout(this->wavefrontContainer);
@@ -82,9 +84,11 @@ PSFGenerationWidget::PSFGenerationWidget(QWidget* parent)
 	this->wavefrontPlot = new WavefrontPlotWidget(this);
 	wfLayout->addWidget(new QLabel(tr("Wavefront"), this));
 	wfLayout->addWidget(this->wavefrontPlot, 1);
-	rightSplitter->addWidget(this->wavefrontContainer);
+	topRowLayout->addWidget(this->wavefrontContainer, 2);
 
-	// PSF preview: stacked widget for 2D/3D modes
+	this->contentSplitter->addWidget(topRow);
+
+	// Bottom: PSF preview (stacked widget for 2D/3D modes)
 	QWidget* psfContainer = new QWidget(this);
 	QVBoxLayout* psfLayout = new QVBoxLayout(psfContainer);
 	psfLayout->setContentsMargins(0, 0, 0, 0);
@@ -95,11 +99,11 @@ PSFGenerationWidget::PSFGenerationWidget(QWidget* parent)
 	this->psf3DPreview = new PSF3DPreviewWidget(this);
 	this->psfPreviewStack->addWidget(this->psf3DPreview);     // page 1: 3D
 	psfLayout->addWidget(this->psfPreviewStack, 1);
-	rightSplitter->addWidget(psfContainer);
+	this->contentSplitter->addWidget(psfContainer);
 
-	contentLayout->addWidget(rightSplitter, 4);
-
-	mainLayout->addLayout(contentLayout, 1);
+	this->contentSplitter->setStretchFactor(0, 1);
+	this->contentSplitter->setStretchFactor(1, 1);
+	mainLayout->addWidget(this->contentSplitter, 1);
 
 	// Connect signals
 	connect(this->generatorTypeCombo, QOverload<const QString&>::of(&QComboBox::currentTextChanged),
@@ -163,12 +167,20 @@ void PSFGenerationWidget::updateWavefront(af::array wavefront)
 void PSFGenerationWidget::updatePSF(af::array psf)
 {
 	bool isFileMode = (this->currentSettings.generatorTypeName == QStringLiteral("From File"));
-	bool is3D = (psf.numdims() > 2 && psf.dims(2) > 1);
-	if (isFileMode || is3D) {
-		this->psfPreviewStack->setCurrentIndex(1);
+	bool is3DMode = (this->currentSettings.generatorTypeName == QStringLiteral("3D PSF Microscopy"));
+	bool show3D = isFileMode || is3DMode || (psf.numdims() > 2 && psf.dims(2) > 1);
+
+	this->psfPreviewStack->setCurrentIndex(show3D ? 1 : 0);
+
+	if (psf.isempty()) {
+		this->psfPreview->clearPreview();
+		this->psf3DPreview->clearPreview();
+		return;
+	}
+
+	if (show3D) {
 		this->psf3DPreview->updatePSF(psf);
 	} else {
-		this->psfPreviewStack->setCurrentIndex(0);
 		this->psfPreview->updateImage(psf);
 	}
 }

@@ -52,7 +52,7 @@ CoefficientEditorWidget::CoefficientEditorWidget(QWidget* parent)
 	QWidget* scrollContent = new QWidget(scrollArea);
 	this->scrollLayout = new QVBoxLayout(scrollContent);
 	this->scrollLayout->setContentsMargins(4, 0, 4, 0);
-	this->scrollLayout->setSpacing(10);
+	this->scrollLayout->setSpacing(2);
 	this->scrollLayout->addStretch();
 
 	scrollArea->setWidget(scrollContent);
@@ -191,7 +191,7 @@ void CoefficientEditorWidget::buildRows()
 		QWidget* rowWidget = new QWidget(this);
 		QVBoxLayout* rowLayout = new QVBoxLayout(rowWidget);
 		rowLayout->setContentsMargins(0, 2, 0, 2);
-		rowLayout->setSpacing(2);
+		rowLayout->setSpacing(1);
 
 		// Line 1: Noll index and name
 		QLabel* label = new QLabel(QString("%1. %2").arg(desc.id).arg(desc.name), rowWidget);
