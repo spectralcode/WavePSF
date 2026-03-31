@@ -525,7 +525,7 @@ void MainWindow::connectImageSessionViewer() {
 		        this->toggleCrossSectionAction, &QAction::setChecked);
 
 		connect(this->applicationController, &ApplicationController::imageSessionChanged,
-		        csWidget, [csWidget](ImageSession* session) {
+		        csWidget, [this, csWidget](ImageSession* session) {
 			if (session && session->hasInputData()) {
 				csWidget->setInputData(session->getInputData());
 			} else {
