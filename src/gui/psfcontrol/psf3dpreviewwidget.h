@@ -5,6 +5,7 @@
 #include <QImage>
 #include <arrayfire.h>
 
+class QMenu;
 class SliceViewerWidget;
 
 class PSF3DPreviewWidget : public QWidget
@@ -17,6 +18,7 @@ public slots:
 	void updatePSF(af::array psf3D);
 	void setFrameIndex(int frame);
 	void clearPreview();
+	void setLutName(const QString& name);
 
 private:
 	void renderXYSlice(int zIndex);
@@ -30,8 +32,10 @@ private:
 	bool normalizePerSlice;
 	bool logScale;
 	bool syncToDataFrame;
+	QString lutName = QStringLiteral("Grayscale");
 	SliceViewerWidget* xyPanel;
 	SliceViewerWidget* xzPanel;
+	QMenu* lutSubmenu;
 };
 
 #endif // PSF3DPREVIEWWIDGET_H

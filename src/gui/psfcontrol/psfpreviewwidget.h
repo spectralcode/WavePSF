@@ -19,6 +19,7 @@ public:
 public slots:
 	void updateImage(af::array psf);
 	void clearPreview();
+	void setLutName(const QString& name);
 
 protected:
 	bool eventFilter(QObject* obj, QEvent* event) override;
@@ -34,6 +35,8 @@ private:
 	QGraphicsScene* scene;
 	QGraphicsPixmapItem* pixmapItem;
 	QImage currentImage;
+	af::array lastPSF;
+	QString lutName = QStringLiteral("Grayscale");
 	int lastWidth;
 	int lastHeight;
 };

@@ -6,6 +6,7 @@
 #include <QList>
 
 class QAction;
+class QMenu;
 class QGraphicsView;
 class QGraphicsScene;
 class QGraphicsPixmapItem;
@@ -28,6 +29,7 @@ public:
 	void setTitle(const QString& text);
 	void setValueLabel(const QString& text);
 	void addContextMenuAction(QAction* action);
+	void addContextMenuSubmenu(QMenu* submenu);
 
 signals:
 	void sliceChanged(int value);
@@ -54,6 +56,7 @@ private:
 	int lastWidth;
 	int lastHeight;
 	QList<QAction*> extraActions;
+	QList<QMenu*> extraSubmenus;
 };
 
 #endif // SLICEVIEWERWIDGET_H

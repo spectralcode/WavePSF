@@ -153,6 +153,9 @@ bool SliceViewerWidget::eventFilter(QObject* obj, QEvent* event)
 			for (QAction* action : qAsConst(this->extraActions)) {
 				menu.addAction(action);
 			}
+			for (QMenu* submenu : qAsConst(this->extraSubmenus)) {
+				menu.addMenu(submenu);
+			}
 			menu.exec(contextEvent->globalPos());
 			return true;
 		}
@@ -213,4 +216,9 @@ void SliceViewerWidget::goToCenter()
 void SliceViewerWidget::addContextMenuAction(QAction* action)
 {
 	this->extraActions.append(action);
+}
+
+void SliceViewerWidget::addContextMenuSubmenu(QMenu* submenu)
+{
+	this->extraSubmenus.append(submenu);
 }

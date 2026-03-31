@@ -1,7 +1,9 @@
 #include "psf3dpreviewwidget.h"
 #include "sliceviewerwidget.h"
+#include "gui/lut.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QMenu>
 #include <QAction>
 #include <QFileDialog>
 #include <QFile>
@@ -59,14 +61,27 @@ PSF3DPreviewWidget::PSF3DPreviewWidget(QWidget* parent)
 		this->syncToDataFrame = checked;
 	});
 
+	// Colormap submenu shared by both panels
+	this->lutSubmenu = new QMenu(tr("Colormap"), this);
+	for (const QString& name : LUT::availableNames()) {
+		QAction* action = this->lutSubmenu->addAction(QIcon(LUT::getPreviewPixmap(name, 64, 12)), name);
+		action->setCheckable(true);
+		action->setChecked(name == this->lutName);
+		connect(action, &QAction::triggered, this, [this, name]() {
+			this->setLutName(name);
+		});
+	}
+
 	this->xyPanel->addContextMenuAction(normalizeAction);
 	this->xyPanel->addContextMenuAction(logScaleAction);
 	this->xyPanel->addContextMenuAction(saveVolumeAction);
 	this->xyPanel->addContextMenuAction(syncFrameAction);
+	this->xyPanel->addContextMenuSubmenu(this->lutSubmenu);
 	this->xzPanel->addContextMenuAction(normalizeAction);
 	this->xzPanel->addContextMenuAction(logScaleAction);
 	this->xzPanel->addContextMenuAction(saveVolumeAction);
 	this->xzPanel->addContextMenuAction(syncFrameAction);
+	this->xzPanel->addContextMenuSubmenu(this->lutSubmenu);
 }
 
 void PSF3DPreviewWidget::updatePSF(af::array psf3D)
@@ -159,7 +174,8 @@ QImage PSF3DPreviewWidget::renderSliceToImage(const af::array& slice2D, float gl
 		return QImage(cols, rows, QImage::Format_Grayscale8);
 	}
 
-	QImage img(cols, rows, QImage::Format_Grayscale8);
+	QImage img(cols, rows, QImage::Format_Indexed8);
+	img.setColorTable(LUT::get(this->lutName));
 
 	if (this->logScale) {
 		const float alpha = 1000.0f;
@@ -213,6 +229,15 @@ void PSF3DPreviewWidget::clearPreview()
 
 	this->xyPanel->setTitle(tr("XY Slice"));
 	this->xzPanel->setTitle(tr("XZ Section"));
+}
+
+void PSF3DPreviewWidget::setLutName(const QString& name)
+{
+	this->lutName = name;
+	for (QAction* a : this->lutSubmenu->actions()) {
+		a->setChecked(a->text() == name);
+	}
+	this->reRenderAll();
 }
 
 void PSF3DPreviewWidget::reRenderAll()

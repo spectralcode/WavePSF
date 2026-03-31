@@ -1,4 +1,5 @@
 #include "psfpreviewwidget.h"
+#include "gui/lut.h"
 #include <QVBoxLayout>
 #include <QGraphicsView>
 #include <QGraphicsScene>
@@ -47,6 +48,8 @@ void PSFPreviewWidget::updateImage(af::array psf)
 {
 	if (psf.isempty()) return;
 
+	this->lastPSF = psf;
+
 	// Extract focal plane if PSF is 3D
 	if (psf.numdims() > 2 && psf.dims(2) > 1) {
 		int centerZ = static_cast<int>(psf.dims(2)) / 2;
@@ -68,8 +71,9 @@ void PSFPreviewWidget::updateImage(af::array psf)
 
 	if (maxVal <= 0.0f) return;
 
-	// Convert to grayscale QImage using log scale for better visibility
-	this->currentImage = QImage(cols, rows, QImage::Format_Grayscale8);
+	// Convert to QImage using log scale for better visibility
+	this->currentImage = QImage(cols, rows, QImage::Format_Indexed8);
+	this->currentImage.setColorTable(LUT::get(this->lutName));
 	float logMax = qLn(1.0f + maxVal);
 
 	for (int y = 0; y < rows; ++y) {
@@ -96,6 +100,7 @@ void PSFPreviewWidget::clearPreview()
 {
 	this->pixmapItem->setPixmap(QPixmap());
 	this->currentImage = QImage();
+	this->lastPSF = af::array();
 	this->lastWidth = 0;
 	this->lastHeight = 0;
 }
@@ -122,9 +127,18 @@ bool PSFPreviewWidget::eventFilter(QObject* obj, QEvent* event)
 		case QEvent::ContextMenu: {
 			QContextMenuEvent* contextEvent = static_cast<QContextMenuEvent*>(event);
 			QMenu menu(this);
+			QMenu* colormapMenu = menu.addMenu(tr("Colormap"));
+			for (const QString& name : LUT::availableNames()) {
+				QAction* action = colormapMenu->addAction(QIcon(LUT::getPreviewPixmap(name, 64, 12)), name);
+				action->setCheckable(true);
+				action->setChecked(name == this->lutName);
+			}
 			QAction* saveAction = menu.addAction(tr("Save image..."));
 			connect(saveAction, &QAction::triggered, this, &PSFPreviewWidget::saveImage);
-			menu.exec(contextEvent->globalPos());
+			QAction* chosen = menu.exec(contextEvent->globalPos());
+			if (chosen && colormapMenu->actions().contains(chosen)) {
+				this->setLutName(chosen->text());
+			}
 			return true;
 		}
 
@@ -148,6 +162,14 @@ void PSFPreviewWidget::showEvent(QShowEvent* event)
 	QWidget::showEvent(event);
 	if (!this->currentImage.isNull()) {
 		this->fitToView();
+	}
+}
+
+void PSFPreviewWidget::setLutName(const QString& name)
+{
+	this->lutName = name;
+	if (!this->lastPSF.isempty()) {
+		this->updateImage(this->lastPSF);
 	}
 }
 
