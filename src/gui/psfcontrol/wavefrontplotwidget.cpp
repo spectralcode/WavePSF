@@ -393,8 +393,8 @@ void WavefrontPlotWidget::setupContextMenu()
 
 	this->contextMenu->addSeparator();
 
-	// Color map submenu
-	QMenu* colorMapMenu = new QMenu(tr("Color Map"), this->contextMenu);
+	// Colormap submenu
+	QMenu* colorMapMenu = new QMenu(tr("Colormap"), this->contextMenu);
 	this->gradientGroup = new QActionGroup(this);
 	this->gradientGroup->setExclusive(true);
 
