@@ -13,6 +13,7 @@
 #include "core/interpolation/interpolationorchestrator.h"
 #include "core/psf/psfgridgenerator.h"
 #include "utils/logging.h"
+#include <QFileInfo>
 #include "utils/settingsfilemanager.h"
 #include "utils/afdevicemanager.h"
 #include <QProgressDialog>
@@ -583,6 +584,12 @@ void ApplicationController::broadcastCurrentState()
 
 void ApplicationController::requestOpenInputFile(const QString& filePath)
 {
+	// Route folder paths to folder loader (e.g. from recent files menu)
+	if (QFileInfo(filePath).isDir()) {
+		this->requestOpenInputFolder(filePath);
+		return;
+	}
+
 	if (this->openInputFile(filePath)) {
 		emit inputFileLoaded(filePath);
 	} else {
