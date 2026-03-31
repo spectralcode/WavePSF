@@ -14,6 +14,18 @@
 #include <cmath>
 #include "utils/supportedfilechecker.h"
 
+static constexpr qreal LINE_GRAB_TOLERANCE_PX = 5.0;
+
+static qreal pointToSegmentDistancePx(const QPointF& point, const QPointF& p1, const QPointF& p2)
+{
+	QPointF d = p2 - p1;
+	qreal lenSq = d.x() * d.x() + d.y() * d.y();
+	if (lenSq < 1e-12) return QLineF(point, p1).length();
+	qreal t = qBound(0.0, ((point.x() - p1.x()) * d.x() + (point.y() - p1.y()) * d.y()) / lenSq, 1.0);
+	QPointF closest(p1.x() + t * d.x(), p1.y() + t * d.y());
+	return QLineF(point, closest).length();
+}
+
 GraphicsView::GraphicsView(QWidget* parent) : QGraphicsView(parent)
 {
 	this->scene = new QGraphicsScene(this);
@@ -122,9 +134,7 @@ void GraphicsView::mouseDoubleClickEvent(QMouseEvent* event) {
 void GraphicsView::mousePressEvent(QMouseEvent* event) {
 	emit pressed();
 	if (event->button() == Qt::LeftButton && this->yPositionLine->isVisible()) {
-		QPointF scenePos = mapToScene(event->pos());
-		qreal lineY = this->yPositionLine->line().y1();
-		if (std::abs(scenePos.y() - lineY) <= 3.0) {
+		if (this->yLineDistancePx(event->pos()) <= LINE_GRAB_TOLERANCE_PX) {
 			this->draggingYLine = true;
 			this->viewport()->setCursor(Qt::SplitVCursor);
 			event->accept();
@@ -173,9 +183,7 @@ void GraphicsView::mouseMoveEvent(QMouseEvent* event) {
 	QGraphicsView::mouseMoveEvent(event);
 
 	if (this->yPositionLine->isVisible() && !(event->buttons())) {
-		QPointF scenePos = mapToScene(event->pos());
-		qreal lineY = this->yPositionLine->line().y1();
-		bool nearLine = (std::abs(scenePos.y() - lineY) <= 3.0);
+		bool nearLine = (this->yLineDistancePx(event->pos()) <= LINE_GRAB_TOLERANCE_PX);
 		if (nearLine) {
 			this->viewport()->setCursor(Qt::SplitVCursor);
 		} else if (this->viewport()->cursor().shape() == Qt::SplitVCursor) {
@@ -192,6 +200,14 @@ void GraphicsView::mouseReleaseEvent(QMouseEvent* event) {
 		return;
 	}
 	QGraphicsView::mouseReleaseEvent(event);
+}
+
+qreal GraphicsView::yLineDistancePx(const QPoint& viewPos) const
+{
+	QLineF sceneLine = this->yPositionLine->line();
+	QPointF p1 = mapFromScene(sceneLine.p1());
+	QPointF p2 = mapFromScene(sceneLine.p2());
+	return pointToSegmentDistancePx(QPointF(viewPos), p1, p2);
 }
 
 void GraphicsView::keyPressEvent(QKeyEvent* event) {

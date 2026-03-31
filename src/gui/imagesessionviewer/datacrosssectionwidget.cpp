@@ -18,6 +18,8 @@
 #include <QWheelEvent>
 #include <QResizeEvent>
 #include <QHoverEvent>
+
+static constexpr qreal LINE_GRAB_TOLERANCE_PX = 5.0;
 #include <QPen>
 #include <QtMath>
 #include <QMetaObject>
@@ -294,9 +296,8 @@ bool DataCrossSectionWidget::eventFilter(QObject* obj, QEvent* event)
 			}
 			QHoverEvent* hoverEvent = static_cast<QHoverEvent*>(event);
 			if (this->showFrameLine && panel->frameLine->isVisible()) {
-				QPointF scenePos = panel->view->mapToScene(hoverEvent->pos());
-				qreal lineY = panel->frameLine->line().y1();
-				bool nearLine = (std::abs(scenePos.y() - lineY) <= 3.0);
+				QPointF lineInView = panel->view->mapFromScene(panel->frameLine->line().p1());
+				bool nearLine = (std::abs(static_cast<qreal>(hoverEvent->pos().y()) - lineInView.y()) <= LINE_GRAB_TOLERANCE_PX);
 				if (nearLine) {
 					panel->view->viewport()->setCursor(Qt::SplitVCursor);
 				} else if (panel->view->viewport()->cursor().shape() == Qt::SplitVCursor) {
@@ -309,9 +310,8 @@ bool DataCrossSectionWidget::eventFilter(QObject* obj, QEvent* event)
 		case QEvent::MouseButtonPress: {
 			QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
 			if (mouseEvent->button() == Qt::LeftButton && this->showFrameLine && panel->frameLine->isVisible()) {
-				QPointF scenePos = panel->view->mapToScene(mouseEvent->pos());
-				qreal lineY = panel->frameLine->line().y1();
-				if (std::abs(scenePos.y() - lineY) <= 3.0) {
+				QPointF lineInView = panel->view->mapFromScene(panel->frameLine->line().p1());
+				if (std::abs(static_cast<qreal>(mouseEvent->pos().y()) - lineInView.y()) <= LINE_GRAB_TOLERANCE_PX) {
 					this->draggingFrameLine = true;
 					this->draggingPanel = panel;
 					// Temporarily disable ScrollHandDrag so it doesn't fight the frame line drag

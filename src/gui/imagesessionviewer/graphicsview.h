@@ -43,6 +43,7 @@ private:
 	void wheelEvent(QWheelEvent* event) override;
 	void contextMenuEvent(QContextMenuEvent* event) override;
 	void scaleView(qreal scaleFactor);
+	qreal yLineDistancePx(const QPoint& viewPos) const;
 
 	QString getFirstFileFromUrls(const QList<QUrl>& urls) const;
 	void setDropHighlight(bool highlight);
