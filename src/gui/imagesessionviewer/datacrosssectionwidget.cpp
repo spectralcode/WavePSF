@@ -466,11 +466,12 @@ void DataCrossSectionWidget::updateYControls()
 	this->ySpinBox->blockSignals(true);
 	this->ySlider->setEnabled(hasData);
 	this->ySpinBox->setEnabled(hasData);
+	bool rangeChanged = (this->ySlider->maximum() != maxIndex);
 	this->ySlider->setRange(0, maxIndex);
 	this->ySpinBox->setRange(0, maxIndex);
-	int clamped = qBound(0, this->ySlider->value(), maxIndex);
-	this->ySlider->setValue(clamped);
-	this->ySpinBox->setValue(clamped);
+	int value = rangeChanged ? (maxIndex / 2) : qBound(0, this->ySlider->value(), maxIndex);
+	this->ySlider->setValue(value);
+	this->ySpinBox->setValue(value);
 	this->ySlider->blockSignals(false);
 	this->ySpinBox->blockSignals(false);
 
