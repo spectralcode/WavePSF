@@ -131,26 +131,19 @@ void DeconvolutionSettingsWidget::setupUI()
 	formLayout->addRow(this->accelerationModeLabel, this->accelerationModeComboBox);
 
 	controlsLayout->addLayout(formLayout);
-
-	// Separator
-	QFrame* separator = new QFrame(controlsWidget);
-	separator->setFrameShape(QFrame::HLine);
-	separator->setFrameShadow(QFrame::Sunken);
-	controlsLayout->addWidget(separator);
-
-	// Live mode checkbox
-	this->liveModeCheckBox = new QCheckBox(tr("Auto-deconvolve on changes"), controlsWidget);
-	controlsLayout->addWidget(this->liveModeCheckBox);
-
-	// Deconvolve button
-	this->deconvolveButton = new QPushButton(tr("Deconvolve"), controlsWidget);
-	controlsLayout->addWidget(this->deconvolveButton);
-
 	controlsLayout->addStretch();
 
 	scrollArea->setWidget(controlsWidget);
 	mainLayout->addWidget(scrollArea, 0);
-	mainLayout->addStretch(1);
+
+	// Right side: action controls (always visible, outside scroll area)
+	QVBoxLayout* actionLayout = new QVBoxLayout();
+	this->liveModeCheckBox = new QCheckBox(tr("Auto-deconvolve on changes"), this);
+	actionLayout->addWidget(this->liveModeCheckBox);
+	this->deconvolveButton = new QPushButton(tr("Deconvolve"), this);
+	actionLayout->addWidget(this->deconvolveButton);
+	actionLayout->addStretch();
+	mainLayout->addLayout(actionLayout);
 
 	// Set initial visibility
 	this->updateParameterVisibility(0);
