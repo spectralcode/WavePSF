@@ -15,7 +15,7 @@ public:
 
 	// PSF file I/O
 	void savePSFToFile(const QString& filePath, PSFModule* psfModule);
-	static af::array loadPSFFromFile(const QString& filePath);
+	static af::array loadPSFFromFile(const QString& filePath, int* outBitDepth = nullptr);
 
 	// Auto-save PSF if enabled
 	void autoSaveIfEnabled(int frame, int patchIdx, PSFModule* psfModule);

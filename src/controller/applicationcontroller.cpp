@@ -41,6 +41,7 @@ ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, Q
 	qRegisterMetaType<OptimizationProgress>("OptimizationProgress");
 	qRegisterMetaType<OptimizationResult>("OptimizationResult");
 	qRegisterMetaType<InterpolationResult>("InterpolationResult");
+	qRegisterMetaType<PSFFileInfo>("PSFFileInfo");
 }
 
 ApplicationController::~ApplicationController()
@@ -210,6 +211,7 @@ void ApplicationController::applyPSFSettings(const PSFSettings& settings)
 		emit coefficientsLoaded(this->psfModule->getAllCoefficients());
 	}
 	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
+	this->emitFileInfoIfApplicable();
 }
 
 void ApplicationController::switchGenerator(const QString& typeName)
@@ -254,6 +256,8 @@ void ApplicationController::switchGenerator(const QString& typeName)
 	if (this->psfModule->getCurrentPSF().isempty()) {
 		this->psfModule->refreshPSF();
 	}
+
+	this->emitFileInfoIfApplicable();
 }
 
 void ApplicationController::applyInlineSettings(const QVariantMap& settings)
@@ -997,6 +1001,15 @@ void ApplicationController::setFilePSFSource(const QString& path)
 	}
 	fileGen->setSource(path);
 	this->psfModule->refreshPSF();
+	this->emitFileInfoIfApplicable();
+}
+
+void ApplicationController::emitFileInfoIfApplicable()
+{
+	FilePSFGenerator* fileGen = dynamic_cast<FilePSFGenerator*>(this->psfModule->getGenerator());
+	if (fileGen != nullptr) {
+		emit filePSFInfoUpdated(fileGen->getFileInfo());
+	}
 }
 
 // --- PSF Grid ---

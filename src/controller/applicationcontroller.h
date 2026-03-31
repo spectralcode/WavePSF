@@ -13,6 +13,7 @@
 #include "core/optimization/optimizationworker.h"
 #include "core/interpolation/tableinterpolator.h"
 #include "core/psf/psfgridgenerator.h"
+#include "core/psf/psffileinfo.h"
 
 // Forward declarations
 class ImageSession;
@@ -207,6 +208,9 @@ private:
 	// PSF grid generation
 	PSFGridGenerator* psfGridGenerator;
 
+	// File PSF info helper
+	void emitFileInfoIfApplicable();
+
 	// Parameter table cache: preserves per-patch coefficients when switching between generator types
 	QMap<QString, WavefrontParameterTable*> cachedParameterTables;
 
@@ -256,6 +260,9 @@ signals:
 
 	// PSF grid
 	void psfGridGenerated(PSFGridResult result);
+
+	// File PSF metadata
+	void filePSFInfoUpdated(PSFFileInfo info);
 };
 
 #endif // APPLICATIONCONTROLLER_H

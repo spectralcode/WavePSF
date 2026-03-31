@@ -5,6 +5,7 @@
 #include <QMap>
 #include <arrayfire.h>
 #include "ipsfgenerator.h"
+#include "psffileinfo.h"
 
 class FilePSFGenerator : public QObject, public IPSFGenerator
 {
@@ -32,16 +33,20 @@ public:
 	// Source selection
 	void setSource(const QString& path);
 	QString source() const;
+	PSFFileInfo getFileInfo() const;
 
 private:
 	void loadFolder(const QString& folderPath);
 	void loadSingleFile(const QString& filePath);
+
+	void computeArrayStats(const af::array& data, double& outMin, double& outMax, double& outSum);
 
 	QString sourcePath;
 	QMap<int, af::array> patchVolumes;
 	af::array singlePSF;
 	bool singleMode;
 	bool volumetric;
+	PSFFileInfo fileInfo;
 };
 
 #endif // FILEPSFGENERATOR_H

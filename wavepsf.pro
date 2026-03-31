@@ -165,6 +165,7 @@ HEADERS += \
 	$$SOURCEDIR/core/optimization/optimizationjobbuilder.h \
 	$$SOURCEDIR/core/psf/psffilemanager.h \
 	$$SOURCEDIR/core/psf/filepsfgenerator.h \
+	$$SOURCEDIR/core/psf/psffileinfo.h \
 	$$SOURCEDIR/core/processing/batchprocessor.h \
 	$$SOURCEDIR/core/processing/volumetricdeconvolver.h \
 	$$SOURCEDIR/core/processing/volumetricprocessor.h \

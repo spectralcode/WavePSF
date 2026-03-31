@@ -14,6 +14,8 @@
 #include <QPushButton>
 #include <QFileDialog>
 #include <QSplitter>
+#include <QGridLayout>
+#include <cmath>
 
 namespace {
 	const QString SETTINGS_GROUP     = QStringLiteral("psf_generation");
@@ -46,9 +48,8 @@ PSFGenerationWidget::PSFGenerationWidget(QWidget* parent)
 	this->fileBrowserWidget = new QWidget(this);
 	QVBoxLayout* fbLayout = new QVBoxLayout(this->fileBrowserWidget);
 	fbLayout->setContentsMargins(0, 0, 0, 0);
-	this->fileSourceLabel = new QLabel(tr("No source selected"), this);
-	this->fileSourceLabel->setWordWrap(true);
-	fbLayout->addWidget(this->fileSourceLabel);
+
+	// Browse buttons at top
 	QHBoxLayout* fbButtonLayout = new QHBoxLayout();
 	QPushButton* browseFolderBtn = new QPushButton(tr("Browse Folder..."), this);
 	QPushButton* browseFileBtn = new QPushButton(tr("Browse File..."), this);
@@ -56,6 +57,49 @@ PSFGenerationWidget::PSFGenerationWidget(QWidget* parent)
 	fbButtonLayout->addWidget(browseFileBtn);
 	fbButtonLayout->addStretch();
 	fbLayout->addLayout(fbButtonLayout);
+
+	// Key-value info grid
+	QString keyStyle = QStringLiteral("font-weight: bold;");
+	QGridLayout* infoGrid = new QGridLayout();
+	infoGrid->setContentsMargins(0, 4, 0, 0);
+	infoGrid->setHorizontalSpacing(8);
+	infoGrid->setVerticalSpacing(2);
+
+	QLabel* sourceKey = new QLabel(tr("Source:"), this);
+	sourceKey->setStyleSheet(keyStyle);
+	sourceKey->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+	this->fileSourceValue = new QLabel(tr("No source selected"), this);
+	this->fileSourceValue->setWordWrap(true);
+	infoGrid->addWidget(sourceKey, 0, 0, Qt::AlignTop);
+	infoGrid->addWidget(this->fileSourceValue, 0, 1);
+
+	QLabel* typeKey = new QLabel(tr("Type:"), this);
+	typeKey->setStyleSheet(keyStyle);
+	this->fileTypeValue = new QLabel(this);
+	infoGrid->addWidget(typeKey, 1, 0, Qt::AlignTop);
+	infoGrid->addWidget(this->fileTypeValue, 1, 1);
+
+	QLabel* filesKey = new QLabel(tr("Files:"), this);
+	filesKey->setStyleSheet(keyStyle);
+	this->fileFilesValue = new QLabel(this);
+	infoGrid->addWidget(filesKey, 2, 0, Qt::AlignTop);
+	infoGrid->addWidget(this->fileFilesValue, 2, 1);
+
+	QLabel* rangeKey = new QLabel(tr("Range:"), this);
+	rangeKey->setStyleSheet(keyStyle);
+	this->fileRangeValue = new QLabel(this);
+	this->fileRangeValue->setWordWrap(true);
+	infoGrid->addWidget(rangeKey, 3, 0, Qt::AlignTop);
+	infoGrid->addWidget(this->fileRangeValue, 3, 1);
+
+	infoGrid->setColumnStretch(1, 1);
+
+	// Wrap info rows in a widget so we can show/hide them together
+	this->fileInfoWidget = new QWidget(this);
+	this->fileInfoWidget->setLayout(infoGrid);
+	this->fileInfoWidget->setVisible(false);
+	fbLayout->addWidget(this->fileInfoWidget);
+
 	fbLayout->addStretch();
 	this->fileBrowserWidget->setVisible(false);
 	mainLayout->addWidget(this->fileBrowserWidget);
@@ -217,10 +261,13 @@ void PSFGenerationWidget::setPSFSettings(const PSFSettings& settings)
 	this->coefficientContainer->setVisible(!isFileMode);
 	this->wavefrontContainer->setVisible(!isFileMode);
 	this->fileBrowserWidget->setVisible(isFileMode);
+	if (!isFileMode) {
+		this->fileInfoWidget->setVisible(false);
+	}
 	if (isFileMode) {
 		QVariantMap fileSettings = settings.allGeneratorSettings.value(QStringLiteral("From File"));
 		QString sourcePath = fileSettings.value(QStringLiteral("source_path")).toString();
-		this->fileSourceLabel->setText(sourcePath.isEmpty() ? tr("No source selected") : sourcePath);
+		this->fileSourceValue->setText(sourcePath.isEmpty() ? tr("No source selected") : sourcePath);
 	}
 }
 
@@ -239,11 +286,57 @@ void PSFGenerationWidget::setCurrentFrame(int frame)
 	this->psf3DPreview->setFrameIndex(frame);
 }
 
+void PSFGenerationWidget::setFilePSFInfo(const PSFFileInfo& info)
+{
+	if (!info.valid) {
+		this->fileInfoWidget->setVisible(false);
+		return;
+	}
+
+	// Source path (updated via browse callbacks and setPSFSettings, but also refresh here)
+	// fileSourceValue is already set by browse/setPSFSettings
+
+	// Type: PSF classification and dimensions
+	QChar times(0x00D7); // × multiplication sign
+	QString typeStr;
+	if (info.patchCount == 1 && !info.volumetric) {
+		typeStr = QString("Single 2D PSF (%1%2%3)").arg(info.width).arg(times).arg(info.height);
+	} else if (info.patchCount == 1 && info.volumetric) {
+		typeStr = QString("3D PSF volume (%1%2%3%4%5)")
+			.arg(info.width).arg(times).arg(info.height).arg(times).arg(info.depth);
+	} else if (info.patchCount > 1 && !info.volumetric) {
+		typeStr = QString("2D PSFs (%1 patches, %2%3%4)")
+			.arg(info.patchCount).arg(info.width).arg(times).arg(info.height);
+	} else {
+		typeStr = QString("3D PSFs (%1 patches, %2%3%4%5%6)")
+			.arg(info.patchCount).arg(info.width).arg(times).arg(info.height).arg(times).arg(info.depth);
+	}
+	this->fileTypeValue->setText(typeStr);
+
+	// Files: count, format, bit depth
+	QString fileWord = (info.fileCount == 1) ? tr("file") : tr("files");
+	QString bitDepthStr = (info.bitDepth > 0) ? QString("%1-bit").arg(info.bitDepth) : tr("mixed bit depth");
+	this->fileFilesValue->setText(QString("%1 %2 %3, %4")
+		.arg(info.fileCount).arg(info.fileFormat).arg(fileWord).arg(bitDepthStr));
+
+	// Range: value range and normalization
+	bool isNormalized = (std::fabs(info.sum - 1.0) < 1e-3) && (info.minValue >= 0.0);
+	QString sumStr = isNormalized
+		? QString("sum %1 1.000 (normalized)").arg(QChar(0x2248)) // ≈
+		: QString("sum = %1").arg(info.sum, 0, 'f', 3);
+	this->fileRangeValue->setText(QString("[%1, %2], %3")
+		.arg(info.minValue, 0, 'f', 3)
+		.arg(info.maxValue, 0, 'f', 3)
+		.arg(sumStr));
+
+	this->fileInfoWidget->setVisible(true);
+}
+
 void PSFGenerationWidget::browseForFolder()
 {
 	QString folder = QFileDialog::getExistingDirectory(this, tr("Select PSF Folder"));
 	if (!folder.isEmpty()) {
-		this->fileSourceLabel->setText(folder);
+		this->fileSourceValue->setText(folder);
 		emit filePSFSourceSelected(folder);
 	}
 }
@@ -253,7 +346,7 @@ void PSFGenerationWidget::browseForFile()
 	QString file = QFileDialog::getOpenFileName(this, tr("Select PSF File"),
 		QString(), tr("Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp)"));
 	if (!file.isEmpty()) {
-		this->fileSourceLabel->setText(file);
+		this->fileSourceValue->setText(file);
 		emit filePSFSourceSelected(file);
 	}
 }

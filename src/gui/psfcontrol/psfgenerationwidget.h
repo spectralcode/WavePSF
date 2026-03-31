@@ -7,6 +7,7 @@
 #include <arrayfire.h>
 #include "core/psf/wavefrontparameter.h"
 #include "core/psf/psfsettings.h"
+#include "core/psf/psffileinfo.h"
 
 class CoefficientEditorWidget;
 class WavefrontPlotWidget;
@@ -41,6 +42,7 @@ public slots:
 	void setPSFSettings(const PSFSettings& settings);
 	void setPSFMode(const QString& modeName);
 	void setCurrentFrame(int frame);
+	void setFilePSFInfo(const PSFFileInfo& info);
 
 signals:
 	void coefficientChanged(int id, double value);
@@ -60,7 +62,11 @@ private:
 	QStackedWidget* psfPreviewStack;
 	RWSettingsWidget* rwSettingsWidget;
 	QWidget* fileBrowserWidget;
-	QLabel* fileSourceLabel;
+	QLabel* fileSourceValue;
+	QLabel* fileTypeValue;
+	QLabel* fileFilesValue;
+	QLabel* fileRangeValue;
+	QWidget* fileInfoWidget;
 	QSplitter* contentSplitter;
 	QWidget* coefficientContainer;
 	QWidget* wavefrontContainer;

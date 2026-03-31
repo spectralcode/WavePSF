@@ -89,7 +89,7 @@ void PSFFileManager::savePSFToFile(const QString& filePath, PSFModule* psfModule
 	LOG_INFO() << "PSF saved:" << filePath << "(" << width << "x" << height << ", 32-bit float)";
 }
 
-af::array PSFFileManager::loadPSFFromFile(const QString& filePath)
+af::array PSFFileManager::loadPSFFromFile(const QString& filePath, int* outBitDepth)
 {
 	QFileInfo fileInfo(filePath);
 	QString suffix = fileInfo.suffix().toLower();
@@ -100,6 +100,13 @@ af::array PSFFileManager::loadPSFFromFile(const QString& filePath)
 		if (suffix == "tif" || suffix == "tiff") {
 			// Load TIFF preserving native type
 			psf = af::loadImageNative(filePath.toStdString().c_str());
+			if (outBitDepth != nullptr) {
+				switch (psf.type()) {
+					case u8:  *outBitDepth = 8; break;
+					case u16: *outBitDepth = 16; break;
+					default:  *outBitDepth = 32; break;
+				}
+			}
 			psf = psf.as(af::dtype::f32);
 		} else {
 			// Load standard image via QImage, normalize to [0,1]
@@ -109,6 +116,9 @@ af::array PSFFileManager::loadPSFFromFile(const QString& filePath)
 				return af::array();
 			}
 			img = img.convertToFormat(QImage::Format_Grayscale8);
+			if (outBitDepth != nullptr) {
+				*outBitDepth = 8;
+			}
 			int w = img.width();
 			int h = img.height();
 			QVector<float> floatData(w * h);
