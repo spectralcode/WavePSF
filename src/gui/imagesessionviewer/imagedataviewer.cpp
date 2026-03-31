@@ -18,13 +18,14 @@ ImageDataViewer::ImageDataViewer(const QString& viewerName, QWidget *parent): QW
 	  mousePosX(-1), mousePosY(-1), currentFrame(-1),
 	  showingReference(false),
 	  renderThread(nullptr), renderWorker(nullptr), latestRequestId(0),
-	  renderBusy(false), hasPending(false)
+	  renderBusy(false), hasPending(false), computeHistogram(false)
 {
 	this->setupUI();
 	this->connectSignals();
 	this->setFocusPolicy(Qt::StrongFocus);
 
 	qRegisterMetaType<RenderRequest>("RenderRequest");
+	qRegisterMetaType<HistogramData>("HistogramData");
 
 	//async renderer setup
 	this->renderThread = new QThread(this);
@@ -45,6 +46,13 @@ ImageDataViewer::ImageDataViewer(const QString& viewerName, QWidget *parent): QW
 	        this, [this](double min, double max, quint64 requestId) {
 		if (requestId == this->latestRequestId.loadAcquire()) {
 			emit this->dataRangeComputed(min, max);
+		}
+	}, Qt::QueuedConnection);
+	// Worker → Viewer (queued): forward histogram (only for latest request)
+	connect(this->renderWorker, &ImageRenderWorker::histogramComputed,
+	        this, [this](const HistogramData& hist, quint64 requestId) {
+		if (requestId == this->latestRequestId.loadAcquire()) {
+			emit this->histogramComputed(hist);
 		}
 	}, Qt::QueuedConnection);
 
@@ -125,6 +133,15 @@ void ImageDataViewer::setDisplaySettings(const DisplaySettings& settings)
 	this->displaySettings = settings;
 	if (this->currentFrame >= 0) {
 		this->displayFrame(this->currentFrame);
+	}
+}
+
+void ImageDataViewer::setComputeHistogram(bool enabled)
+{
+	if (this->computeHistogram == enabled) return;
+	this->computeHistogram = enabled;
+	if (enabled) {
+		this->refresh();
 	}
 }
 
@@ -255,6 +272,7 @@ void ImageDataViewer::dispatchRenderNow()
 	req.manualMin = this->displaySettings.rangeMin;
 	req.manualMax = this->displaySettings.rangeMax;
 	req.logScale = this->displaySettings.logScale;
+	req.computeHistogram = this->computeHistogram;
 	req.colorTable = LUT::get(this->displaySettings.lutName);
 
 	// PerVolume: use global min/max as manual range

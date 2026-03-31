@@ -47,6 +47,18 @@ void RangeSlider::setGradient(const QVector<QRgb>& lut)
 	update();
 }
 
+void RangeSlider::setHistogram(const HistogramData& hist)
+{
+	this->histogram = hist;
+	update();
+}
+
+void RangeSlider::clearHistogram()
+{
+	this->histogram.bins.clear();
+	update();
+}
+
 void RangeSlider::setIntegerMode(bool intMode)
 {
 	this->integerMode = intMode;
@@ -71,16 +83,16 @@ int RangeSlider::valueToX(double value) const
 {
 	QRect bar = barRect();
 	double range = this->rangeMax - this->rangeMin;
-	if (range <= 0.0) return bar.left();
-	double frac = (value - this->rangeMin) / range;
-	return bar.left() + qRound(frac * bar.width());
+	if (range <= 0.0 || bar.width() <= 1) return bar.left();
+	double frac = qBound(0.0, (value - this->rangeMin) / range, 1.0);
+	return bar.left() + qRound(frac * (bar.width() - 1));
 }
 
 double RangeSlider::xToValue(int x) const
 {
 	QRect bar = barRect();
-	if (bar.width() <= 0) return this->rangeMin;
-	double frac = static_cast<double>(x - bar.left()) / bar.width();
+	if (bar.width() <= 1) return this->rangeMin;
+	double frac = static_cast<double>(x - bar.left()) / (bar.width() - 1);
 	frac = qBound(0.0, frac, 1.0);
 	return this->rangeMin + frac * (this->rangeMax - this->rangeMin);
 }
@@ -123,6 +135,38 @@ void RangeSlider::paintEvent(QPaintEvent*)
 		}
 		QPixmap gradPx = QPixmap::fromImage(strip.scaled(gradientWidth, BAR_H, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
 		p.drawPixmap(xLow, bar.top(), gradPx);
+	}
+
+	// Draw histogram overlay (clipped to bar)
+	const int numBins = this->histogram.bins.size();
+	if (numBins > 0) {
+		int maxBin = 0;
+		for (int i = 0; i < numBins; ++i) {
+			if (this->histogram.bins[i] > maxBin) maxBin = this->histogram.bins[i];
+		}
+		if (maxBin > 0) {
+			p.save();
+			p.setClipRect(bar);
+			const double sqrtMax = std::sqrt(static_cast<double>(maxBin));
+			const double domainRange = this->histogram.domainMax - this->histogram.domainMin;
+			if (domainRange > 0.0) {
+				const double binWidth = domainRange / numBins;
+				p.setPen(Qt::NoPen);
+				p.setBrush(QColor(255, 255, 255, 100));
+				for (int i = 0; i < numBins; ++i) {
+					if (this->histogram.bins[i] == 0) continue;
+					const double binLeft = this->histogram.domainMin + i * binWidth;
+					const double binRight = binLeft + binWidth;
+					const int x1 = valueToX(binLeft);
+					const int x2 = valueToX(binRight);
+					const int spanW = qMax(1, x2 - x1);
+					const double h = std::sqrt(static_cast<double>(this->histogram.bins[i])) / sqrtMax * BAR_H * 0.8;
+					const int barY = bar.bottom() - static_cast<int>(h);
+					p.drawRect(x1, barY, spanW, static_cast<int>(h));
+				}
+			}
+			p.restore();
+		}
 	}
 
 	// Draw bar border

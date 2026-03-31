@@ -8,6 +8,7 @@
 #include <QAtomicInteger>
 #include <QtGlobal>
 #include "data/imagedata.h"
+#include "histogramdata.h"
 
 
 // RenderRequest owns a deep copy of the frame bytes (avoids dangling pointers).
@@ -27,6 +28,7 @@ struct RenderRequest
 
 	// Display transforms
 	bool logScale = false;				// Apply log1p before scaling
+	bool computeHistogram = false;		// Compute 256-bin histogram for this frame
 	QVector<QRgb> colorTable;			// 256-entry LUT (empty = grayscale)
 
 	// Identity (latest-only filtering and cancellation)
@@ -49,6 +51,7 @@ signals:
 	// Event: a frame has been rendered (or cancelled) on the worker thread.
 	void frameRendered(const QImage& image, quint64 requestId);
 	void dataRangeComputed(double min, double max, quint64 requestId);
+	void histogramComputed(const HistogramData& hist, quint64 requestId);
 
 public slots:
 	// Action: perform the heavy work off the GUI thread.
@@ -61,6 +64,9 @@ private:
 
 	template<typename T>
 	void percentileBoundsTyped(const T* data, int count, double lowP, double highP, double& outLow, double& outHigh, quint64 curId) const;
+
+	template<typename T>
+	void histogramTyped(const T* data, int count, double min, double max, QVector<int>& bins, quint64 curId) const;
 
 	template<typename T>
 	void scaleToU8Typed(const T* src, int count, double minV, double maxV, uchar* dst, quint64 curId) const;

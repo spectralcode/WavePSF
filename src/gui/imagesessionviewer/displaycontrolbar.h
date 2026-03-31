@@ -3,6 +3,9 @@
 
 #include <QWidget>
 #include "displaysettings.h"
+#include "histogramdata.h"
+
+enum class HistogramMode { Off, InputFrame, OutputFrame };
 
 class QComboBox;
 class QCheckBox;
@@ -21,8 +24,16 @@ public:
 	void setOutputFrameRange(double min, double max);
 	void setIntegerMode(bool intMode);
 
+	void setInputHistogram(const HistogramData& hist);
+	void setOutputHistogram(const HistogramData& hist);
+	void clearInputHistogram();
+	void clearOutputHistogram();
+	void setHistogramMode(HistogramMode mode);
+	HistogramMode getHistogramMode() const;
+
 signals:
 	void settingsChanged(const DisplaySettings& settings);
+	void histogramModeChanged(HistogramMode mode);
 	void resetToInputStackRequested();
 	void resetToOutputStackRequested();
 
@@ -44,6 +55,10 @@ private:
 	double lastInputFrameMax;
 	double lastOutputFrameMin;
 	double lastOutputFrameMax;
+
+	HistogramMode histogramMode;
+	HistogramData inputHistogram;
+	HistogramData outputHistogram;
 };
 
 #endif // DISPLAYCONTROLBAR_H

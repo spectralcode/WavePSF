@@ -84,6 +84,23 @@ void ImageRenderWorker::renderFrame(const RenderRequest& req)
 
 	emit this->dataRangeComputed(dataMin, dataMax, req.requestId);
 
+	// Compute histogram (second pass, cache-warm) — only when requested
+	if (req.computeHistogram) {
+		HistogramData hist;
+		hist.domainMin = dataMin;
+		hist.domainMax = dataMax;
+		hist.bins.resize(256);
+		hist.bins.fill(0);
+		this->dispatchByType(req.dataType, srcPtr, count, [&](auto* p, int n) {
+			this->histogramTyped(p, n, dataMin, dataMax, hist.bins, curId);
+		});
+		if (isCancelled(curId)) {
+			emit this->frameRendered(QImage(), req.requestId);
+			return;
+		}
+		emit this->histogramComputed(hist, req.requestId);
+	}
+
 	if (req.useAutoRange) {
 		if (req.usePercentile) {
 			this->dispatchByType(req.dataType, srcPtr, count, [&](auto* p, int n) {
@@ -182,6 +199,24 @@ void ImageRenderWorker::minMaxTyped(const T* data, int count, double& outMin, do
 	} else {
 		outMin = mn;
 		outMax = mx;
+	}
+}
+
+template<typename T>
+void ImageRenderWorker::histogramTyped(const T* data, int count, double min, double max, QVector<int>& bins, quint64 curId) const
+{
+	const double range = max - min;
+	if (range <= 0.0) return;
+	const double scale = 255.0 / range;
+
+	for (int i = 0; i < count; ++i) {
+		if (isCancelledPeriodic(curId, i)) return;
+		const double v = static_cast<double>(data[i]);
+		if (!qIsFinite(v)) continue;
+		int idx = static_cast<int>((v - min) * scale);
+		if (idx < 0) idx = 0;
+		if (idx > 255) idx = 255;
+		bins[idx]++;
 	}
 }
 

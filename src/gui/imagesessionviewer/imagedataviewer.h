@@ -40,6 +40,7 @@ public:
 	// Display settings
 	void setDisplaySettings(const DisplaySettings& settings);
 	DisplaySettings getDisplaySettings() const;
+	void setComputeHistogram(bool enabled);
 
 	// Patch grid
 	void configurePatchGrid(int cols, int rows);
@@ -123,6 +124,7 @@ private:
 	QAtomicInteger<quint64> latestRequestId;
 	bool renderBusy;
 	bool hasPending;
+	bool computeHistogram;
 
 signals:
 	void currentFrameChanged(int frameNr);
@@ -137,6 +139,7 @@ signals:
 
 	void renderRequested(const RenderRequest& req);
 	void dataRangeComputed(double min, double max);
+	void histogramComputed(const HistogramData& hist);
 
 	void inputFileDropRequested(const QString& filePath);
 

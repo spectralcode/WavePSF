@@ -119,6 +119,7 @@ HEADERS += \
 	$$SOURCEDIR/gui/imagesessionviewer/imagerenderworker.h \
 	$$SOURCEDIR/gui/imagesessionviewer/datacrosssectionwidget.h \
 	$$SOURCEDIR/gui/imagesessionviewer/rangeslider.h \
+	$$SOURCEDIR/gui/imagesessionviewer/histogramdata.h \
 	$$SOURCEDIR/gui/imagesessionviewer/displaycontrolbar.h \
 	$$SOURCEDIR/utils/supportedfilechecker.h \
 	$$SOURCEDIR/gui/messageconsole/messagerouter.h \

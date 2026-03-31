@@ -27,6 +27,7 @@ namespace {
 	const QString KEY_RIGHT_SPLITTER_STATE  = QStringLiteral("right_splitter_state");
 	const QString KEY_MAIN_SPLITTER_STATE   = QStringLiteral("main_splitter_state");
 	const QString KEY_SYNC_VIEWS            = QStringLiteral("sync_views");
+	const QString KEY_HISTOGRAM_MODE       = QStringLiteral("histogram_mode");
 
 	const int    DEF_AUTO_RANGE_MODE       = static_cast<int>(AutoRangeMode::PerFrame);
 	const double DEF_DISPLAY_RANGE_MIN     = 0.0;
@@ -34,6 +35,7 @@ namespace {
 	const bool   DEF_LOG_SCALE             = false;
 	const QString DEF_LUT_NAME             = QStringLiteral("Grayscale");
 	const bool   DEF_SYNC_VIEWS            = false;
+	const int    DEF_HISTOGRAM_MODE        = static_cast<int>(HistogramMode::Off);
 	const int    DEF_PATCH_GRID_COLS       = 6;
 	const int    DEF_PATCH_GRID_ROWS       = 8;
 	const int    DEF_PATCH_BORDER_EXT      = 10;
@@ -89,6 +91,9 @@ QVariantMap ImageSessionViewer::getSettings() const
 	settingsMap.insert(KEY_LOG_SCALE,          this->displaySettings.logScale);
 	settingsMap.insert(KEY_LUT_NAME,           this->displaySettings.lutName);
 	settingsMap.insert(KEY_SYNC_VIEWS,         this->viewSyncEnabled);
+	if (this->displayControlBar) {
+		settingsMap.insert(KEY_HISTOGRAM_MODE, static_cast<int>(this->displayControlBar->getHistogramMode()));
+	}
 	settingsMap.insert(KEY_PATCH_GRID_COLS,    this->imageSession->getPatchGridCols());
 	settingsMap.insert(KEY_PATCH_GRID_ROWS,    this->imageSession->getPatchGridRows());
 	settingsMap.insert(KEY_PATCH_BORDER_EXT,   this->imageSession->getPatchBorderExtension());
@@ -118,6 +123,10 @@ void ImageSessionViewer::setSettings(const QVariantMap& settingsMap)
 
 	this->setDisplaySettings(ds);
 	this->setViewSyncEnabled(syncViews);
+	if (this->displayControlBar) {
+		this->displayControlBar->setHistogramMode(
+			static_cast<HistogramMode>(settingsMap.value(KEY_HISTOGRAM_MODE, DEF_HISTOGRAM_MODE).toInt()));
+	}
 	this->configurePatchGrid(cols, rows, border);
 	emit patchGridConfigurationRequested(cols, rows, border);
 
@@ -596,6 +605,19 @@ void ImageSessionViewer::connectSignals()
 	connect(this->outputViewer, &ImageDataViewer::dataRangeComputed,
 	        this->displayControlBar, &DisplayControlBar::setOutputFrameRange);
 
+	// Forward per-frame histograms from viewers → display control bar
+	connect(this->inputViewer, &ImageDataViewer::histogramComputed,
+	        this->displayControlBar, &DisplayControlBar::setInputHistogram);
+	connect(this->outputViewer, &ImageDataViewer::histogramComputed,
+	        this->displayControlBar, &DisplayControlBar::setOutputHistogram);
+
+	// Histogram mode changed → enable/disable histogram computation in viewers
+	connect(this->displayControlBar, &DisplayControlBar::histogramModeChanged,
+	        this, [this](HistogramMode mode) {
+		this->inputViewer->setComputeHistogram(mode == HistogramMode::InputFrame);
+		this->outputViewer->setComputeHistogram(mode == HistogramMode::OutputFrame);
+	});
+
 	// "Fit to Input/Output Stack" → apply global data range
 	connect(this->displayControlBar, &DisplayControlBar::resetToInputStackRequested, this, [this]() {
 		if (this->connectedInputData) {
@@ -709,6 +731,7 @@ void ImageSessionViewer::updateDataInViewers()
 		} else {
 			this->connectedInputData = nullptr;
 			this->inputViewer->disconnectImageData();
+			this->displayControlBar->clearInputHistogram();
 		}
 
 		if (this->imageSession->hasOutputData()) {
@@ -720,6 +743,7 @@ void ImageSessionViewer::updateDataInViewers()
 		} else {
 			this->connectedOutputData = nullptr;
 			this->outputViewer->disconnectImageData();
+			this->displayControlBar->clearOutputHistogram();
 		}
 
 		if (this->crossSectionWidget != nullptr) {

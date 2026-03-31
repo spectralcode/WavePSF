@@ -43,6 +43,7 @@ DisplayControlBar::DisplayControlBar(QWidget* parent)
 	, lastInputFrameMax(255.0)
 	, lastOutputFrameMin(0.0)
 	, lastOutputFrameMax(255.0)
+	, histogramMode(HistogramMode::Off)
 {
 	QHBoxLayout* layout = new QHBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
@@ -181,6 +182,69 @@ void DisplayControlBar::setIntegerMode(bool intMode)
 	this->rangeSlider->setIntegerMode(intMode);
 }
 
+void DisplayControlBar::setInputHistogram(const HistogramData& hist)
+{
+	this->inputHistogram = hist;
+	if (this->histogramMode == HistogramMode::InputFrame) {
+		this->rangeSlider->setHistogram(hist);
+	}
+}
+
+void DisplayControlBar::setOutputHistogram(const HistogramData& hist)
+{
+	this->outputHistogram = hist;
+	if (this->histogramMode == HistogramMode::OutputFrame) {
+		this->rangeSlider->setHistogram(hist);
+	}
+}
+
+void DisplayControlBar::clearInputHistogram()
+{
+	this->inputHistogram.bins.clear();
+	if (this->histogramMode == HistogramMode::InputFrame) {
+		this->rangeSlider->clearHistogram();
+	}
+}
+
+void DisplayControlBar::clearOutputHistogram()
+{
+	this->outputHistogram.bins.clear();
+	if (this->histogramMode == HistogramMode::OutputFrame) {
+		this->rangeSlider->clearHistogram();
+	}
+}
+
+void DisplayControlBar::setHistogramMode(HistogramMode mode)
+{
+	if (mode == this->histogramMode) return;
+	this->histogramMode = mode;
+	switch (mode) {
+		case HistogramMode::InputFrame:
+			if (!this->inputHistogram.bins.isEmpty()) {
+				this->rangeSlider->setHistogram(this->inputHistogram);
+			} else {
+				this->rangeSlider->clearHistogram();
+			}
+			break;
+		case HistogramMode::OutputFrame:
+			if (!this->outputHistogram.bins.isEmpty()) {
+				this->rangeSlider->setHistogram(this->outputHistogram);
+			} else {
+				this->rangeSlider->clearHistogram();
+			}
+			break;
+		default:
+			this->rangeSlider->clearHistogram();
+			break;
+	}
+	emit this->histogramModeChanged(mode);
+}
+
+HistogramMode DisplayControlBar::getHistogramMode() const
+{
+	return this->histogramMode;
+}
+
 void DisplayControlBar::contextMenuEvent(QContextMenuEvent* event)
 {
 	QMenu menu(this);
@@ -189,6 +253,18 @@ void DisplayControlBar::contextMenuEvent(QContextMenuEvent* event)
 	menu.addSeparator();
 	QAction* inputStack  = menu.addAction(tr("Fit to Input Stack"));
 	QAction* outputStack = menu.addAction(tr("Fit to Output Stack"));
+
+	menu.addSeparator();
+	QMenu* histMenu = menu.addMenu(tr("Histogram"));
+	QAction* histOff    = histMenu->addAction(tr("Off"));
+	QAction* histInput  = histMenu->addAction(tr("Input Frame"));
+	QAction* histOutput = histMenu->addAction(tr("Output Frame"));
+	histOff->setCheckable(true);
+	histInput->setCheckable(true);
+	histOutput->setCheckable(true);
+	histOff->setChecked(this->histogramMode == HistogramMode::Off);
+	histInput->setChecked(this->histogramMode == HistogramMode::InputFrame);
+	histOutput->setChecked(this->histogramMode == HistogramMode::OutputFrame);
 
 	QAction* chosen = menu.exec(event->globalPos());
 	if (chosen == inputFrame) {
@@ -219,6 +295,12 @@ void DisplayControlBar::contextMenuEvent(QContextMenuEvent* event)
 		this->updateManualControlsEnabled();
 		this->blockEmit = false;
 		emit this->resetToOutputStackRequested();
+	} else if (chosen == histOff) {
+		this->setHistogramMode(HistogramMode::Off);
+	} else if (chosen == histInput) {
+		this->setHistogramMode(HistogramMode::InputFrame);
+	} else if (chosen == histOutput) {
+		this->setHistogramMode(HistogramMode::OutputFrame);
 	}
 }
 

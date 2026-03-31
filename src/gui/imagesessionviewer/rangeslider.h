@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QVector>
 #include <QRgb>
+#include "histogramdata.h"
 
 class QLineEdit;
 
@@ -16,6 +17,8 @@ public:
 	void setRange(double absMin, double absMax);
 	void setValues(double low, double high);
 	void setGradient(const QVector<QRgb>& lut);
+	void setHistogram(const HistogramData& hist);
+	void clearHistogram();
 	void setIntegerMode(bool intMode);
 
 	double low() const { return this->lowValue; }
@@ -49,6 +52,7 @@ private:
 	double highValue;
 
 	QVector<QRgb> lutColors;
+	HistogramData histogram;
 	bool integerMode;
 
 	enum DragTarget { None, Low, High, Both };
