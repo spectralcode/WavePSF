@@ -268,13 +268,17 @@ void RangeSlider::mousePressEvent(QMouseEvent* event)
 	int distLow = std::abs(mx - xLow);
 	int distHigh = std::abs(mx - xHigh);
 
-	// Pick the closer handle (prefer low if equal)
-	if (distLow <= distHigh && distLow < HANDLE_W + 4) {
+	const bool overlap = (xLow == xHigh);
+	const bool nearHandle = (distLow < HANDLE_W + 4);
+
+	// When handles overlap, split into left half (Low) / right half (High)
+	if (overlap && nearHandle) {
+		this->dragging = (mx < xLow) ? Low : High;
+	} else if (distLow <= distHigh && distLow < HANDLE_W + 4) {
 		this->dragging = Low;
 	} else if (distHigh < HANDLE_W + 4) {
 		this->dragging = High;
 	} else if (mx > xLow && mx < xHigh) {
-		// Click between handles: drag both
 		this->dragging = Both;
 		this->dragOffset = xToValue(mx) - this->lowValue;
 	} else {
@@ -351,7 +355,11 @@ void RangeSlider::mouseDoubleClickEvent(QMouseEvent* event)
 	int xHigh = valueToX(this->highValue);
 
 	DragTarget target = None;
-	if (std::abs(mx - xLow) < HANDLE_W + 4) {
+	const bool overlap = (xLow == xHigh);
+	const bool nearHandle = (std::abs(mx - xLow) < HANDLE_W + 4);
+	if (overlap && nearHandle) {
+		target = (mx < xLow) ? Low : High;
+	} else if (std::abs(mx - xLow) < HANDLE_W + 4) {
 		target = Low;
 	} else if (std::abs(mx - xHigh) < HANDLE_W + 4) {
 		target = High;
