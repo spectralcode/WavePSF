@@ -99,17 +99,27 @@ void ApplicationController::setCurrentFrame(int frame)
 	if (this->imageSession != nullptr) {
 		this->storeCurrentCoefficients();
 
-		// Suppress live deconvolution during frame change for 3D algorithms.
-		// 3D processes all frames at once, so frame change should not re-trigger.
 		bool suppress3D = this->deconvolutionLiveMode &&
 						  this->psfModule != nullptr &&
 						  this->psfModule->is3DAlgorithm();
-		if (suppress3D) this->suppressLiveDeconv = true;
+
+		// Suppress psfUpdated-triggered deconv during coefficient loading
+		// to avoid double-fire.  We trigger explicitly below instead,
+		// because input data always changes on frame switch even when
+		// the PSF stays the same.
+		bool oldSuppress = this->suppressLiveDeconv;
+		this->suppressLiveDeconv = true;
 
 		this->imageSession->setCurrentFrame(frame);
 		this->loadCoefficientsForCurrentPatch();
 
-		if (suppress3D) this->suppressLiveDeconv = false;
+		this->suppressLiveDeconv = oldSuppress;
+
+		// Re-deconvolve: input data changed (different frame).
+		// Skip for 3D algorithms — they process all frames at once.
+		if (this->deconvolutionLiveMode && !suppress3D) {
+			this->runDeconvolutionOnCurrentPatch();
+		}
 	}
 }
 
@@ -117,8 +127,18 @@ void ApplicationController::setCurrentPatch(int x, int y)
 {
 	if (this->imageSession != nullptr) {
 		this->storeCurrentCoefficients();
+
+		bool oldSuppress = this->suppressLiveDeconv;
+		this->suppressLiveDeconv = true;
+
 		this->imageSession->setCurrentPatch(x, y);
 		this->loadCoefficientsForCurrentPatch();
+
+		this->suppressLiveDeconv = oldSuppress;
+
+		if (this->deconvolutionLiveMode) {
+			this->runDeconvolutionOnCurrentPatch();
+		}
 	}
 }
 
@@ -727,10 +747,9 @@ void ApplicationController::connectDeconvolutionSignals()
 	}
 
 	if (this->imageSession != nullptr) {
-		// Note: deconvolution on patch/frame change is triggered via
-		// loadCoefficientsForCurrentPatch() → setAllCoefficients()/refreshPSF()
-		// → psfUpdated → handlePSFUpdatedForDeconvolution(), so no separate
-		// patchChanged/frameChanged → deconvolve connections are needed.
+		// Note: deconvolution on patch/frame change is triggered explicitly
+		// from setCurrentFrame()/setCurrentPatch(), not through the
+		// psfUpdated signal chain.
 
 		// Forward outputPatchUpdated to deconvolutionCompleted
 		connect(this->imageSession, &ImageSession::outputPatchUpdated,
