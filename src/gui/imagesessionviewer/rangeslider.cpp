@@ -182,9 +182,14 @@ void RangeSlider::paintEvent(QPaintEvent*)
 				}
 				// Dark envelope polyline for visibility on bright LUTs
 				if (!envelope.isEmpty()) {
+					p.save();
+					p.setRenderHint(QPainter::Antialiasing, false);
 					p.setBrush(Qt::NoBrush);
-					p.setPen(QPen(QColor(0, 0, 0, 140), 1.0));
+					QPen pen(QColor(0, 0, 0, 140), 1);
+					pen.setCosmetic(true);
+					p.setPen(pen);
 					p.drawPolyline(envelope.constData(), envelope.size());
+					p.restore();
 				}
 			}
 			p.restore();
