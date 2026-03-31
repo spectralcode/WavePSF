@@ -139,7 +139,7 @@ void DeconvolutionSettingsWidget::setupUI()
 	controlsLayout->addWidget(separator);
 
 	// Live mode checkbox
-	this->liveModeCheckBox = new QCheckBox(tr("Live Deconvolution"), controlsWidget);
+	this->liveModeCheckBox = new QCheckBox(tr("Auto-deconvolve on changes"), controlsWidget);
 	controlsLayout->addWidget(this->liveModeCheckBox);
 
 	// Deconvolve button
