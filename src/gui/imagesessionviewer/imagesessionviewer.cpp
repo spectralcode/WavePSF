@@ -1,6 +1,7 @@
 #include "imagesessionviewer.h"
 #include "imagedataviewer.h"
 #include "datacrosssectionwidget.h"
+#include "displaycontrolbar.h"
 #include "controller/imagesession.h"
 #include "utils/logging.h"
 #include <QHBoxLayout>
@@ -43,7 +44,7 @@ ImageSessionViewer::ImageSessionViewer(QWidget* parent)
 	  mainSplitter(nullptr), controlsWidget(nullptr), sidebarLayout(nullptr), rightSplitter(nullptr), viewersWidget(nullptr),
 	  frameControlsGroup(nullptr), frameSlider(nullptr), frameSpinBox(nullptr),
 	  patchSlider(nullptr), patchSpinBox(nullptr),
-	  inputViewer(nullptr), outputViewer(nullptr), activeViewer(nullptr), crossSectionWidget(nullptr), updatingControls(false),
+	  inputViewer(nullptr), outputViewer(nullptr), activeViewer(nullptr), crossSectionWidget(nullptr), displayControlBar(nullptr), updatingControls(false),
 	  viewSyncEnabled(false), crossSectionVisible(false), patchGridVisible(true),
 	  connectedInputData(nullptr), connectedOutputData(nullptr)
 {
@@ -105,13 +106,7 @@ QVariantMap ImageSessionViewer::getSettings() const
 void ImageSessionViewer::setSettings(const QVariantMap& settingsMap)
 {
 	DisplaySettings ds;
-	// Backward compat: old settings had "auto_range_enabled" (bool), new uses "auto_range_mode" (int)
-	if (settingsMap.contains(KEY_AUTO_RANGE_MODE)) {
-		ds.autoRangeMode = static_cast<AutoRangeMode>(settingsMap.value(KEY_AUTO_RANGE_MODE, DEF_AUTO_RANGE_MODE).toInt());
-	} else if (settingsMap.contains(QStringLiteral("auto_range_enabled"))) {
-		ds.autoRangeMode = settingsMap.value(QStringLiteral("auto_range_enabled"), true).toBool()
-			? AutoRangeMode::PerFrame : AutoRangeMode::Off;
-	}
+	ds.autoRangeMode = static_cast<AutoRangeMode>(settingsMap.value(KEY_AUTO_RANGE_MODE, DEF_AUTO_RANGE_MODE).toInt());
 	ds.rangeMin  = settingsMap.value(KEY_DISPLAY_RANGE_MIN, DEF_DISPLAY_RANGE_MIN).toDouble();
 	ds.rangeMax  = settingsMap.value(KEY_DISPLAY_RANGE_MAX, DEF_DISPLAY_RANGE_MAX).toDouble();
 	ds.logScale  = settingsMap.value(KEY_LOG_SCALE,         DEF_LOG_SCALE).toBool();
@@ -280,6 +275,12 @@ void ImageSessionViewer::setDisplaySettings(const DisplaySettings& settings)
 	}
 	if (this->crossSectionWidget != nullptr) {
 		this->crossSectionWidget->setDisplaySettings(settings);
+	}
+	// Sync control bar UI (block re-emission to avoid feedback loop)
+	if (this->displayControlBar != nullptr) {
+		this->displayControlBar->blockSignals(true);
+		this->displayControlBar->setSettings(settings);
+		this->displayControlBar->blockSignals(false);
 	}
 }
 
@@ -499,23 +500,32 @@ void ImageSessionViewer::setupFrameControls()
 
 void ImageSessionViewer::setupImageViewers()
 {
-	// Create viewers widget
+	// Create viewers widget (container for control bar + image viewers)
 	this->viewersWidget = new QWidget();
+	QVBoxLayout* viewersOuterLayout = new QVBoxLayout(this->viewersWidget);
+	viewersOuterLayout->setContentsMargins(0, 0, 0, 0);
+	viewersOuterLayout->setSpacing(0);
+
+	// Display control bar (LUT, range slider, auto-range, log)
+	this->displayControlBar = new DisplayControlBar(this->viewersWidget);
+	viewersOuterLayout->addWidget(this->displayControlBar);
 
 	// Create input and output viewers
-	this->inputViewer  = new ImageDataViewer("Input",  this->viewersWidget);
-	this->outputViewer = new ImageDataViewer("Output", this->viewersWidget);
+	QWidget* viewersPair = new QWidget(this->viewersWidget);
+	this->inputViewer  = new ImageDataViewer("Input",  viewersPair);
+	this->outputViewer = new ImageDataViewer("Output", viewersPair);
 	this->activeViewer = this->inputViewer;
 	this->crossSectionWidget = new DataCrossSectionWidget(this);
 
 	// Enable drag and drop on input viewer only
 	this->inputViewer->enableInputDataDrops(true);
 
-	// Create layout for viewers
-	QHBoxLayout* viewersLayout = new QHBoxLayout(this->viewersWidget);
+	QHBoxLayout* viewersLayout = new QHBoxLayout(viewersPair);
 	viewersLayout->setContentsMargins(0, 0, 0, 0);
 	viewersLayout->addWidget(this->inputViewer, 1);
 	viewersLayout->addWidget(this->outputViewer, 1);
+
+	viewersOuterLayout->addWidget(viewersPair, 1);
 }
 
 void ImageSessionViewer::connectSignals()
@@ -575,6 +585,30 @@ void ImageSessionViewer::connectSignals()
 	        this->outputViewer, &ImageDataViewer::setYPositionLineVisible);
 	connect(this->outputViewer, &ImageDataViewer::yPositionLineToggled,
 	        this->inputViewer, &ImageDataViewer::setYPositionLineVisible);
+
+	// Display control bar → display settings
+	connect(this->displayControlBar, &DisplayControlBar::settingsChanged,
+	        this, &ImageSessionViewer::setDisplaySettings);
+
+	// Forward per-frame data range from viewers → display control bar (for "Fit to Frame" context menu)
+	connect(this->inputViewer, &ImageDataViewer::dataRangeComputed,
+	        this->displayControlBar, &DisplayControlBar::setInputFrameRange);
+	connect(this->outputViewer, &ImageDataViewer::dataRangeComputed,
+	        this->displayControlBar, &DisplayControlBar::setOutputFrameRange);
+
+	// "Fit to Input/Output Stack" → apply global data range
+	connect(this->displayControlBar, &DisplayControlBar::resetToInputStackRequested, this, [this]() {
+		if (this->connectedInputData) {
+			auto range = this->connectedInputData->getGlobalRange();
+			this->displayControlBar->setSliderRange(range.first, range.second);
+		}
+	});
+	connect(this->displayControlBar, &DisplayControlBar::resetToOutputStackRequested, this, [this]() {
+		if (this->connectedOutputData) {
+			auto range = this->connectedOutputData->getGlobalRange();
+			this->displayControlBar->setSliderRange(range.first, range.second);
+		}
+	});
 }
 
 void ImageSessionViewer::updateFrameControls()
@@ -664,6 +698,12 @@ void ImageSessionViewer::updateDataInViewers()
 			if (this->connectedInputData != this->imageSession->getInputData()) {
 				this->connectedInputData = this->imageSession->getInputData();
 				this->inputViewer->connectImageData(this->connectedInputData);
+
+				// Set slider range from full volume scan and configure integer/float formatting
+				auto range = this->connectedInputData->getGlobalRange();
+				this->displayControlBar->setSliderRange(range.first, range.second);
+				EnviDataType dt = this->connectedInputData->getDataType();
+				this->displayControlBar->setIntegerMode(dt != FLOAT_32BIT && dt != DOUBLE_64BIT);
 			}
 			this->inputViewer->setPatchGridVisible(this->patchGridVisible);
 		} else {

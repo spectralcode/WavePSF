@@ -16,6 +16,7 @@
 
 // Forward declarations
 class ImageDataViewer;
+class DisplayControlBar;
 class SettingsFileManager;
 
 class ImageSessionViewer : public QWidget
@@ -123,6 +124,7 @@ private:
 	ImageDataViewer* outputViewer;
 	ImageDataViewer* activeViewer;
 	DataCrossSectionWidget* crossSectionWidget;
+	DisplayControlBar* displayControlBar;
 
 	// State tracking
 	bool updatingControls;

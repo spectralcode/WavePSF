@@ -8,11 +8,13 @@
 #include <QtMath>
 #include <cstring>
 #include <algorithm>
+#include <limits>
 
 ImageData::ImageData(void* data, int width, int height, int frames, EnviDataType dataType,
 					 const QVector<qreal>& wavelengths, const QString& wavelengthUnit, QObject* parent)
 	: QObject(parent), width(width), height(height), frames(frames), dataType(dataType),
-	  data(data), wavelengths(wavelengths), wavelengthUnit(wavelengthUnit)
+	  data(data), wavelengths(wavelengths), wavelengthUnit(wavelengthUnit),
+	  globalRangeDirty(true), globalRangeMin(0.0), globalRangeMax(0.0)
 {
 	// Generate frame names for HSI data
 	this->frameNames.reserve(this->frames);
@@ -27,7 +29,8 @@ ImageData::ImageData(void* data, int width, int height, int frames, EnviDataType
 
 ImageData::ImageData(const QImage& image, QObject* parent)
 	: QObject(parent), width(image.width()), height(image.height()),
-	  dataType(UNSIGNED_CHAR_8BIT), data(nullptr)
+	  dataType(UNSIGNED_CHAR_8BIT), data(nullptr),
+	  globalRangeDirty(true), globalRangeMin(0.0), globalRangeMax(0.0)
 {
 	if (image.isNull() || this->width <= 0 || this->height <= 0) {
 		LOG_WARNING() << "Invalid image provided";
@@ -53,7 +56,8 @@ ImageData::ImageData(const QImage& image, QObject* parent)
 ImageData::ImageData(const ImageData& other)
 	: QObject(other.parent()), width(other.width), height(other.height), frames(other.frames),
 	  dataType(other.dataType), data(nullptr), wavelengths(other.wavelengths),
-	  wavelengthUnit(other.wavelengthUnit), frameNames(other.frameNames)
+	  wavelengthUnit(other.wavelengthUnit), frameNames(other.frameNames),
+	  globalRangeDirty(true), globalRangeMin(0.0), globalRangeMax(0.0)
 {
 	// Deep copy data
 	size_t totalBytes = static_cast<size_t>(this->width) * static_cast<size_t>(this->height) * static_cast<size_t>(this->frames) * this->calculateBytesPerSample();
@@ -123,6 +127,7 @@ void ImageData::writeSingleFrame(int frameNr, void* data)
 	size_t bytesPerFrame = bytesPerSample * static_cast<size_t>(this->width) * static_cast<size_t>(this->height);
 	void* framePosition = &static_cast<char*>(this->data)[bytesPerFrame * frameNr];
 	std::memcpy(framePosition, data, bytesPerFrame);
+	this->globalRangeDirty = true;
 	emit dataChanged();
 }
 
@@ -151,6 +156,7 @@ void ImageData::writeSingleSubFrame(int frameNr, int x, int y, int width, int he
 					&static_cast<char*>(data)[bytesPerSubLine * i],
 					bytesPerSubLine);
 	}
+	this->globalRangeDirty = true;
 	emit dataChanged();
 }
 
@@ -169,87 +175,54 @@ QStringList ImageData::getFrameNames() const
 	return this->frameNames;
 }
 
-// todo: check performance and maybe use openmp
-// todo: check if data conversion is correct for each datatype
-double ImageData::getMaxPixelValue()
+QPair<double,double> ImageData::getGlobalRange() const
 {
-	if (this->data == nullptr) {
-		return 0.0;
+	if (!this->globalRangeDirty) {
+		return qMakePair(this->globalRangeMin, this->globalRangeMax);
 	}
 
-	double maxValue = 0.0;
-	size_t totalSamples = static_cast<size_t>(this->width) * static_cast<size_t>(this->height) * static_cast<size_t>(this->frames);
+	if (this->data == nullptr) {
+		return qMakePair(0.0, 255.0);
+	}
+
+	const size_t total = static_cast<size_t>(this->width) * static_cast<size_t>(this->height) * static_cast<size_t>(this->frames);
+	double lo = (std::numeric_limits<double>::max)();
+	double hi = -(std::numeric_limits<double>::max)();
+
+	#define SCAN_RANGE(Type) { \
+		auto* p = static_cast<const Type*>(this->data); \
+		for (size_t i = 0; i < total; ++i) { \
+			const double v = static_cast<double>(p[i]); \
+			if (!qIsFinite(v)) continue; \
+			if (v < lo) lo = v; \
+			if (v > hi) hi = v; \
+		} \
+	}
 
 	switch (this->dataType) {
-		case UNSIGNED_CHAR_8BIT: {
-			auto* typedData = static_cast<unsigned char*>(this->data);
-			for (size_t i = 0; i < totalSamples; ++i) {
-				maxValue = std::max(maxValue, static_cast<double>(typedData[i]));
-			}
-			break;
-		}
-		case SIGNED_SHORT_16BIT: {
-			auto* typedData = static_cast<short*>(this->data);
-			for (size_t i = 0; i < totalSamples; ++i) {
-				maxValue = std::max(maxValue, static_cast<double>(typedData[i]));
-			}
-			break;
-		}
-		case UNSIGNED_SHORT_16BIT: {
-			auto* typedData = static_cast<unsigned short*>(this->data);
-			for (size_t i = 0; i < totalSamples; ++i) {
-				maxValue = std::max(maxValue, static_cast<double>(typedData[i]));
-			}
-			break;
-		}
-		case SIGNED_INT_32BIT: {
-			auto* typedData = static_cast<int*>(this->data);
-			for (size_t i = 0; i < totalSamples; ++i) {
-				maxValue = std::max(maxValue, static_cast<double>(typedData[i]));
-			}
-			break;
-		}
-		case UNSIGNED_INT_32BIT: {
-			auto* typedData = static_cast<unsigned int*>(this->data);
-			for (size_t i = 0; i < totalSamples; ++i) {
-				maxValue = std::max(maxValue, static_cast<double>(typedData[i]));
-			}
-			break;
-		}
-		case FLOAT_32BIT: {
-			auto* typedData = static_cast<float*>(this->data);
-			for (size_t i = 0; i < totalSamples; ++i) {
-				maxValue = std::max(maxValue, static_cast<double>(typedData[i]));
-			}
-			break;
-		}
-		case DOUBLE_64BIT: {
-			auto* typedData = static_cast<double*>(this->data);
-			for (size_t i = 0; i < totalSamples; ++i) {
-				maxValue = std::max(maxValue, typedData[i]);
-			}
-			break;
-		}
-		case SIGNED_LONG_INT_64BIT: {
-			auto* typedData = static_cast<long long*>(this->data);
-			for (size_t i = 0; i < totalSamples; ++i) {
-				maxValue = std::max(maxValue, static_cast<double>(typedData[i]));
-			}
-			break;
-		}
-		case UNSIGNED_LONG_INT_64BIT: {
-			auto* typedData = static_cast<unsigned long long*>(this->data);
-			for (size_t i = 0; i < totalSamples; ++i) {
-				maxValue = std::max(maxValue, static_cast<double>(typedData[i]));
-			}
-			break;
-		}
+		case UNSIGNED_CHAR_8BIT:     SCAN_RANGE(unsigned char);      break;
+		case SIGNED_SHORT_16BIT:     SCAN_RANGE(short);              break;
+		case UNSIGNED_SHORT_16BIT:   SCAN_RANGE(unsigned short);     break;
+		case SIGNED_INT_32BIT:       SCAN_RANGE(int);                break;
+		case UNSIGNED_INT_32BIT:     SCAN_RANGE(unsigned int);       break;
+		case FLOAT_32BIT:            SCAN_RANGE(float);              break;
+		case DOUBLE_64BIT:           SCAN_RANGE(double);             break;
+		case SIGNED_LONG_INT_64BIT:  SCAN_RANGE(long long);          break;
+		case UNSIGNED_LONG_INT_64BIT:SCAN_RANGE(unsigned long long); break;
 		default:
-			LOG_WARNING() << "Unsupported data type for getMaxPixelValue:" << this->dataType;
-			break;
+			LOG_WARNING() << "Unsupported data type for getGlobalRange:" << this->dataType;
+			return qMakePair(0.0, 255.0);
 	}
 
-	return maxValue;
+	#undef SCAN_RANGE
+
+	if (lo > hi) { lo = 0.0; hi = 255.0; }
+	if (!(hi > lo)) hi = lo + 1.0;
+
+	this->globalRangeMin = lo;
+	this->globalRangeMax = hi;
+	this->globalRangeDirty = false;
+	return qMakePair(lo, hi);
 }
 
 void ImageData::saveDataToDisk(const QString& filePath)

@@ -61,27 +61,37 @@ void ImageRenderWorker::renderFrame(const RenderRequest& req)
 	const int count = req.width * req.height;
 	const quint64 curId = req.requestId;
 
+	double dataMin = DEFAULT_MIN_VALUE;
+	double dataMax = DEFAULT_MAX_VALUE;
 	double minV = DEFAULT_MIN_VALUE;
 	double maxV = DEFAULT_MAX_VALUE;
 
 #if ENABLE_WORKER_TIMING
 	tStage.start();
 #endif
+	// Always compute actual data range (for dataRangeComputed signal)
+	const bool okMinMax = this->dispatchByType(req.dataType, srcPtr, count, [&](auto* p, int n) {
+		this->minMaxTyped(p, n, dataMin, dataMax, curId);
+	});
+	if (!okMinMax) {
+		emit this->frameRendered(QImage(), req.requestId);
+		return;
+	}
+	if (isCancelled(curId)) {
+		emit this->frameRendered(QImage(), req.requestId);
+		return;
+	}
+
+	emit this->dataRangeComputed(dataMin, dataMax, req.requestId);
+
 	if (req.useAutoRange) {
-		const bool ok = this->dispatchByType(req.dataType, srcPtr, count, [&](auto* p, int n) {
-			if (req.usePercentile) {
+		if (req.usePercentile) {
+			this->dispatchByType(req.dataType, srcPtr, count, [&](auto* p, int n) {
 				this->percentileBoundsTyped(p, n, P_LOW, P_HIGH, minV, maxV, curId);
-			} else {
-				this->minMaxTyped(p, n, minV, maxV, curId);
-			}
-		});
-		if (!ok) {
-			emit this->frameRendered(QImage(), req.requestId);
-			return;
-		}
-		if (isCancelled(curId)) {
-			emit this->frameRendered(QImage(), req.requestId);
-			return;
+			});
+		} else {
+			minV = dataMin;
+			maxV = dataMax;
 		}
 	} else {
 		minV = req.manualMin;
@@ -99,8 +109,6 @@ void ImageRenderWorker::renderFrame(const RenderRequest& req)
 		emit this->frameRendered(QImage(), req.requestId);
 		return;
 	}
-
-	emit this->dataRangeComputed(minV, maxV, req.requestId);
 
 	// Choose image format: indexed (with color table) or grayscale
 	const bool useColorTable = !req.colorTable.isEmpty();

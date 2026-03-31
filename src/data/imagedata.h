@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QVector>
+#include <QPair>
 #include <QString>
 #include <QImage>
 
@@ -59,7 +60,7 @@ public:
 	QStringList getFrameNames() const;
 
 	// Utility
-	double getMaxPixelValue();
+	QPair<double,double> getGlobalRange() const;
 	void saveDataToDisk(const QString& filePath);
 	void saveAsEnvi(const QString& filePath);
 	void saveAsTiff(const QString& filePath);
@@ -83,6 +84,10 @@ private:
 	void allocateDataBuffer(size_t totalBytes);
 	size_t calculateBytesPerSample() const;
 	bool isGrayscaleImage(const QImage& image) const;
+
+	mutable bool globalRangeDirty;
+	mutable double globalRangeMin;
+	mutable double globalRangeMax;
 
 signals:
 	void dataChanged();

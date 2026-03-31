@@ -1,0 +1,379 @@
+#include "rangeslider.h"
+#include <QPainter>
+#include <QMouseEvent>
+#include <QLineEdit>
+#include <QValidator>
+#include <QtGlobal>
+#include <cmath>
+
+RangeSlider::RangeSlider(QWidget* parent)
+	: QWidget(parent)
+	, rangeMin(0.0)
+	, rangeMax(255.0)
+	, lowValue(0.0)
+	, highValue(255.0)
+	, integerMode(true)
+	, dragging(None)
+	, dragOffset(0.0)
+	, activeEditor(nullptr)
+	, editTarget(None)
+{
+	setMouseTracking(true);
+	setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	setMaximumWidth(300);
+}
+
+void RangeSlider::setRange(double absMin, double absMax)
+{
+	if (absMin > absMax) std::swap(absMin, absMax);
+	this->rangeMin = absMin;
+	this->rangeMax = absMax;
+	this->lowValue = qBound(absMin, this->lowValue, absMax);
+	this->highValue = qBound(absMin, this->highValue, absMax);
+	update();
+}
+
+void RangeSlider::setValues(double low, double high)
+{
+	if (low > high) std::swap(low, high);
+	this->lowValue = qBound(this->rangeMin, low, this->rangeMax);
+	this->highValue = qBound(this->rangeMin, high, this->rangeMax);
+	update();
+}
+
+void RangeSlider::setGradient(const QVector<QRgb>& lut)
+{
+	this->lutColors = lut;
+	update();
+}
+
+void RangeSlider::setIntegerMode(bool intMode)
+{
+	this->integerMode = intMode;
+	update();
+}
+
+QString RangeSlider::formatValue(double v) const
+{
+	if (this->integerMode) {
+		return QString::number(qRound(v));
+	}
+	return QString::number(v, 'f', 2);
+}
+
+QRect RangeSlider::barRect() const
+{
+	int y = (height() - BAR_H) / 2;
+	return QRect(MARGIN, y, width() - 2 * MARGIN, BAR_H);
+}
+
+int RangeSlider::valueToX(double value) const
+{
+	QRect bar = barRect();
+	double range = this->rangeMax - this->rangeMin;
+	if (range <= 0.0) return bar.left();
+	double frac = (value - this->rangeMin) / range;
+	return bar.left() + qRound(frac * bar.width());
+}
+
+double RangeSlider::xToValue(int x) const
+{
+	QRect bar = barRect();
+	if (bar.width() <= 0) return this->rangeMin;
+	double frac = static_cast<double>(x - bar.left()) / bar.width();
+	frac = qBound(0.0, frac, 1.0);
+	return this->rangeMin + frac * (this->rangeMax - this->rangeMin);
+}
+
+void RangeSlider::paintEvent(QPaintEvent*)
+{
+	QPainter p(this);
+	p.setRenderHint(QPainter::Antialiasing);
+
+	QRect bar = barRect();
+	int lutSize = this->lutColors.size();
+	int xLow = valueToX(this->lowValue);
+	int xHigh = valueToX(this->highValue);
+
+	// Determine first and last LUT colors
+	QRgb firstColor = (lutSize >= 256) ? this->lutColors.first() : qRgb(0, 0, 0);
+	QRgb lastColor = (lutSize >= 256) ? this->lutColors.last() : qRgb(255, 255, 255);
+
+	// Fill region left of low handle with clamped first color
+	if (xLow > bar.left()) {
+		p.fillRect(QRect(bar.left(), bar.top(), xLow - bar.left(), BAR_H), QColor(firstColor));
+	}
+
+	// Fill region right of high handle with clamped last color
+	if (xHigh < bar.right()) {
+		p.fillRect(QRect(xHigh, bar.top(), bar.right() - xHigh + 1, BAR_H), QColor(lastColor));
+	}
+
+	// Draw LUT gradient only between the two handles
+	int gradientWidth = xHigh - xLow;
+	if (gradientWidth > 0) {
+		QImage strip(gradientWidth, 1, QImage::Format_RGB32);
+		for (int x = 0; x < gradientWidth; ++x) {
+			int idx = x * 255 / qMax(1, gradientWidth - 1);
+			if (lutSize >= 256) {
+				strip.setPixel(x, 0, this->lutColors.value(idx, qRgb(idx, idx, idx)));
+			} else {
+				strip.setPixel(x, 0, qRgb(idx, idx, idx));
+			}
+		}
+		QPixmap gradPx = QPixmap::fromImage(strip.scaled(gradientWidth, BAR_H, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+		p.drawPixmap(xLow, bar.top(), gradPx);
+	}
+
+	// Draw bar border
+	p.setPen(QPen(palette().mid().color(), 1));
+	p.setBrush(Qt::NoBrush);
+	p.drawRect(bar);
+
+	// Draw handles
+	auto drawHandle = [&](int cx, bool active) {
+		int hy = (height() - HANDLE_H) / 2;
+		QRect hr(cx - HANDLE_W / 2, hy, HANDLE_W, HANDLE_H);
+		p.setPen(QPen(active ? palette().highlight().color() : palette().dark().color(), 1));
+		p.setBrush(palette().button());
+		p.drawRoundedRect(hr, 2, 2);
+	};
+	drawHandle(xLow, this->dragging == Low);
+	drawHandle(xHigh, this->dragging == High);
+
+	// Gray overlay when disabled (auto modes)
+	if (!isEnabled()) {
+		p.fillRect(rect(), QColor(0, 0, 0, 120));
+	}
+
+	// Draw value tooltip above the active handle during drag
+	if (this->dragging == Low || this->dragging == High || this->dragging == Both) {
+		auto drawTooltip = [&](int cx, double value) {
+			QString text = formatValue(value);
+			QFont f = font();
+			QFontMetrics fm(f);
+			int tw = fm.horizontalAdvance(text) + 6;
+			int th = fm.height() + 4;
+			int tx = cx - tw / 2;
+			int ty = bar.top() - th - 4;
+
+			// Keep within widget bounds
+			tx = qBound(0, tx, width() - tw);
+			ty = qMax(0, ty);
+
+			QRect tooltipRect(tx, ty, tw, th);
+			p.setPen(Qt::NoPen);
+			p.setBrush(QColor(50, 50, 50, 210));
+			p.drawRoundedRect(tooltipRect, 3, 3);
+			p.setFont(f);
+			p.setPen(Qt::white);
+			p.drawText(tooltipRect, Qt::AlignCenter, text);
+		};
+
+		if (this->dragging == Low) {
+			drawTooltip(xLow, this->lowValue);
+		} else if (this->dragging == High) {
+			drawTooltip(xHigh, this->highValue);
+		} else if (this->dragging == Both) {
+			drawTooltip(xLow, this->lowValue);
+			drawTooltip(xHigh, this->highValue);
+		}
+	}
+}
+
+void RangeSlider::mousePressEvent(QMouseEvent* event)
+{
+	if (event->button() != Qt::LeftButton) return;
+
+	// Close any open editor on click elsewhere
+	if (this->activeEditor) {
+		commitEditor(false);
+	}
+
+	int mx = event->pos().x();
+	int xLow = valueToX(this->lowValue);
+	int xHigh = valueToX(this->highValue);
+
+	int distLow = std::abs(mx - xLow);
+	int distHigh = std::abs(mx - xHigh);
+
+	// Pick the closer handle (prefer low if equal)
+	if (distLow <= distHigh && distLow < HANDLE_W + 4) {
+		this->dragging = Low;
+	} else if (distHigh < HANDLE_W + 4) {
+		this->dragging = High;
+	} else if (mx > xLow && mx < xHigh) {
+		// Click between handles: drag both
+		this->dragging = Both;
+		this->dragOffset = xToValue(mx) - this->lowValue;
+	} else {
+		this->dragging = None;
+	}
+	update();
+}
+
+void RangeSlider::mouseMoveEvent(QMouseEvent* event)
+{
+	if (this->dragging == None) {
+		// Update cursor based on hover position
+		int mx = event->pos().x();
+		int xLow = valueToX(this->lowValue);
+		int xHigh = valueToX(this->highValue);
+		bool nearHandle = (std::abs(mx - xLow) < HANDLE_W + 4) || (std::abs(mx - xHigh) < HANDLE_W + 4);
+		bool betweenHandles = (mx > xLow + HANDLE_W / 2) && (mx < xHigh - HANDLE_W / 2);
+		if (nearHandle) {
+			setCursor(Qt::SizeHorCursor);
+		} else if (betweenHandles) {
+			setCursor(Qt::SizeAllCursor);
+		} else {
+			setCursor(Qt::ArrowCursor);
+		}
+		return;
+	}
+
+	double val = xToValue(event->pos().x());
+	if (this->dragging == Low) {
+		val = qBound(this->rangeMin, val, this->highValue);
+		if (val != this->lowValue) {
+			this->lowValue = val;
+			update();
+			emit valuesChanged(this->lowValue, this->highValue);
+		}
+	} else if (this->dragging == High) {
+		val = qBound(this->lowValue, val, this->rangeMax);
+		if (val != this->highValue) {
+			this->highValue = val;
+			update();
+			emit valuesChanged(this->lowValue, this->highValue);
+		}
+	} else if (this->dragging == Both) {
+		double span = this->highValue - this->lowValue;
+		double newLow = val - this->dragOffset;
+		// Clamp so both handles stay within range
+		if (newLow < this->rangeMin) newLow = this->rangeMin;
+		if (newLow + span > this->rangeMax) newLow = this->rangeMax - span;
+		double newHigh = newLow + span;
+		if (newLow != this->lowValue || newHigh != this->highValue) {
+			this->lowValue = newLow;
+			this->highValue = newHigh;
+			update();
+			emit valuesChanged(this->lowValue, this->highValue);
+		}
+	}
+}
+
+void RangeSlider::mouseReleaseEvent(QMouseEvent* event)
+{
+	if (event->button() == Qt::LeftButton && this->dragging != None) {
+		this->dragging = None;
+		setCursor(Qt::ArrowCursor);
+		update();
+	}
+}
+
+void RangeSlider::mouseDoubleClickEvent(QMouseEvent* event)
+{
+	if (event->button() != Qt::LeftButton) return;
+
+	int mx = event->pos().x();
+	int xLow = valueToX(this->lowValue);
+	int xHigh = valueToX(this->highValue);
+
+	DragTarget target = None;
+	if (std::abs(mx - xLow) < HANDLE_W + 4) {
+		target = Low;
+	} else if (std::abs(mx - xHigh) < HANDLE_W + 4) {
+		target = High;
+	}
+
+	if (target == None) return;
+
+	// Close any previous editor
+	if (this->activeEditor) {
+		commitEditor(false);
+	}
+
+	this->editTarget = target;
+	double currentValue = (target == Low) ? this->lowValue : this->highValue;
+	int cx = (target == Low) ? xLow : xHigh;
+
+	this->activeEditor = new QLineEdit(this);
+	this->activeEditor->setAlignment(Qt::AlignCenter);
+	this->activeEditor->setText(formatValue(currentValue));
+	this->activeEditor->selectAll();
+
+	if (this->integerMode) {
+		this->activeEditor->setValidator(new QIntValidator(this->activeEditor));
+	} else {
+		this->activeEditor->setValidator(new QDoubleValidator(this->activeEditor));
+	}
+
+	// Position above the handle
+	QFont f = font();
+	QFontMetrics fm(f);
+	int edW = qMax(60, fm.horizontalAdvance(this->activeEditor->text()) + 20);
+	int edH = fm.height() + 6;
+	int edX = cx - edW / 2;
+	int edY = barRect().top() - edH - 4;
+	edX = qBound(0, edX, width() - edW);
+	edY = qMax(0, edY);
+
+	this->activeEditor->setFont(f);
+	this->activeEditor->setGeometry(edX, edY, edW, edH);
+	this->activeEditor->show();
+	this->activeEditor->setFocus();
+
+	connect(this->activeEditor, &QLineEdit::returnPressed, this, [this]() {
+		commitEditor(true);
+	});
+	// Also commit on focus loss (click elsewhere)
+	connect(this->activeEditor, &QLineEdit::editingFinished, this, [this]() {
+		commitEditor(true);
+	});
+}
+
+void RangeSlider::commitEditor(bool accept)
+{
+	if (!this->activeEditor) return;
+
+	if (accept) {
+		bool ok = false;
+		double val = this->activeEditor->text().toDouble(&ok);
+		if (ok) {
+			// Expand slider range if value is outside current bounds
+			if (val < this->rangeMin) this->rangeMin = val;
+			if (val > this->rangeMax) this->rangeMax = val;
+
+			if (this->editTarget == Low) {
+				val = qBound(this->rangeMin, val, this->highValue);
+				this->lowValue = val;
+			} else if (this->editTarget == High) {
+				val = qBound(this->lowValue, val, this->rangeMax);
+				this->highValue = val;
+			}
+			emit valuesChanged(this->lowValue, this->highValue);
+		}
+	}
+
+	this->activeEditor->deleteLater();
+	this->activeEditor = nullptr;
+	this->editTarget = None;
+	update();
+}
+
+
+bool RangeSlider::isNearHandle(int x) const
+{
+	return (std::abs(x - valueToX(this->lowValue)) < HANDLE_W + 4)
+	    || (std::abs(x - valueToX(this->highValue)) < HANDLE_W + 4);
+}
+
+QSize RangeSlider::sizeHint() const
+{
+	return QSize(200, HANDLE_H + 4);
+}
+
+QSize RangeSlider::minimumSizeHint() const
+{
+	return QSize(80, HANDLE_H + 4);
+}

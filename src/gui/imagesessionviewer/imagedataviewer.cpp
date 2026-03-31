@@ -40,6 +40,13 @@ ImageDataViewer::ImageDataViewer(const QString& viewerName, QWidget *parent): QW
 	connect(this->renderWorker, &ImageRenderWorker::frameRendered,
 	        this, &ImageDataViewer::updateRenderedImage,
 	        Qt::QueuedConnection);
+	// Worker → Viewer (queued): forward data range (only for latest request)
+	connect(this->renderWorker, &ImageRenderWorker::dataRangeComputed,
+	        this, [this](double min, double max, quint64 requestId) {
+		if (requestId == this->latestRequestId.loadAcquire()) {
+			emit this->dataRangeComputed(min, max);
+		}
+	}, Qt::QueuedConnection);
 
 	this->renderThread->start();
 }
@@ -243,12 +250,22 @@ void ImageDataViewer::dispatchRenderNow()
 	req.width = w;
 	req.height = h;
 	req.dataType = dt;
-	req.useAutoRange = (this->displaySettings.autoRangeMode != AutoRangeMode::Off);
+	req.useAutoRange = (this->displaySettings.autoRangeMode == AutoRangeMode::PerFrame);
 	req.usePercentile = false;
 	req.manualMin = this->displaySettings.rangeMin;
 	req.manualMax = this->displaySettings.rangeMax;
 	req.logScale = this->displaySettings.logScale;
 	req.colorTable = LUT::get(this->displaySettings.lutName);
+
+	// PerVolume: use global min/max as manual range
+	if (this->displaySettings.autoRangeMode == AutoRangeMode::PerVolume) {
+		const ImageData* ds = this->getCurrentDataSource();
+		if (ds) {
+			auto range = ds->getGlobalRange();
+			req.manualMin = range.first;
+			req.manualMax = range.second;
+		}
+	}
 
 	copyFrameToBytes(req.frameBytes, framePtr, count, dt);
 

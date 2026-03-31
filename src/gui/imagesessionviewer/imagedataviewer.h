@@ -136,6 +136,7 @@ signals:
 	void toggleReleased();
 
 	void renderRequested(const RenderRequest& req);
+	void dataRangeComputed(double min, double max);
 
 	void inputFileDropRequested(const QString& filePath);
 
