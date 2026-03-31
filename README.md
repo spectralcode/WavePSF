@@ -29,6 +29,12 @@ The estimated PSFs can also be used for optical characterization of your system.
 - Basic tutorial: [docs/user/tutorial.md](docs/user/tutorial.md)
 - Example datasets: [data.uni-hannover.de](https://doi.org/10.25835/yu47lho4) -> download `data_tobacco_leaf.zip` for a purposely defocused dataset with ground truth, which produces particularly impressive deconvolution results
 
+
+## Volumetric PSF and Deconvolution Support
+In version 1.2.0, support for 3D PSF generation and deconvolution has been added.
+
+![WavePSF screenshot](images/wavepsf_V1.2.0_screenshot_win11.png)
+
 ## Build
 
 ### Requirements

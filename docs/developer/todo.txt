@@ -114,7 +114,7 @@
 
 - change the mouse interaction (zoom, translation, etc) for input/output viewer or for psf grid viewer such that all viewers use same control (i think the control of psf grid viewer is more intuitive and this should be used)
 
-- add optional 3d deconvolution functionality (maybe ui in deconvolution tab). maybe richardson-lucy only? see:
+[done] add optional 3d deconvolution functionality (maybe ui in deconvolution tab). maybe richardson-lucy only? see:
 	- https://svi.nl/Huygens-Deconvolution
 	- https://bigwww.epfl.ch/deconvolution/
 	- https://www.sciencedirect.com/science/article/pii/S1046202316305096
@@ -122,18 +122,37 @@
 
 - add option to select what initial estimate should be used for 3d deconvolution
 
-- add 3d PSF generator: input frame above focal plane with user defined zernike coeffs, frame nr of focal plane --> coeffs of start frame, and user defined or 0.0. coeffs in focal plane frame, are then used to make linear or maybe parabolic fit to generate 3d PSF
+[dismissed] add 3d PSF generator: input frame above focal plane with user defined zernike coeffs, frame nr of focal plane --> coeffs of start frame, and user defined or 0.0. coeffs in focal plane frame, are then used to make linear or maybe parabolic fit to generate 3d PSF
+-> instead I decided to use a vectorial Richards-Wolf PSF model and Zernike wavefront for optical aberrations.
 
-- add optional cross sectional view 
+[done] add optional cross sectional view 
 
 - maybe add volume viewer
 
-- maybe move "set custom psf folder" and "use custom psf folder" from PSF menu to PSF Generator groupb box in the Generator drop down. maybe call it "custom psf" or "from file"
+[done] maybe move "set custom psf folder" and "use custom psf folder" from PSF menu to PSF Generator groupb box in the Generator drop down. maybe call it "custom psf" or "from file"
 
-- add confocal psf approximation in 3d microscopy psf generator. --> psf^2
+[done] add confocal psf approximation in 3d microscopy psf generator. --> psf^2
 
 - maybe add multi volume/channel support
 
 [done] add 3d psf microscopy settings tab to dialog just like zernike and deformable mirror generator
 
 [done] fix bug: iterations spin box in deconvolution tab needs to be per algorithm and not global
+
+[done] fix bug: 3d psf is clipped on edges for grid dimensions smaller 768. fast as well as exact mode
+
+- all viewers should support dragging via middle mouse to imitate input/oputut viewers
+
+[done] add optional log scaling to input/output viewer
+
+[done] add LUTs to PSF and input/output viewers
+
+- maybe add MIP option to viewers
+
+[done] double slider with LUT and maybe a histogram in it
+
+[done] add cancle option to deconvolution busy dialog
+
+- add option for custom (non-square) psf grid size
+
+[done] bug fix: when rotating input/output viewer position line is also rotated but mouse symbol (when above position line) is not adjusted

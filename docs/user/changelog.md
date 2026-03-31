@@ -1,5 +1,38 @@
 # WavePSF - Changelog
 
+## Version 1.2.0 (2026-04-01)
+
+### Added
+
+- Display control bar with optional histogram view. Provides controls for display range, lut and log scale 
+- 3D PSF generator for Microscopy: `PSF-Generator > Generator > 3D PSF Microscopy`
+- 3D Richardson-Lucy deconvolution: `Deconvolution > Algorithm > Richardson-Lucy 3D` 
+- PSF grid viewer: Shows the spatial distribution of PSFs across all patches, with orientation controls and view sync (`View > PSF Grid`)
+- Cross-section viewer: Shows cross-sections of input and output data side by side, with draggable Y position line synced between viewers (`View > Cross-Section Viewer`)
+- External PSF folder support: Load PSF folders with arbitrary file naming is now supported (files are ordered alphanumerically and assembled into a 3d PSF)
+- Option to reset all wavefront coefficients:`Edit > Reset All Coefficients`
+- Option to clear optimization plot between batch jobs and via context menu
+- Busy dialog is now visible when saving/loading wavefront coefficients
+- Remember last used directories for wavefront coefficient and output file dialogs
+- 768 and 1024 PSF grid size options in settings dialog
+- Ctrl+Z to undo coefficient paste (only one level of undo is supported, and it only tracks the last paste action, not individual coefficient edits)
+- Plain scroll wheel zoom in input/output viewers (in addition to Ctrl+scroll)
+
+### Changed
+
+- "Offset from current" optimization option renamed to "From relative frame"
+- "Load PSF from file" removed from main menu and replaced by "From File" PSF generator
+- Settings Dialog: PSF calculation settings (phase scale, aperture, normalization, padding) are now stored per generator type instead of being shared globally. Switching between generators preserves each mode's configuration. Only PSF grid size remains a shared setting.
+- "Live Deconvolution" checkbox is now labeled "Auto-deconvolve on changes"
+
+### Fixed
+
+- Changing patch grid or grid size no longer wipes loaded coefficients
+- Zernike range overrides restored correctly on restart
+- Patch grid visibility state respected when loading new data
+
+
+
 ## Version 1.1.0 (2026-03-08)
 
 ### Added
