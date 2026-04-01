@@ -229,6 +229,8 @@ void PSFModule::applyInlineSettings(const QVariantMap& settings)
 	if (!settings.isEmpty()) {
 		this->generator->applyInlineSettings(settings);
 	}
+	this->allGeneratorSettings[this->generator->typeName()] =
+		this->generator->serializeSettings();
 	this->regeneratePipeline();
 }
 

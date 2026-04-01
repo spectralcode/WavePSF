@@ -313,6 +313,7 @@ void ApplicationController::applyInlineSettings(const QVariantMap& settings)
 {
 	if (this->psfModule != nullptr) {
 		this->psfModule->applyInlineSettings(settings);
+		emit psfSettingsUpdated(this->psfModule->getPSFSettings());
 	}
 }
 

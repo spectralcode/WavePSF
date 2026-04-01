@@ -94,12 +94,24 @@ PSFSettings SettingsDialog::getSettings() const
 	     it != this->generatorSettingWidgets.constEnd(); ++it) {
 		QVariantMap descriptorComposed = this->readGeneratorSettingsWidgets(it.key());
 
-		// If this mode also has custom Zernike UI, only merge propagator_settings
-		// (generator_settings was already set by the Zernike UI loop above)
+		// If this mode also has custom Zernike UI, only merge the propagator
+		// keys that have corresponding dialog widgets — the remaining keys
+		// (e.g. RW inline settings) are preserved from the existing map.
 		if (this->zernikeWidgets.contains(it.key())) {
 			QVariantMap existing = s.allGeneratorSettings.value(it.key());
-			existing[QStringLiteral("propagator_settings")] =
-				descriptorComposed.value(QStringLiteral("propagator_settings"));
+			QVariantMap existingProp = existing.value(QStringLiteral("propagator_settings")).toMap();
+			QVariantMap roundTripped = descriptorComposed.value(QStringLiteral("propagator_settings")).toMap();
+			if (existingProp.isEmpty()) {
+				existingProp = roundTripped;
+			} else {
+				const QMap<QString, QWidget*>& modeWidgets = this->generatorSettingWidgets.value(it.key());
+				for (auto wit = modeWidgets.constBegin(); wit != modeWidgets.constEnd(); ++wit) {
+					if (roundTripped.contains(wit.key())) {
+						existingProp[wit.key()] = roundTripped.value(wit.key());
+					}
+				}
+			}
+			existing[QStringLiteral("propagator_settings")] = existingProp;
 			s.allGeneratorSettings[it.key()] = existing;
 		} else {
 			s.allGeneratorSettings[it.key()] = descriptorComposed;

@@ -439,7 +439,13 @@ void RichardsWolfCalculator::deserializeSettings(const QVariantMap& settings)
 void RichardsWolfCalculator::applyInlineSettings(const QVariantMap& settings)
 {
 	if (!settings.isEmpty()) {
-		this->deserializeSettings(settings);
+		// Merge partial update onto current full state so that keys not
+		// present in |settings| (e.g. phase_scale) are preserved.
+		QVariantMap merged = this->serializeSettings();
+		for (auto it = settings.constBegin(); it != settings.constEnd(); ++it) {
+			merged[it.key()] = it.value();
+		}
+		this->deserializeSettings(merged);
 	}
 }
 
