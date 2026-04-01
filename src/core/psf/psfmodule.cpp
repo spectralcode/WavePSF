@@ -207,8 +207,6 @@ void PSFModule::applyPSFSettings(const PSFSettings& settings)
 
 	// Switch generator if needed
 	if (this->generator->typeName() != modeName) {
-		this->allGeneratorSettings[this->generator->typeName()] =
-			this->generator->serializeSettings();
 		delete this->generator;
 		this->generator = PSFGeneratorFactory::create(modeName, this);
 		emit generatorChanged(modeName);
