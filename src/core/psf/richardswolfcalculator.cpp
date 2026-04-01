@@ -386,13 +386,13 @@ QVector<NumericSettingDescriptor> RichardsWolfCalculator::getSettingsDescriptors
 		{KEY_PHASE_SCALE,    tr("Phase Scale"),            tr("Phase scale in rad per wavefront unit.\n"
 		                                                      "The wavefront is multiplied by this value as first step of PSF calculation.\n"
 		                                                      "Default value: 1.0."),
-		                                                      0.001, 10000.0, 1.0, DEF_PHASE_SCALE, 3, {}},
-		{KEY_WAVELENGTH_NM,  tr("Wavelength (nm)"),        tr("Emission wavelength in nanometers"),      1.0, 10000.0, 1.0,   DEF_WAVELENGTH_NM, 0, {}},
-		{KEY_NA,             tr("Numerical Aperture"),     tr("Objective numerical aperture"),            0.01,   2.0,  0.01,  DEF_NA,            2, {}},
-		{KEY_N_IMMERSION,    tr("Immersion Index"),        tr("Refractive index of immersion medium"),    1.0,    3.0,  0.001, DEF_N_IMMERSION,   3, {}},
-		{KEY_Z_STEP_NM,      tr("Z Step (nm)"),            tr("Axial step between z-planes"),             1.0, 99999.0, 10.0,  DEF_Z_STEP_NM,     0, {}},
-		{KEY_NUM_Z_PLANES,   tr("Num Z Planes"),           tr("Number of axial planes"),                  1.0, 10240.0,  1.0, static_cast<double>(DEF_NUM_Z_PLANES), 0, {}},
-		{KEY_XY_STEP_NM,     tr("XY Pixel Size (nm)"),    tr("Lateral pixel spacing in nm (0 = native FFT spacing)"), 0.0, 99999999.0, 1.0, DEF_XY_STEP_NM, 1, {}},
+		                                                      0.001, 10000.0, 1.0, DEF_PHASE_SCALE, 3, {}, false},
+		{KEY_WAVELENGTH_NM,  tr("Wavelength (nm)"),        tr("Emission wavelength in nanometers"),      1.0, 10000.0, 1.0,   DEF_WAVELENGTH_NM, 0, {}, true},
+		{KEY_NA,             tr("Numerical Aperture"),     tr("Objective numerical aperture"),            0.01,   2.0,  0.01,  DEF_NA,            2, {}, true},
+		{KEY_N_IMMERSION,    tr("Immersion Index"),        tr("Refractive index of immersion medium"),    1.0,    3.0,  0.001, DEF_N_IMMERSION,   3, {}, true},
+		{KEY_Z_STEP_NM,      tr("Z Step (nm)"),            tr("Axial step between z-planes"),             1.0, 99999.0, 10.0,  DEF_Z_STEP_NM,     0, {}, true},
+		{KEY_NUM_Z_PLANES,   tr("Num Z Planes"),           tr("Number of axial planes"),                  1.0, 10240.0,  1.0, static_cast<double>(DEF_NUM_Z_PLANES), 0, {}, true},
+		{KEY_XY_STEP_NM,     tr("XY Pixel Size (nm)"),    tr("Lateral pixel spacing in nm (0 = native FFT spacing)"), 0.0, 99999999.0, 1.0, DEF_XY_STEP_NM, 1, {}, true},
 	};
 }
 

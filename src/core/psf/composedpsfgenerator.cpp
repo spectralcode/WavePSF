@@ -1,6 +1,7 @@
 #include "composedpsfgenerator.h"
 #include "iwavefrontgenerator.h"
 #include "ipsfpropagator.h"
+#include <QSet>
 
 namespace {
 	const QString KEY_GENERATOR_SETTINGS  = QStringLiteral("generator_settings");
@@ -116,6 +117,11 @@ bool ComposedPSFGenerator::is3D() const
 	return this->propagator_->is3D();
 }
 
+bool ComposedPSFGenerator::supportsRangeOverrides() const
+{
+	return this->generator->supportsRangeOverrides();
+}
+
 void ComposedPSFGenerator::applyInlineSettings(const QVariantMap& settings)
 {
 	this->propagator_->applyInlineSettings(settings);
@@ -133,12 +139,45 @@ void ComposedPSFGenerator::invalidateCache()
 	this->lastWavefront = af::array();
 }
 
-IWavefrontGenerator* ComposedPSFGenerator::wavefrontGenerator() const
+QVariantMap ComposedPSFGenerator::extractDialogValues(const QVariantMap& persisted) const
 {
-	return this->generator;
+	QVariantMap flat;
+	QVariantMap gs = persisted.value(KEY_GENERATOR_SETTINGS).toMap();
+	QVariantMap ps = persisted.value(KEY_PROPAGATOR_SETTINGS).toMap();
+	for (auto it = gs.constBegin(); it != gs.constEnd(); ++it) flat[it.key()] = it.value();
+	for (auto it = ps.constBegin(); it != ps.constEnd(); ++it) flat[it.key()] = it.value();
+	return flat;
 }
 
-IPSFPropagator* ComposedPSFGenerator::propagator() const
+QVariantMap ComposedPSFGenerator::mergeDialogValues(
+	const QVariantMap& basePersisted,
+	const QVariantMap& flatDialogValues) const
 {
-	return this->propagator_;
+	QVariantMap result = basePersisted;
+	QVariantMap genSettings = result.value(KEY_GENERATOR_SETTINGS).toMap();
+	QVariantMap propSettings = result.value(KEY_PROPAGATOR_SETTINGS).toMap();
+
+	// Route descriptor-owned keys to the correct sub-map via storageSection
+	QSet<QString> descriptorKeys;
+	for (const NumericSettingDescriptor& desc : this->getSettingsDescriptors()) {
+		descriptorKeys.insert(desc.key);
+		if (!flatDialogValues.contains(desc.key)) continue;
+		if (desc.storageSection == SettingsStorageSection::Generator) {
+			genSettings[desc.key] = flatDialogValues[desc.key];
+		} else {
+			propSettings[desc.key] = flatDialogValues[desc.key];
+		}
+	}
+
+	// Route remaining keys not matched by any descriptor into generator_settings.
+	// This handles Zernike custom UI keys (noll_index_spec, global_min, etc.)
+	// which are not part of getSettingsDescriptors() but belong to the generator side.
+	for (auto it = flatDialogValues.constBegin(); it != flatDialogValues.constEnd(); ++it) {
+		if (!descriptorKeys.contains(it.key()))
+			genSettings[it.key()] = it.value();
+	}
+
+	result[KEY_GENERATOR_SETTINGS] = genSettings;
+	result[KEY_PROPAGATOR_SETTINGS] = propSettings;
+	return result;
 }

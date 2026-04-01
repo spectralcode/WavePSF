@@ -20,8 +20,8 @@ RWSettingsWidget::RWSettingsWidget(QWidget* parent)
 	QVector<NumericSettingDescriptor> descriptors = rwCalc.getSettingsDescriptors();
 
 	for (const NumericSettingDescriptor& desc : descriptors) {
-		// Skip settings configured in the settings dialog
-		if (desc.key == QStringLiteral("phase_scale")) {
+		// Only show inline-flagged descriptors (the rest belong in the settings dialog)
+		if (!desc.inlineOnly) {
 			continue;
 		}
 		if (desc.decimals == 0) {

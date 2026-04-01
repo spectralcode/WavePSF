@@ -8,8 +8,16 @@
 
 struct PSFSettings {
 	QString generatorTypeName = "Zernike";
-	QMap<QString, QVariantMap> allGeneratorSettings; // type name → serialized composed settings
+	QMap<QString, QVariantMap> allGeneratorSettings; // type name → serialized per-generator settings
 	int gridSize = 128;
+
+	// Runtime capabilities of the active generator (set by PSFModule, not serialized)
+	bool is3D = false;
+	bool hasInlineSettings = false;
+	bool isFileBased = false;
+	int apertureGeometry = 0;
+	double apertureRadius = 1.0;
+	QVariantMap inlineSettingsValues;  // flat map for inline settings widget (e.g., RW parameters)
 };
 
 // Parse 0-based index spec string into sorted list of indices

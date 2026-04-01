@@ -87,6 +87,14 @@ PSFSettings PSFModule::getPSFSettings() const
 	s.gridSize = this->gridSize;
 	s.allGeneratorSettings = this->allGeneratorSettings;
 	s.allGeneratorSettings[s.generatorTypeName] = this->generator->serializeSettings();
+	s.is3D = this->generator->is3D();
+	s.hasInlineSettings = this->generator->hasInlineSettings();
+	s.isFileBased = this->generator->isFileBased();
+	s.apertureGeometry = this->generator->getApertureGeometry();
+	s.apertureRadius = this->generator->getApertureRadius();
+	// Flatten all settings for inline widget (RWSettingsWidget ignores unknown keys)
+	s.inlineSettingsValues = this->generator->extractDialogValues(
+		this->generator->serializeSettings());
 	return s;
 }
 

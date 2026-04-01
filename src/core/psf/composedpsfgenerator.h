@@ -42,18 +42,19 @@ public:
 	int getApertureGeometry() const override;
 	double getApertureRadius() const override;
 
-	// Capabilities — delegate to propagator
+	// Capabilities — delegate to components
 	bool is3D() const override;
+	bool supportsRangeOverrides() const override;
 
 	// Inline settings — delegate to propagator
 	void applyInlineSettings(const QVariantMap& settings) override;
 	void setNumOutputPlanes(int numPlanes) override;
 	void invalidateCache() override;
 
-	// Temporary migration accessors (remove after SettingsDialog refactoring)
-	IWavefrontGenerator* wavefrontGenerator() const;
-	IPSFPropagator* propagator() const;
-
+	// Dialog value mapping — flattens/routes composed settings
+	QVariantMap extractDialogValues(const QVariantMap& persisted) const override;
+	QVariantMap mergeDialogValues(const QVariantMap& basePersisted,
+								 const QVariantMap& flatDialogValues) const override;
 private:
 	QString name;
 	IWavefrontGenerator* generator;

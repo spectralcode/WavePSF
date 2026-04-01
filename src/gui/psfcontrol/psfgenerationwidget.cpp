@@ -210,9 +210,8 @@ void PSFGenerationWidget::updateWavefront(af::array wavefront)
 
 void PSFGenerationWidget::updatePSF(af::array psf)
 {
-	bool isFileMode = (this->currentSettings.generatorTypeName == QStringLiteral("From File"));
-	bool is3DMode = (this->currentSettings.generatorTypeName == QStringLiteral("3D PSF Microscopy"));
-	bool show3D = isFileMode || is3DMode || (psf.numdims() > 2 && psf.dims(2) > 1);
+	bool show3D = this->currentSettings.isFileBased || this->currentSettings.is3D
+	           || (psf.numdims() > 2 && psf.dims(2) > 1);
 
 	this->psfPreviewStack->setCurrentIndex(show3D ? 1 : 0);
 
@@ -241,31 +240,23 @@ void PSFGenerationWidget::setPSFSettings(const PSFSettings& settings)
 	}
 	this->generatorTypeCombo->blockSignals(false);
 
-	// Read aperture and RW settings from the active generator's composed settings
-	QVariantMap activeSettings = settings.allGeneratorSettings.value(settings.generatorTypeName);
-	QVariantMap propSettings = activeSettings.value(QStringLiteral("propagator_settings")).toMap();
+	this->wavefrontPlot->setAperture(settings.apertureGeometry, settings.apertureRadius);
 
-	int apertureGeometry = propSettings.value(QStringLiteral("aperture_geometry"), 0).toInt();
-	double apertureRadius = propSettings.value(QStringLiteral("aperture_radius"), 1.0).toDouble();
-	this->wavefrontPlot->setAperture(apertureGeometry, apertureRadius);
-
-	// Show/hide RW settings widget (preview stack is switched in updatePSF() based on data)
-	bool is3D = (settings.generatorTypeName == QStringLiteral("3D PSF Microscopy"));
-	this->rwSettingsWidget->setVisible(is3D);
-	if (is3D) {
-		this->rwSettingsWidget->setSettings(propSettings);
+	// Show/hide inline settings widget (preview stack is switched in updatePSF() based on data)
+	this->rwSettingsWidget->setVisible(settings.hasInlineSettings);
+	if (settings.hasInlineSettings) {
+		this->rwSettingsWidget->setSettings(settings.inlineSettingsValues);
 	}
 
 	// Toggle coefficient editor / wavefront vs file browser
-	bool isFileMode = (settings.generatorTypeName == QStringLiteral("From File"));
-	this->coefficientContainer->setVisible(!isFileMode);
-	this->wavefrontContainer->setVisible(!isFileMode);
-	this->fileBrowserWidget->setVisible(isFileMode);
-	if (!isFileMode) {
+	this->coefficientContainer->setVisible(!settings.isFileBased);
+	this->wavefrontContainer->setVisible(!settings.isFileBased);
+	this->fileBrowserWidget->setVisible(settings.isFileBased);
+	if (!settings.isFileBased) {
 		this->fileInfoWidget->setVisible(false);
 	}
-	if (isFileMode) {
-		QVariantMap fileSettings = settings.allGeneratorSettings.value(QStringLiteral("From File"));
+	if (settings.isFileBased) {
+		QVariantMap fileSettings = settings.allGeneratorSettings.value(settings.generatorTypeName);
 		QString sourcePath = fileSettings.value(QStringLiteral("source_path")).toString();
 		this->fileSourceValue->setText(sourcePath.isEmpty() ? tr("No source selected") : sourcePath);
 	}

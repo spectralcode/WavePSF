@@ -22,24 +22,13 @@
 
 namespace {
 
-const QString MODE_3D_MICROSCOPY = QStringLiteral("3D PSF Microscopy");
-
-// Keys already shown inline by RWSettingsWidget — don't duplicate in settings dialog
-const QSet<QString> RW_INLINE_KEYS = {
-	QStringLiteral("wavelength_nm"), QStringLiteral("numerical_aperture"),
-	QStringLiteral("immersion_index"), QStringLiteral("z_step_nm"),
-	QStringLiteral("num_z_planes"), QStringLiteral("xy_step_nm")
-};
-
-// Flatten composed settings {generator_settings: {...}, propagator_settings: {...}} into a single map
-QVariantMap flattenComposedSettings(const QVariantMap& composed)
+// Reads the current value from an auto-generated settings widget (QComboBox, QDoubleSpinBox, or QSpinBox)
+QVariant readWidgetValue(QWidget* widget)
 {
-	QVariantMap flat;
-	QVariantMap gs = composed.value(QStringLiteral("generator_settings")).toMap();
-	QVariantMap ps = composed.value(QStringLiteral("propagator_settings")).toMap();
-	for (auto it = gs.constBegin(); it != gs.constEnd(); ++it) flat[it.key()] = it.value();
-	for (auto it = ps.constBegin(); it != ps.constEnd(); ++it) flat[it.key()] = it.value();
-	return flat;
+	if (auto* combo = qobject_cast<QComboBox*>(widget)) return combo->currentIndex();
+	if (auto* dSpin = qobject_cast<QDoubleSpinBox*>(widget)) return dSpin->value();
+	if (auto* iSpin = qobject_cast<QSpinBox*>(widget)) return iSpin->value();
+	return QVariant();
 }
 
 } // namespace
@@ -70,51 +59,32 @@ SettingsDialog::SettingsDialog(const PSFSettings& settings,
 	});
 }
 
+SettingsDialog::~SettingsDialog()
+{
+	qDeleteAll(this->generatorPrototypes);
+}
+
 PSFSettings SettingsDialog::getSettings() const
 {
 	PSFSettings s;
 	s.generatorTypeName = this->currentGeneratorTypeName;
 	s.gridSize = this->gridSizeCombo->currentText().toInt();
-
-	// Start from initial settings to preserve anything not edited by this dialog
 	s.allGeneratorSettings = this->initialSettings.allGeneratorSettings;
 
-	// Read Zernike custom UI settings per mode
-	for (auto it = this->zernikeWidgets.constBegin(); it != this->zernikeWidgets.constEnd(); ++it) {
-		const QString& modeName = it.key();
-		QVariantMap zernikeGs = this->readZernikeSettings(it.value());
-
-		QVariantMap composed = s.allGeneratorSettings.value(modeName);
-		composed[QStringLiteral("generator_settings")] = zernikeGs;
-		s.allGeneratorSettings[modeName] = composed;
-	}
-
-	// Merge descriptor-based widget values for modes that have dialog widgets
+	// Merge descriptor-based widget values first (all modes that have widgets)
 	for (auto it = this->generatorSettingWidgets.constBegin();
 	     it != this->generatorSettingWidgets.constEnd(); ++it) {
-		QVariantMap descriptorComposed = this->readGeneratorSettingsWidgets(it.key());
+		s.allGeneratorSettings[it.key()] = this->readGeneratorSettingsWidgets(it.key());
+	}
 
-		// If this mode also has custom Zernike UI, only merge the propagator
-		// keys that have corresponding dialog widgets — the remaining keys
-		// (e.g. RW inline settings) are preserved from the existing map.
-		if (this->zernikeWidgets.contains(it.key())) {
-			QVariantMap existing = s.allGeneratorSettings.value(it.key());
-			QVariantMap existingProp = existing.value(QStringLiteral("propagator_settings")).toMap();
-			QVariantMap roundTripped = descriptorComposed.value(QStringLiteral("propagator_settings")).toMap();
-			if (existingProp.isEmpty()) {
-				existingProp = roundTripped;
-			} else {
-				const QMap<QString, QWidget*>& modeWidgets = this->generatorSettingWidgets.value(it.key());
-				for (auto wit = modeWidgets.constBegin(); wit != modeWidgets.constEnd(); ++wit) {
-					if (roundTripped.contains(wit.key())) {
-						existingProp[wit.key()] = roundTripped.value(wit.key());
-					}
-				}
-			}
-			existing[QStringLiteral("propagator_settings")] = existingProp;
-			s.allGeneratorSettings[it.key()] = existing;
-		} else {
-			s.allGeneratorSettings[it.key()] = descriptorComposed;
+	// Merge Zernike custom UI values on top (modes that support range overrides)
+	for (auto it = this->zernikeWidgets.constBegin(); it != this->zernikeWidgets.constEnd(); ++it) {
+		const QString& modeName = it.key();
+		QVariantMap zernikeGs = this->readZernikeSettings(modeName, it.value());
+		IPSFGenerator* adapter = this->generatorPrototypes.value(modeName, nullptr);
+		if (adapter) {
+			s.allGeneratorSettings[modeName] =
+				adapter->mergeDialogValues(s.allGeneratorSettings.value(modeName), zernikeGs);
 		}
 	}
 
@@ -177,32 +147,32 @@ void SettingsDialog::setupUI()
 	QTabWidget* generatorSubTabs = new QTabWidget(generatorTab);
 
 	for (const QString& typeName : PSFGeneratorFactory::availableTypeNames()) {
-		if (typeName == QStringLiteral("From File")) continue;
+		IPSFGenerator* gen = PSFGeneratorFactory::create(typeName, nullptr);
+		this->generatorPrototypes[typeName] = gen;
+
+		// File-based generators have no settings UI in this dialog
+		if (gen->isFileBased()) { continue; }
+
 		QWidget* subTabPage = new QWidget(generatorSubTabs);
 		QVBoxLayout* subTabLayout = new QVBoxLayout(subTabPage);
 		subTabLayout->setSpacing(3);
 		subTabLayout->setContentsMargins(3, 3, 3, 3);
 
-		// Add Zernike custom UI to modes that use ZernikeGenerator
-		if (typeName == QStringLiteral("Zernike") || typeName == MODE_3D_MICROSCOPY) {
+		// Build Zernike coefficient range UI for generators that support it
+		if (gen->supportsRangeOverrides()) {
 			ZernikeWidgets zw = this->buildZernikeUI(typeName, subTabPage);
 			this->zernikeWidgets[typeName] = zw;
 			subTabLayout->addWidget(zw.groupBox);
 		}
 
-		// Add descriptor-based settings GroupBox
-		IPSFGenerator* gen = PSFGeneratorFactory::create(typeName, nullptr);
+		// Build descriptor-based settings, filtering out inline-only descriptors
 		QVector<NumericSettingDescriptor> descriptors = gen->getSettingsDescriptors();
-		delete gen;
-
-		// For 3D PSF Microscopy, filter out settings already shown inline by RWSettingsWidget
-		if (typeName == MODE_3D_MICROSCOPY) {
-			descriptors.erase(std::remove_if(descriptors.begin(), descriptors.end(),
-				[](const NumericSettingDescriptor& d) { return RW_INLINE_KEYS.contains(d.key); }),
-				descriptors.end());
-		}
+		descriptors.erase(std::remove_if(descriptors.begin(), descriptors.end(),
+			[](const NumericSettingDescriptor& d) { return d.inlineOnly; }),
+			descriptors.end());
 
 		if (!descriptors.isEmpty()) {
+			this->generatorDescriptors[typeName] = descriptors;
 			this->buildGeneratorSettingsGroup(typeName, descriptors, subTabPage);
 			subTabLayout->addWidget(this->generatorGroupBoxes.value(typeName));
 		}
@@ -455,7 +425,7 @@ void SettingsDialog::rebuildOverrideTable(ZernikeWidgets& zw, const QVector<int>
 	}
 }
 
-QVariantMap SettingsDialog::readZernikeSettings(const ZernikeWidgets& zw) const
+QVariantMap SettingsDialog::readZernikeSettings(const QString& typeName, const ZernikeWidgets& zw) const
 {
 	QVariantMap zernikeGs;
 	zernikeGs[QLatin1String(ZernikeGenerator::KEY_NOLL_INDEX_SPEC)] = zw.nollIndicesEdit->text().trimmed();
@@ -463,11 +433,12 @@ QVariantMap SettingsDialog::readZernikeSettings(const ZernikeWidgets& zw) const
 	zernikeGs[QLatin1String(ZernikeGenerator::KEY_GLOBAL_MAX)] = zw.globalMaxSpin->value();
 
 	// Preserve step from initial settings (no UI widget for it)
-	// Use Zernike mode's initial settings as default, fall back to 0.1
-	QVariantMap initialZernikeGs = flattenComposedSettings(
-		this->initialSettings.allGeneratorSettings.value(QStringLiteral("Zernike")));
+	IPSFGenerator* adapter = this->generatorPrototypes.value(typeName, nullptr);
+	QVariantMap initialFlat = adapter
+		? adapter->extractDialogValues(this->initialSettings.allGeneratorSettings.value(typeName))
+		: this->initialSettings.allGeneratorSettings.value(typeName);
 	zernikeGs[QLatin1String(ZernikeGenerator::KEY_STEP)] =
-		initialZernikeGs.value(QLatin1String(ZernikeGenerator::KEY_STEP), 0.1);
+		initialFlat.value(QLatin1String(ZernikeGenerator::KEY_STEP), 0.1);
 
 	QVariantMap overrides;
 	for (int row = 0; row < zw.overrideTable->rowCount(); ++row) {
@@ -534,8 +505,9 @@ void SettingsDialog::populateFromSettings(const PSFSettings& settings)
 	// Populate per-mode Zernike widgets
 	for (auto it = this->zernikeWidgets.begin(); it != this->zernikeWidgets.end(); ++it) {
 		QVariantMap composed = allGenSettings.value(it.key());
-		QVariantMap zernikeGs = composed.value(QStringLiteral("generator_settings")).toMap();
-		this->populateZernikeWidgets(it.value(), zernikeGs);
+		IPSFGenerator* adapter = this->generatorPrototypes.value(it.key(), nullptr);
+		QVariantMap flat = adapter ? adapter->extractDialogValues(composed) : composed;
+		this->populateZernikeWidgets(it.value(), flat);
 	}
 
 	// Populate descriptor-based generator settings (flatten composed settings for widget population)
@@ -555,7 +527,7 @@ void SettingsDialog::buildGeneratorSettingsGroup(const QString& typeName,
                                                      const QVector<NumericSettingDescriptor>& descriptors,
                                                      QWidget* parent)
 {
-	QGroupBox* group = new QGroupBox(tr("Propagator Settings"), parent);
+	QGroupBox* group = new QGroupBox(tr("Settings"), parent);
 	QFormLayout* layout = new QFormLayout(group);
 	layout->setSpacing(3);
 
@@ -603,35 +575,23 @@ void SettingsDialog::buildGeneratorSettingsGroup(const QString& typeName,
 
 QVariantMap SettingsDialog::readGeneratorSettingsWidgets(const QString& typeName) const
 {
-	// Read flat values from widgets
-	QVariantMap flat;
-	const QMap<QString, QWidget*>& widgets = this->generatorSettingWidgets.value(typeName);
-	for (auto it = widgets.constBegin(); it != widgets.constEnd(); ++it) {
-		QComboBox* combo = qobject_cast<QComboBox*>(it.value());
-		if (combo) { flat[it.key()] = combo->currentIndex(); continue; }
-		QDoubleSpinBox* dSpin = qobject_cast<QDoubleSpinBox*>(it.value());
-		if (dSpin) { flat[it.key()] = dSpin->value(); continue; }
-		QSpinBox* iSpin = qobject_cast<QSpinBox*>(it.value());
-		if (iSpin) { flat[it.key()] = iSpin->value(); }
-	}
+	QVariantMap base = this->initialSettings.allGeneratorSettings.value(typeName);
+	IPSFGenerator* adapter = this->generatorPrototypes.value(typeName, nullptr);
+	if (!adapter) return base;
 
-	// Round-trip through a temp generator to split flat map into composed format.
-	// Each component only reads the keys it knows, so passing flat as both
-	// generator_settings and propagator_settings is safe.
-	IPSFGenerator* temp = PSFGeneratorFactory::create(typeName, nullptr);
-	QVariantMap composed;
-	composed[QStringLiteral("generator_settings")] = flat;
-	composed[QStringLiteral("propagator_settings")] = flat;
-	temp->deserializeSettings(composed);
-	QVariantMap result = temp->serializeSettings();
-	delete temp;
-	return result;
+	QVariantMap flat;
+	const auto& widgets = this->generatorSettingWidgets.value(typeName);
+	for (auto it = widgets.constBegin(); it != widgets.constEnd(); ++it) {
+		QVariant value = readWidgetValue(it.value());
+		if (value.isValid()) flat[it.key()] = value;
+	}
+	return adapter->mergeDialogValues(base, flat);
 }
 
-void SettingsDialog::populateGeneratorSettingsWidgets(const QString& typeName, const QVariantMap& composedSettings)
+void SettingsDialog::populateGeneratorSettingsWidgets(const QString& typeName, const QVariantMap& settings)
 {
-	// Flatten composed settings for widget population
-	QVariantMap flat = flattenComposedSettings(composedSettings);
+	IPSFGenerator* adapter = this->generatorPrototypes.value(typeName, nullptr);
+	QVariantMap flat = adapter ? adapter->extractDialogValues(settings) : settings;
 
 	const QMap<QString, QWidget*>& widgets = this->generatorSettingWidgets.value(typeName);
 	for (auto it = widgets.constBegin(); it != widgets.constEnd(); ++it) {

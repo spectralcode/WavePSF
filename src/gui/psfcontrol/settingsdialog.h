@@ -18,6 +18,7 @@ class QPushButton;
 class QGroupBox;
 class QWidget;
 class QLabel;
+class IPSFGenerator;
 
 class SettingsDialog : public QDialog
 {
@@ -27,6 +28,7 @@ public:
 							   const QVector<AFBackendInfo>& backends,
 							   int activeBackend, int activeDevice,
 							   QWidget* parent = nullptr);
+	~SettingsDialog() override;
 
 	PSFSettings getSettings() const;
 	int getSelectedBackend() const;
@@ -66,7 +68,7 @@ private:
 	};
 	ZernikeWidgets buildZernikeUI(const QString& modeName, QWidget* parent);
 	void rebuildOverrideTable(ZernikeWidgets& zw, const QVector<int>& indices);
-	QVariantMap readZernikeSettings(const ZernikeWidgets& zw) const;
+	QVariantMap readZernikeSettings(const QString& typeName, const ZernikeWidgets& zw) const;
 	void populateZernikeWidgets(ZernikeWidgets& zw, const QVariantMap& zernikeGs);
 
 	QMap<QString, ZernikeWidgets> zernikeWidgets;
@@ -76,6 +78,12 @@ private:
 
 	// Auto-generated setting widgets (typeName → key → QSpinBox or QDoubleSpinBox)
 	QMap<QString, QMap<QString, QWidget*>> generatorSettingWidgets;
+
+	// Cached descriptors per generator type (after inlineOnly filtering)
+	QMap<QString, QVector<NumericSettingDescriptor>> generatorDescriptors;
+
+	// Cached per-type generator prototypes for extract/merge delegation
+	QMap<QString, IPSFGenerator*> generatorPrototypes;
 
 	// PSF calculation controls
 	QComboBox* gridSizeCombo;

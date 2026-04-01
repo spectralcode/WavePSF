@@ -26,6 +26,7 @@ public:
 
 	// Capabilities
 	bool is3D() const override;
+	bool isFileBased() const override { return true; }
 
 	// Cache management
 	void invalidateCache() override;

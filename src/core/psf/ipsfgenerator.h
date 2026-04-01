@@ -50,6 +50,14 @@ public:
 
 	// Capabilities
 	virtual bool is3D() const { return false; }
+	virtual bool isFileBased() const { return false; }
+	virtual bool supportsRangeOverrides() const { return false; }
+	virtual bool hasInlineSettings() const {
+		for (const auto& d : this->getSettingsDescriptors()) {
+			if (d.inlineOnly) return true;
+		}
+		return false;
+	}
 
 	// Inline settings updates (e.g., RW settings widget)
 	virtual void applyInlineSettings(const QVariantMap& settings) { Q_UNUSED(settings); }
@@ -59,6 +67,22 @@ public:
 
 	// Cache management
 	virtual void invalidateCache() {}
+
+	// Dialog value mapping — generators own the translation between persisted
+	// settings format and the flat key→value maps used by SettingsDialog widgets.
+	// Default implementations work for flat (standalone) settings.
+	virtual QVariantMap extractDialogValues(const QVariantMap& persisted) const {
+		return persisted;
+	}
+	virtual QVariantMap mergeDialogValues(
+		const QVariantMap& basePersisted,
+		const QVariantMap& flatDialogValues) const
+	{
+		QVariantMap result = basePersisted;
+		for (auto it = flatDialogValues.constBegin(); it != flatDialogValues.constEnd(); ++it)
+			result[it.key()] = it.value();
+		return result;
+	}
 };
 
 #endif // IPSFGENERATOR_H
