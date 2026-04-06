@@ -296,7 +296,7 @@ void ImageDataViewer::dispatchRenderNow()
 
 	// PerVolume: use global min/max as manual range
 	if (this->displaySettings.autoRangeMode == AutoRangeMode::PerVolume) {
-		auto range = dataSource->getGlobalRange();
+		auto range = dataSource->getGlobalRangeCached();
 		req.manualMin = range.first;
 		req.manualMax = range.second;
 	}

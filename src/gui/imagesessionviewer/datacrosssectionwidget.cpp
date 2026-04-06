@@ -268,7 +268,7 @@ void DataCrossSectionWidget::dispatchPanelRender(Panel& panel, const ImageData* 
 	req.manualMax = this->displaySettings.rangeMax;
 
 	if (this->displaySettings.autoRangeMode == AutoRangeMode::PerVolume) {
-		auto range = data->getGlobalRange();
+		auto range = data->getGlobalRangeCached();
 		req.manualMin = range.first;
 		req.manualMax = range.second;
 	}

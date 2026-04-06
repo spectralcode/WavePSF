@@ -9,12 +9,15 @@
 #include <cstring>
 #include <algorithm>
 #include <limits>
+#include <omp.h>
+
+static constexpr size_t OMP_PIXEL_THRESHOLD = 65535;
 
 ImageData::ImageData(void* data, int width, int height, int frames, EnviDataType dataType,
 					 const QVector<qreal>& wavelengths, const QString& wavelengthUnit, QObject* parent)
 	: QObject(parent), width(width), height(height), frames(frames), dataType(dataType),
 	  data(data), wavelengths(wavelengths), wavelengthUnit(wavelengthUnit),
-	  globalRangeDirty(true), globalRangeMin(0.0), globalRangeMax(0.0)
+	  globalRangeDirty(true), globalRangeEverComputed(false), globalRangeMin(0.0), globalRangeMax(0.0)
 {
 	// Generate frame names for HSI data
 	this->frameNames.reserve(this->frames);
@@ -30,7 +33,7 @@ ImageData::ImageData(void* data, int width, int height, int frames, EnviDataType
 ImageData::ImageData(const QImage& image, QObject* parent)
 	: QObject(parent), width(image.width()), height(image.height()),
 	  dataType(UNSIGNED_CHAR_8BIT), data(nullptr),
-	  globalRangeDirty(true), globalRangeMin(0.0), globalRangeMax(0.0)
+	  globalRangeDirty(true), globalRangeEverComputed(false), globalRangeMin(0.0), globalRangeMax(0.0)
 {
 	if (image.isNull() || this->width <= 0 || this->height <= 0) {
 		LOG_WARNING() << "Invalid image provided";
@@ -57,7 +60,8 @@ ImageData::ImageData(const ImageData& other)
 	: QObject(other.parent()), width(other.width), height(other.height), frames(other.frames),
 	  dataType(other.dataType), data(nullptr), wavelengths(other.wavelengths),
 	  wavelengthUnit(other.wavelengthUnit), frameNames(other.frameNames),
-	  globalRangeDirty(true), globalRangeMin(0.0), globalRangeMax(0.0)
+	  globalRangeDirty(other.globalRangeDirty), globalRangeEverComputed(other.globalRangeEverComputed),
+	  globalRangeMin(other.globalRangeMin), globalRangeMax(other.globalRangeMax)
 {
 	// Deep copy data
 	size_t totalBytes = static_cast<size_t>(this->width) * static_cast<size_t>(this->height) * static_cast<size_t>(this->frames) * this->calculateBytesPerSample();
@@ -182,6 +186,29 @@ void ImageData::setFrameNames(const QStringList& names)
 	}
 }
 
+template<typename T>
+static void scanRange(const void* data, size_t total, double& lo, double& hi)
+{
+	auto* p = static_cast<const T*>(data);
+	#pragma omp parallel if(total >= OMP_PIXEL_THRESHOLD)
+	{
+		double tLo = (std::numeric_limits<double>::max)();
+		double tHi = -(std::numeric_limits<double>::max)();
+		#pragma omp for schedule(static) nowait
+		for (long long i = 0; i < static_cast<long long>(total); ++i) {
+			const double v = static_cast<double>(p[i]);
+			if (!qIsFinite(v)) continue;
+			if (v < tLo) tLo = v;
+			if (v > tHi) tHi = v;
+		}
+		#pragma omp critical
+		{
+			if (tLo < lo) lo = tLo;
+			if (tHi > hi) hi = tHi;
+		}
+	}
+}
+
 QPair<double,double> ImageData::getGlobalRange() const
 {
 	if (!this->globalRangeDirty) {
@@ -196,32 +223,20 @@ QPair<double,double> ImageData::getGlobalRange() const
 	double lo = (std::numeric_limits<double>::max)();
 	double hi = -(std::numeric_limits<double>::max)();
 
-	#define SCAN_RANGE(Type) { \
-		auto* p = static_cast<const Type*>(this->data); \
-		for (size_t i = 0; i < total; ++i) { \
-			const double v = static_cast<double>(p[i]); \
-			if (!qIsFinite(v)) continue; \
-			if (v < lo) lo = v; \
-			if (v > hi) hi = v; \
-		} \
-	}
-
 	switch (this->dataType) {
-		case UNSIGNED_CHAR_8BIT:     SCAN_RANGE(unsigned char);      break;
-		case SIGNED_SHORT_16BIT:     SCAN_RANGE(short);              break;
-		case UNSIGNED_SHORT_16BIT:   SCAN_RANGE(unsigned short);     break;
-		case SIGNED_INT_32BIT:       SCAN_RANGE(int);                break;
-		case UNSIGNED_INT_32BIT:     SCAN_RANGE(unsigned int);       break;
-		case FLOAT_32BIT:            SCAN_RANGE(float);              break;
-		case DOUBLE_64BIT:           SCAN_RANGE(double);             break;
-		case SIGNED_LONG_INT_64BIT:  SCAN_RANGE(long long);          break;
-		case UNSIGNED_LONG_INT_64BIT:SCAN_RANGE(unsigned long long); break;
+		case UNSIGNED_CHAR_8BIT:     scanRange<unsigned char>(this->data, total, lo, hi);      break;
+		case SIGNED_SHORT_16BIT:     scanRange<short>(this->data, total, lo, hi);              break;
+		case UNSIGNED_SHORT_16BIT:   scanRange<unsigned short>(this->data, total, lo, hi);     break;
+		case SIGNED_INT_32BIT:       scanRange<int>(this->data, total, lo, hi);                break;
+		case UNSIGNED_INT_32BIT:     scanRange<unsigned int>(this->data, total, lo, hi);       break;
+		case FLOAT_32BIT:            scanRange<float>(this->data, total, lo, hi);              break;
+		case DOUBLE_64BIT:           scanRange<double>(this->data, total, lo, hi);             break;
+		case SIGNED_LONG_INT_64BIT:  scanRange<long long>(this->data, total, lo, hi);          break;
+		case UNSIGNED_LONG_INT_64BIT:scanRange<unsigned long long>(this->data, total, lo, hi); break;
 		default:
 			LOG_WARNING() << "Unsupported data type for getGlobalRange:" << this->dataType;
 			return qMakePair(0.0, 255.0);
 	}
-
-	#undef SCAN_RANGE
 
 	if (lo > hi) { lo = 0.0; hi = 255.0; }
 	if (!(hi > lo)) hi = lo + 1.0;
@@ -229,7 +244,16 @@ QPair<double,double> ImageData::getGlobalRange() const
 	this->globalRangeMin = lo;
 	this->globalRangeMax = hi;
 	this->globalRangeDirty = false;
+	this->globalRangeEverComputed = true;
 	return qMakePair(lo, hi);
+}
+
+QPair<double, double> ImageData::getGlobalRangeCached() const
+{
+	if (!this->globalRangeEverComputed) {
+		return this->getGlobalRange();
+	}
+	return qMakePair(this->globalRangeMin, this->globalRangeMax);
 }
 
 void ImageData::saveDataToDisk(const QString& filePath)

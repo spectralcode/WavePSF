@@ -62,6 +62,7 @@ public:
 
 	// Utility
 	QPair<double,double> getGlobalRange() const;
+	QPair<double,double> getGlobalRangeCached() const;
 	void saveDataToDisk(const QString& filePath);
 	void saveAsEnvi(const QString& filePath);
 	void saveAsTiff(const QString& filePath);
@@ -87,6 +88,7 @@ private:
 	bool isGrayscaleImage(const QImage& image) const;
 
 	mutable bool globalRangeDirty;
+	mutable bool globalRangeEverComputed;
 	mutable double globalRangeMin;
 	mutable double globalRangeMax;
 
