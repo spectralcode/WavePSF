@@ -224,6 +224,7 @@ void ImageDataViewer::displayFrame(int frameNr)
 	// Clamp frame for current data source (e.g. single-frame ground truth → 0)
 	// but preserve the logical frame position so switching back restores it
 	const int validFrame = this->getValidFrameForDataSource(frameNr, dataSource);
+	const bool frameActuallyChanged = (this->currentFrame != frameNr);
 	this->currentFrame = frameNr;
 
 	// Update bottom info immediately
@@ -242,14 +243,17 @@ void ImageDataViewer::displayFrame(int frameNr)
 			: QString("Frame %1").arg(validFrame));
 	}
 
-	// Only emit frame/wavelength signals when showing primary data,
-	// not during temporary ground truth preview
+	// Only emit navigation signals when showing primary data
+	// and the frame actually changed — display-only redraws
+	// (e.g. from setDisplaySettings) should not trigger frame-change propagation
 	if (!this->showingReference) {
 		QVector<qreal> wavelengths = dataSource->getWavelengths();
 		if (validFrame < wavelengths.size()) {
 			emit currentWavelengthChanged(wavelengths[validFrame]);
 		}
-		emit currentFrameChanged(validFrame);
+		if (frameActuallyChanged) {
+			emit currentFrameChanged(validFrame);
+		}
 	}
 
 	// Coalesce rapid changes

@@ -102,30 +102,31 @@ bool ApplicationController::openGroundTruthFile(const QString& filePath)
 
 void ApplicationController::setCurrentFrame(int frame)
 {
-	if (this->imageSession != nullptr) {
-		this->coefficientWorkspace->store();
+	if (this->imageSession == nullptr) return;
+	if (this->imageSession->getCurrentFrame() == frame) return;
 
-		bool suppress3D = this->deconvolutionLiveMode &&
-						  this->psfModule != nullptr &&
-						  this->psfModule->is3DAlgorithm();
+	this->coefficientWorkspace->store();
 
-		// Suppress psfUpdated-triggered deconv during coefficient loading
-		// to avoid double-fire.  We trigger explicitly below instead,
-		// because input data always changes on frame switch even when
-		// the PSF stays the same.
-		bool oldSuppress = this->suppressLiveDeconv;
-		this->suppressLiveDeconv = true;
+	bool suppress3D = this->deconvolutionLiveMode &&
+					  this->psfModule != nullptr &&
+					  this->psfModule->is3DAlgorithm();
 
-		this->imageSession->setCurrentFrame(frame);
-		this->coefficientWorkspace->loadForCurrentPatch();
+	// Suppress psfUpdated-triggered deconv during coefficient loading
+	// to avoid double-fire.  We trigger explicitly below instead,
+	// because input data always changes on frame switch even when
+	// the PSF stays the same.
+	bool oldSuppress = this->suppressLiveDeconv;
+	this->suppressLiveDeconv = true;
 
-		this->suppressLiveDeconv = oldSuppress;
+	this->imageSession->setCurrentFrame(frame);
+	this->coefficientWorkspace->loadForCurrentPatch();
 
-		// Re-deconvolve: input data changed (different frame).
-		// Skip for 3D algorithms — they process all frames at once.
-		if (this->deconvolutionLiveMode && !suppress3D) {
-			this->deconvolutionOrchestrator->runOnCurrentPatch();
-		}
+	this->suppressLiveDeconv = oldSuppress;
+
+	// Re-deconvolve: input data changed (different frame).
+	// Skip for 3D algorithms — they process all frames at once.
+	if (this->deconvolutionLiveMode && !suppress3D) {
+		this->deconvolutionOrchestrator->runOnCurrentPatch();
 	}
 }
 
