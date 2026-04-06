@@ -17,6 +17,7 @@
 #include <QContextMenuEvent>
 #include <QWheelEvent>
 #include <QResizeEvent>
+#include <QScrollBar>
 #include <QHoverEvent>
 
 static constexpr qreal LINE_GRAB_TOLERANCE_PX = 5.0;
@@ -34,6 +35,8 @@ DataCrossSectionWidget::DataCrossSectionWidget(QWidget* parent)
 	, outputData(nullptr)
 	, currentFrame(0)
 	, showFrameLine(true)
+	, viewSyncEnabled(false)
+	, syncInProgress(false)
 	, pendingRefresh(false)
 	, initialPositionSet(false)
 	, draggingFrameLine(false)
@@ -252,6 +255,8 @@ void DataCrossSectionWidget::handlePanelRendered(Panel& panel, const QImage& ima
 		panel.lastWidth = image.width();
 		panel.lastHeight = image.height();
 		this->fitPanelToView(panel);
+		Panel& other = (&panel == &this->inputPanel) ? this->outputPanel : this->inputPanel;
+		this->syncPanelView(panel, other);
 	}
 
 	int numFrames = 0;
@@ -287,6 +292,8 @@ bool DataCrossSectionWidget::eventFilter(QObject* obj, QEvent* event)
 			if (current >= 0.07 && current <= 100.0) {
 				panel->view->scale(factor, factor);
 			}
+			Panel& other = (panel == &this->inputPanel) ? this->outputPanel : this->inputPanel;
+			this->syncPanelView(*panel, other);
 			return true;
 		}
 
@@ -360,6 +367,8 @@ bool DataCrossSectionWidget::eventFilter(QObject* obj, QEvent* event)
 
 		case QEvent::MouseButtonDblClick: {
 			this->fitPanelToView(*panel);
+			Panel& other = (panel == &this->inputPanel) ? this->outputPanel : this->inputPanel;
+			this->syncPanelView(*panel, other);
 			return true;
 		}
 
@@ -396,6 +405,7 @@ void DataCrossSectionWidget::showEvent(QShowEvent* event)
 	if (!this->outputPanel.pixmapItem->pixmap().isNull()) {
 		this->fitPanelToView(this->outputPanel);
 	}
+	this->syncPanelView(this->inputPanel, this->outputPanel);
 }
 
 void DataCrossSectionWidget::resizeEvent(QResizeEvent* event)
@@ -407,6 +417,7 @@ void DataCrossSectionWidget::resizeEvent(QResizeEvent* event)
 	if (!this->outputPanel.pixmapItem->pixmap().isNull()) {
 		this->fitPanelToView(this->outputPanel);
 	}
+	this->syncPanelView(this->inputPanel, this->outputPanel);
 }
 
 void DataCrossSectionWidget::setupUI()
@@ -460,6 +471,14 @@ void DataCrossSectionWidget::connectSignals()
 		this->updatePanel(this->outputPanel, this->outputData, yIndex);
 		emit yPositionChanged(yIndex);
 	});
+
+	// Cross-section panel view sync (pan via scrollbar changes)
+	auto syncFromInput = [this]() { this->syncPanelView(this->inputPanel, this->outputPanel); };
+	auto syncFromOutput = [this]() { this->syncPanelView(this->outputPanel, this->inputPanel); };
+	connect(this->inputPanel.view->horizontalScrollBar(), &QScrollBar::valueChanged, this, syncFromInput);
+	connect(this->inputPanel.view->verticalScrollBar(), &QScrollBar::valueChanged, this, syncFromInput);
+	connect(this->outputPanel.view->horizontalScrollBar(), &QScrollBar::valueChanged, this, syncFromOutput);
+	connect(this->outputPanel.view->verticalScrollBar(), &QScrollBar::valueChanged, this, syncFromOutput);
 }
 
 void DataCrossSectionWidget::updateYControls()
@@ -530,4 +549,22 @@ void DataCrossSectionWidget::clearPanel(Panel& panel)
 	panel.lastWidth = 0;
 	panel.lastHeight = 0;
 	panel.titleLabel->setText(panel.baseTitle);
+}
+
+void DataCrossSectionWidget::setViewSyncEnabled(bool enabled)
+{
+	this->viewSyncEnabled = enabled;
+	if (enabled) {
+		this->syncPanelView(this->inputPanel, this->outputPanel);
+	}
+}
+
+void DataCrossSectionWidget::syncPanelView(Panel& source, Panel& target)
+{
+	if (!this->viewSyncEnabled || this->syncInProgress) return;
+	this->syncInProgress = true;
+	QPointF center = source.view->mapToScene(source.view->viewport()->rect().center());
+	target.view->setTransform(source.view->transform());
+	target.view->centerOn(center);
+	this->syncInProgress = false;
 }

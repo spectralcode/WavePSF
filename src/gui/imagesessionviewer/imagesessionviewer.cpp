@@ -320,6 +320,7 @@ void ImageSessionViewer::setViewSyncEnabled(bool enabled)
 		// Bring output view in line with input view immediately
 		this->inputViewer->broadcastViewTransform();
 	}
+	this->crossSectionWidget->setViewSyncEnabled(enabled);
 }
 
 

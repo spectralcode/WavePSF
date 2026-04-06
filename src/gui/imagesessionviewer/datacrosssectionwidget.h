@@ -34,6 +34,7 @@ public slots:
 	void setCurrentFrame(int frame);
 	void setYPosition(int y);
 	void refreshPanels();
+	void setViewSyncEnabled(bool enabled);
 
 signals:
 	void frameChangeRequested(int frame);
@@ -67,6 +68,7 @@ private:
 	void connectSignals();
 	void updateYControls();
 	void clearPanel(Panel& panel);
+	void syncPanelView(Panel& source, Panel& target);
 
 	bool eventFilter(QObject* obj, QEvent* event) override;
 	void showEvent(QShowEvent* event) override;
@@ -81,6 +83,8 @@ private:
 	int currentFrame;
 	bool showFrameLine;
 	DisplaySettings displaySettings;
+	bool viewSyncEnabled;
+	bool syncInProgress;
 	bool pendingRefresh;
 	bool initialPositionSet;
 	bool draggingFrameLine;
