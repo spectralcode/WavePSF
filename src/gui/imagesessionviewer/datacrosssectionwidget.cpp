@@ -50,6 +50,8 @@ DataCrossSectionWidget::DataCrossSectionWidget(QWidget* parent)
 
 DataCrossSectionWidget::~DataCrossSectionWidget()
 {
+	this->viewSyncEnabled = false;
+
 	auto stopRenderer = [](Panel& p) {
 		if (p.renderThread) {
 			p.renderThread->quit();
