@@ -2,7 +2,7 @@ QT += core gui widgets printsupport
 
 CONFIG += c++11
 TARGET = WavePSF
-VERSION = 1.2.0
+VERSION = 1.3.0
 DEFINES += APP_NAME=\\\"$$TARGET\\\"
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
