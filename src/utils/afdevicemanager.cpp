@@ -1,5 +1,6 @@
 #include "afdevicemanager.h"
 #include "settingsfilemanager.h"
+#include "logging.h"
 #include <arrayfire.h>
 
 namespace {
@@ -48,7 +49,14 @@ bool AFDeviceManager::setDevice(int backendId, int deviceId)
 
 	emit aboutToChangeDevice(backendId, deviceId);
 
-	AFDeviceManager::setDeviceForCurrentThread(backendId, deviceId);
+	if (!this->tryActivateBackend(backendId, deviceId)) {
+		LOG_WARNING() << "Failed to switch to backend" << backendId
+					  << "device" << deviceId;
+		// Restore previous backend (best-effort)
+		this->tryActivateBackend(this->activeBackendId, this->activeDeviceId);
+		this->syncActiveState();
+		return false;
+	}
 
 	this->activeBackendId = backendId;
 	this->activeDeviceId = deviceId;
@@ -59,9 +67,19 @@ bool AFDeviceManager::setDevice(int backendId, int deviceId)
 
 void AFDeviceManager::setDeviceForCurrentThread(int backendId, int deviceId)
 {
-	af::setBackend(static_cast<af_backend>(backendId));
-	if (deviceId >= 0 && deviceId < static_cast<int>(af::getDeviceCount())) {
+	try {
+		af::setBackend(static_cast<af_backend>(backendId));
+		int deviceCount = static_cast<int>(af::getDeviceCount());
+		if (deviceId < 0 || deviceId >= deviceCount) {
+			LOG_WARNING() << "setDeviceForCurrentThread: invalid device" << deviceId
+						  << "for backend" << backendId
+						  << "(device count:" << deviceCount << ")";
+			return;
+		}
 		af::setDevice(deviceId);
+	} catch (af::exception& e) {
+		LOG_WARNING() << "setDeviceForCurrentThread failed for backend"
+					  << backendId << "device" << deviceId << ":" << e.what();
 	}
 }
 
@@ -69,10 +87,21 @@ void AFDeviceManager::enumerateDevices()
 {
 	this->backends.clear();
 
-	af_backend savedBackend = af::getActiveBackend();
-	int savedDevice = static_cast<int>(af::getDevice());
+	// Save current AF state (best-effort — may fail if startup state is broken)
+	af_backend savedBackend = AF_BACKEND_CPU;
+	int savedDevice = 0;
+	try {
+		savedBackend = af::getActiveBackend();
+		savedDevice = static_cast<int>(af::getDevice());
+	} catch (af::exception&) {}
 
-	int available = af::getAvailableBackends();
+	int available = 0;
+	try {
+		available = af::getAvailableBackends();
+	} catch (af::exception& e) {
+		LOG_WARNING() << "af::getAvailableBackends() failed:" << e.what();
+		return;
+	}
 
 	struct BackendEntry { af_backend id; const char* name; };
 	BackendEntry entries[] = {
@@ -84,34 +113,40 @@ void AFDeviceManager::enumerateDevices()
 	for (const auto& entry : entries) {
 		if (!(available & entry.id)) continue;
 
-		af::setBackend(entry.id);
+		try {
+			af::setBackend(entry.id);
 
-		AFBackendInfo backendInfo;
-		backendInfo.backendId = static_cast<int>(entry.id);
-		backendInfo.name = QString::fromLatin1(entry.name);
+			AFBackendInfo backendInfo;
+			backendInfo.backendId = static_cast<int>(entry.id);
+			backendInfo.name = QString::fromLatin1(entry.name);
 
-		int deviceCount = static_cast<int>(af::getDeviceCount());
-		for (int i = 0; i < deviceCount; ++i) {
-			af::setDevice(i);
+			int deviceCount = static_cast<int>(af::getDeviceCount());
+			for (int i = 0; i < deviceCount; ++i) {
+				af::setDevice(i);
 
-			char name[256], platform[256], toolkit[256], compute[256];
-			af::deviceInfo(name, platform, toolkit, compute);
+				char name[256], platform[256], toolkit[256], compute[256];
+				af::deviceInfo(name, platform, toolkit, compute);
 
-			AFDeviceInfo devInfo;
-			devInfo.deviceId = i;
-			devInfo.name     = QString::fromUtf8(name).trimmed();
-			devInfo.platform = QString::fromUtf8(platform).trimmed();
-			devInfo.toolkit  = QString::fromUtf8(toolkit).trimmed();
-			devInfo.compute  = QString::fromUtf8(compute).trimmed();
-			backendInfo.devices.append(devInfo);
+				AFDeviceInfo devInfo;
+				devInfo.deviceId = i;
+				devInfo.name     = QString::fromUtf8(name).trimmed();
+				devInfo.platform = QString::fromUtf8(platform).trimmed();
+				devInfo.toolkit  = QString::fromUtf8(toolkit).trimmed();
+				devInfo.compute  = QString::fromUtf8(compute).trimmed();
+				backendInfo.devices.append(devInfo);
+			}
+
+			this->backends.append(backendInfo);
+		} catch (af::exception& e) {
+			LOG_WARNING() << "Skipping" << entry.name << "backend:" << e.what();
 		}
-
-		this->backends.append(backendInfo);
 	}
 
-	// Restore original AF state
-	af::setBackend(savedBackend);
-	af::setDevice(savedDevice);
+	// Restore original AF state (best-effort)
+	try {
+		af::setBackend(savedBackend);
+		af::setDevice(savedDevice);
+	} catch (af::exception&) {}
 }
 
 void AFDeviceManager::loadSettings()
@@ -134,9 +169,15 @@ void AFDeviceManager::loadSettings()
 		return;
 	}
 
-	// Default: use whatever AF initialized with
-	this->activeBackendId = static_cast<int>(af::getActiveBackend());
-	this->activeDeviceId  = static_cast<int>(af::getDevice());
+	// Default: use whatever AF initialized with (best-effort)
+	try {
+		this->activeBackendId = static_cast<int>(af::getActiveBackend());
+		this->activeDeviceId  = static_cast<int>(af::getDevice());
+	} catch (af::exception& e) {
+		LOG_WARNING() << "loadSettings default AF query failed:" << e.what();
+		this->activeBackendId = AF_BACKEND_CPU;
+		this->activeDeviceId  = 0;
+	}
 }
 
 void AFDeviceManager::saveSettings()
@@ -147,14 +188,78 @@ void AFDeviceManager::saveSettings()
 	this->guiSettings->storeSettings(SETTINGS_GROUP, settings);
 }
 
+bool AFDeviceManager::tryActivateBackend(int backendId, int deviceId)
+{
+	try {
+		af::setBackend(static_cast<af_backend>(backendId));
+		int deviceCount = static_cast<int>(af::getDeviceCount());
+		if (deviceId < 0 || deviceId >= deviceCount) {
+			LOG_WARNING() << "Invalid device" << deviceId
+						  << "for backend" << backendId
+						  << "(device count:" << deviceCount << ")";
+			return false;
+		}
+		af::setDevice(deviceId);
+		// Compute probe: force real execution to verify backend works.
+		// eval() alone may defer via JIT; sync() forces completion.
+		af::array probe = af::constant(1.0f, 2);
+		probe.eval();
+		af::sync();
+		return true;
+	} catch (af::exception& e) {
+		LOG_WARNING() << "Backend" << backendId << "device" << deviceId
+					  << "failed probe:" << e.what();
+		return false;
+	}
+}
+
+void AFDeviceManager::syncActiveState()
+{
+	try {
+		this->activeBackendId = static_cast<int>(af::getActiveBackend());
+		this->activeDeviceId  = static_cast<int>(af::getDevice());
+	} catch (af::exception& e) {
+		LOG_WARNING() << "syncActiveState failed:" << e.what();
+	}
+}
+
+bool AFDeviceManager::isBackendAvailable(int backendId) const
+{
+	for (const auto& backend : this->backends) {
+		if (backend.backendId == backendId) {
+			return !backend.devices.isEmpty();
+		}
+	}
+	return false;
+}
+
 void AFDeviceManager::restoreDevice()
 {
-	if (this->activeBackendId > 0 &&
-		(af::getAvailableBackends() & this->activeBackendId)) {
-		AFDeviceManager::setDeviceForCurrentThread(this->activeBackendId, this->activeDeviceId);
+	// Try saved backend+device first
+	if (this->isBackendAvailable(this->activeBackendId)) {
+		if (this->tryActivateBackend(this->activeBackendId, this->activeDeviceId)) {
+			this->syncActiveState();
+			return;
+		}
+		LOG_WARNING() << "Saved backend" << this->activeBackendId
+					  << "failed, trying fallback chain";
 	}
 
-	// Sync internal state with what AF actually set
-	this->activeBackendId = static_cast<int>(af::getActiveBackend());
-	this->activeDeviceId  = static_cast<int>(af::getDevice());
+	// Fallback: try each enumerated backend in priority order (CUDA > OpenCL > CPU)
+	for (const auto& backend : this->backends) {
+		if (!backend.devices.isEmpty()) {
+			if (this->tryActivateBackend(backend.backendId, 0)) {
+				LOG_INFO() << "Fallback activated:" << backend.name;
+				this->syncActiveState();
+				this->saveSettings();
+				return;
+			}
+		}
+	}
+
+	// Last resort: whatever AF defaults to.
+	// Do NOT save settings here — avoid overwriting a previously good config
+	// with a potentially broken default state.
+	LOG_WARNING() << "All backends failed probe, using AF default";
+	this->syncActiveState();
 }

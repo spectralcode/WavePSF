@@ -53,6 +53,10 @@ private:
 	void saveSettings();
 	void restoreDevice();
 
+	bool tryActivateBackend(int backendId, int deviceId);
+	void syncActiveState();
+	bool isBackendAvailable(int backendId) const;
+
 	SettingsFileManager* guiSettings;
 	QVector<AFBackendInfo> backends;
 	int activeBackendId;
