@@ -8,7 +8,7 @@
 - Cross-sectional views now sync zoom and pan when "Sync Views" is enabled
 
 ### Changed
-- Windows binaries now use ArrayFire 3.10.0 instead of 3.8.2
+- Windows binaries now ship with ArrayFire 3.10.0 (previously 3.8.2)
 
 ### Fixed
 - Center-frame artifact in 3D deconvolution caused by mismatched padding between PSF and volume is now fixed

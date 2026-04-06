@@ -160,3 +160,5 @@
 - rename WavefrontParameterTable to WavefrontCoefficientTable
 
 - in sync mode pixel value output should also be synced. this makes it easier to compare specific pixel values between input and output images
+
+- move computeAvgXY() / computeAvgXZ() off the GUI thread into seperate worker thread and maybe use use qtimer to defer updates/to avoid to many updates in short period
