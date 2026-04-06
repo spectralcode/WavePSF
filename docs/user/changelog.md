@@ -1,5 +1,23 @@
 # WavePSF - Changelog
 
+## Version 1.3.0 (2026-04-06)
+
+### Added
+- Optional total variation regularization for 3D Richardson-Lucy deconvolution `Deconvolution > Algorithm > Richardson-Lucy 3D > Regularization > Total Variation`
+- Projection modes (MIP, Min, Average) can now be selected in the display control bar above the input/output viewers
+- Cross-sectional views now sync zoom and pan when "Sync Views" is enabled
+
+### Changed
+- Windows binaries now use ArrayFire 3.10.0 instead of 3.8.2
+
+### Fixed
+- Center-frame artifact in 3D deconvolution caused by mismatched padding between PSF and volume is now fixed
+- Possible crash when GPU backend fails during startup is now handled
+- Correct PSF depth slice is now used per frame when combining 3D PSF with 2D deconvolution
+- 3D PSF Microscopy settings are now preserved across dialog, restart, and inline edits
+- Zernike range overrides from the settings dialog are no longer lost after restart
+
+
 ## Version 1.2.0 (2026-04-01)
 
 ### Added
