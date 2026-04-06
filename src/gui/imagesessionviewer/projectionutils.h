@@ -37,12 +37,15 @@ static QByteArray computeMIPXYTyped(const ImageData* data)
 	std::memcpy(dst, framePtrs[0], count * sizeof(T));
 
 	// Max with remaining frames — sequential over frames, parallel over pixels
-	for (int f = 1; f < frames; ++f) {
-		if (!framePtrs[f]) continue;
-		const T* src = framePtrs[f];
-		#pragma omp parallel for if(count >= OMP_PIXEL_THRESHOLD) schedule(static)
-		for (int i = 0; i < count; ++i) {
-			if (src[i] > dst[i]) dst[i] = src[i];
+	#pragma omp parallel if(count >= OMP_PIXEL_THRESHOLD)
+	{
+		for (int f = 1; f < frames; ++f) {
+			if (!framePtrs[f]) continue;
+			const T* src = framePtrs[f];
+			#pragma omp for schedule(static)
+			for (int i = 0; i < count; ++i) {
+				if (src[i] > dst[i]) dst[i] = src[i];
+			}
 		}
 	}
 	return result;
@@ -106,12 +109,15 @@ static QByteArray computeMinXYTyped(const ImageData* data)
 
 	std::memcpy(dst, framePtrs[0], count * sizeof(T));
 
-	for (int f = 1; f < frames; ++f) {
-		if (!framePtrs[f]) continue;
-		const T* src = framePtrs[f];
-		#pragma omp parallel for if(count >= OMP_PIXEL_THRESHOLD) schedule(static)
-		for (int i = 0; i < count; ++i) {
-			if (src[i] < dst[i]) dst[i] = src[i];
+	#pragma omp parallel if(count >= OMP_PIXEL_THRESHOLD)
+	{
+		for (int f = 1; f < frames; ++f) {
+			if (!framePtrs[f]) continue;
+			const T* src = framePtrs[f];
+			#pragma omp for schedule(static)
+			for (int i = 0; i < count; ++i) {
+				if (src[i] < dst[i]) dst[i] = src[i];
+			}
 		}
 	}
 	return result;
@@ -174,25 +180,27 @@ static QByteArray computeAvgXYTyped(const ImageData* data)
 
 	// Accumulate — sequential over frames, parallel over pixels
 	QVector<double> acc(count, 0.0);
-	for (int f = 0; f < frames; ++f) {
-		if (!framePtrs[f]) continue;
-		const T* src = framePtrs[f];
-		#pragma omp parallel for if(count >= OMP_PIXEL_THRESHOLD) schedule(static)
-		for (int i = 0; i < count; ++i) {
-			acc[i] += static_cast<double>(src[i]);
-		}
-	}
-
-	// Divide and store
 	QByteArray result(count * static_cast<int>(sizeof(T)), '\0');
 	T* dst = reinterpret_cast<T*>(result.data());
-	#pragma omp parallel for if(count >= OMP_PIXEL_THRESHOLD) schedule(static)
-	for (int i = 0; i < count; ++i) {
-		double avg = acc[i] / divisor;
-		if (std::is_integral<T>::value) {
-			dst[i] = static_cast<T>(std::round(avg));
-		} else {
-			dst[i] = static_cast<T>(avg);
+
+	#pragma omp parallel if(count >= OMP_PIXEL_THRESHOLD)
+	{
+		for (int f = 0; f < frames; ++f) {
+			if (!framePtrs[f]) continue;
+			const T* src = framePtrs[f];
+			#pragma omp for schedule(static)
+			for (int i = 0; i < count; ++i) {
+				acc[i] += static_cast<double>(src[i]);
+			}
+		}
+		#pragma omp for schedule(static)
+		for (int i = 0; i < count; ++i) {
+			double avg = acc[i] / divisor;
+			if (std::is_integral<T>::value) {
+				dst[i] = static_cast<T>(std::round(avg));
+			} else {
+				dst[i] = static_cast<T>(avg);
+			}
 		}
 	}
 	return result;
