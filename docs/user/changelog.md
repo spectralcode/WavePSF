@@ -16,6 +16,7 @@
 - Correct PSF depth slice is now used per frame when combining 3D PSF with 2D deconvolution
 - 3D PSF Microscopy settings are now preserved across dialog, restart, and inline edits
 - Zernike range overrides from the settings dialog are no longer lost after restart
+- "Auto (Stack)" display range no longer causes slowdowns during deconvolution
 
 
 ## Version 1.2.0 (2026-04-01)
