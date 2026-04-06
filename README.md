@@ -31,7 +31,7 @@ The estimated PSFs can also be used for optical characterization of your system.
 
 
 ## Volumetric PSF and Deconvolution Support
-In version 1.2.0, support for 3D PSF generation and deconvolution has been added.
+In version 1.2.0, support for 3D PSF generation and deconvolution has been added. See [volumentric PSF and deconvolution tutorial](docs/user/tutorial_volumetric_deconvolution.md).
 
 ![WavePSF screenshot](images/wavepsf_V1.2.0_screenshot_win11.png)
 
@@ -42,7 +42,7 @@ In version 1.2.0, support for 3D PSF generation and deconvolution has been added
 | Dependency | Notes |
 |---|---|
 | Qt5 | Tested with 5.12.12, should work with other versions too. But not with Qt 6.0+ |
-| ArrayFire | Tested with 3.8.2, should work with other versions too. |
+| ArrayFire | Tested with 3.8.2, and 3.10. Should work with other versions too. |
 | C++ compiler | C++11, MSVC is required due to ArrayFire |
 
 ### Windows
