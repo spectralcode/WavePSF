@@ -49,6 +49,20 @@ DisplayControlBar::DisplayControlBar(QWidget* parent)
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(4);
 
+	// Projection mode combo
+	this->projectionCombo = new QComboBox(this);
+	this->projectionCombo->addItem(tr("Slice"));
+	this->projectionCombo->addItem(tr("MIP"));
+	this->projectionCombo->addItem(tr("Min"));
+	this->projectionCombo->addItem(tr("Average"));
+	this->projectionCombo->setCurrentIndex(0);
+	this->projectionCombo->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+	this->projectionCombo->setToolTip(tr("Slice: display a single slice of the stack.\n"
+	                                     "MIP: Maximum Intensity Projection across all frames.\n"
+	                                     "Min: Minimum Intensity Projection across all frames.\n"
+	                                     "Average: Mean projection across all frames."));
+	layout->addWidget(this->projectionCombo);
+
 	// LUT combo (text-only when closed, icons when dropdown is open)
 	this->lutCombo = new LutComboBox(this);
 	this->populateLutCombo();
@@ -102,6 +116,10 @@ DisplayControlBar::DisplayControlBar(QWidget* parent)
 
 	connect(this->logCheck, &QCheckBox::toggled, this, [this]() { this->emitSettings(); });
 
+	connect(this->projectionCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() {
+		this->emitSettings();
+	});
+
 	// Catch double-click on disabled slider to switch to Manual mode
 	this->rangeSlider->installEventFilter(this);
 }
@@ -127,6 +145,12 @@ DisplaySettings DisplayControlBar::getSettings() const
 	s.rangeMax = this->rangeSlider->high();
 	s.logScale = this->logCheck->isChecked();
 	s.lutName = this->lutCombo->currentText();
+	switch (this->projectionCombo->currentIndex()) {
+		case 1:  s.projectionMode = ProjectionMode::MaxIntensity; break;
+		case 2:  s.projectionMode = ProjectionMode::MinIntensity; break;
+		case 3:  s.projectionMode = ProjectionMode::Average; break;
+		default: s.projectionMode = ProjectionMode::Normal; break;
+	}
 	return s;
 }
 
@@ -151,6 +175,13 @@ void DisplayControlBar::setSettings(const DisplaySettings& settings)
 		case AutoRangeMode::Off:       this->autoRangeCombo->setCurrentIndex(2); break;
 	}
 	this->logCheck->setChecked(settings.logScale);
+
+	switch (settings.projectionMode) {
+		case ProjectionMode::MaxIntensity: this->projectionCombo->setCurrentIndex(1); break;
+		case ProjectionMode::MinIntensity: this->projectionCombo->setCurrentIndex(2); break;
+		case ProjectionMode::Average:      this->projectionCombo->setCurrentIndex(3); break;
+		default:                           this->projectionCombo->setCurrentIndex(0); break;
+	}
 
 	this->updateManualControlsEnabled();
 	this->blockEmit = false;

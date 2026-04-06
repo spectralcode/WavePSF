@@ -1,5 +1,6 @@
 #include "datacrosssectionwidget.h"
 #include "imagerenderworker.h"
+#include "projectionutils.h"
 #include "gui/lut.h"
 #include "data/imagedata.h"
 #include <QVBoxLayout>
@@ -121,7 +122,8 @@ void DataCrossSectionWidget::setOutputData(const ImageData* data)
 void DataCrossSectionWidget::setDisplaySettings(const DisplaySettings& settings)
 {
 	this->displaySettings = settings;
-	this->refreshPanels();
+	this->updateYControls();
+	this->renderPanels();
 }
 
 void DataCrossSectionWidget::setFrameLineVisible(bool visible)
@@ -161,8 +163,19 @@ void DataCrossSectionWidget::updatePanel(Panel& panel, const ImageData* data, in
 		return;
 	}
 
+	const bool isProjection = (this->displaySettings.projectionMode != ProjectionMode::Normal);
+
 	// Update title and frame line immediately (don't depend on render result)
-	panel.titleLabel->setText(panel.baseTitle + tr(" (y=%1)").arg(clampedY));
+	if (isProjection) {
+		switch (this->displaySettings.projectionMode) {
+			case ProjectionMode::MaxIntensity: panel.titleLabel->setText(panel.baseTitle + tr(" (MIP Y)")); break;
+			case ProjectionMode::MinIntensity: panel.titleLabel->setText(panel.baseTitle + tr(" (Min Y)")); break;
+			case ProjectionMode::Average:      panel.titleLabel->setText(panel.baseTitle + tr(" (Average Y)")); break;
+			default: break;
+		}
+	} else {
+		panel.titleLabel->setText(panel.baseTitle + tr(" (y=%1)").arg(clampedY));
+	}
 	this->updateFrameLine(panel, qBound(0, this->currentFrame, frames - 1), frames);
 
 	// Dispatch async render via ImageRenderWorker
@@ -222,7 +235,26 @@ QByteArray DataCrossSectionWidget::extractXZSliceBytes(const ImageData* data, in
 
 void DataCrossSectionWidget::dispatchPanelRender(Panel& panel, const ImageData* data, int yIndex)
 {
-	QByteArray sliceBytes = this->extractXZSliceBytes(data, yIndex);
+	QByteArray sliceBytes;
+	if (this->displaySettings.projectionMode != ProjectionMode::Normal) {
+		if (panel.cachedProjectionSource == data
+		    && panel.cachedProjectionMode == this->displaySettings.projectionMode
+		    && !panel.cachedProjectionBytes.isEmpty()) {
+			sliceBytes = panel.cachedProjectionBytes;
+		} else {
+			switch (this->displaySettings.projectionMode) {
+				case ProjectionMode::MaxIntensity: sliceBytes = ProjectionUtils::computeMIPXZ(data); break;
+				case ProjectionMode::MinIntensity: sliceBytes = ProjectionUtils::computeMinXZ(data); break;
+				case ProjectionMode::Average:      sliceBytes = ProjectionUtils::computeAvgXZ(data); break;
+				default: break;
+			}
+			panel.cachedProjectionBytes = sliceBytes;
+			panel.cachedProjectionMode = this->displaySettings.projectionMode;
+			panel.cachedProjectionSource = data;
+		}
+	} else {
+		sliceBytes = this->extractXZSliceBytes(data, yIndex);
+	}
 	if (sliceBytes.isEmpty()) return;
 
 	RenderRequest req;
@@ -230,10 +262,16 @@ void DataCrossSectionWidget::dispatchPanelRender(Panel& panel, const ImageData* 
 	req.width = data->getWidth();
 	req.height = data->getFrames();
 	req.dataType = data->getDataType();
-	req.useAutoRange = (this->displaySettings.autoRangeMode != AutoRangeMode::Off);
+	req.useAutoRange = (this->displaySettings.autoRangeMode == AutoRangeMode::PerFrame);
 	req.usePercentile = false;
 	req.manualMin = this->displaySettings.rangeMin;
 	req.manualMax = this->displaySettings.rangeMax;
+
+	if (this->displaySettings.autoRangeMode == AutoRangeMode::PerVolume) {
+		auto range = data->getGlobalRange();
+		req.manualMin = range.first;
+		req.manualMax = range.second;
+	}
 	req.logScale = this->displaySettings.logScale;
 	req.colorTable = LUT::get(this->displaySettings.lutName);
 
@@ -492,11 +530,12 @@ void DataCrossSectionWidget::updateYControls()
 
 	const bool hasData = maxHeight > 0;
 	const int maxIndex = hasData ? maxHeight - 1 : 0;
+	const bool isProjection = (this->displaySettings.projectionMode != ProjectionMode::Normal);
 
 	this->ySlider->blockSignals(true);
 	this->ySpinBox->blockSignals(true);
-	this->ySlider->setEnabled(hasData);
-	this->ySpinBox->setEnabled(hasData);
+	this->ySlider->setEnabled(hasData && !isProjection);
+	this->ySpinBox->setEnabled(hasData && !isProjection);
 	this->ySlider->setRange(0, maxIndex);
 	this->ySpinBox->setRange(0, maxIndex);
 	bool justCentered = false;
@@ -524,6 +563,17 @@ void DataCrossSectionWidget::updateYControls()
 }
 
 void DataCrossSectionWidget::refreshPanels()
+{
+	this->inputPanel.cachedProjectionBytes.clear();
+	this->inputPanel.cachedProjectionMode = ProjectionMode::Normal;
+	this->inputPanel.cachedProjectionSource = nullptr;
+	this->outputPanel.cachedProjectionBytes.clear();
+	this->outputPanel.cachedProjectionMode = ProjectionMode::Normal;
+	this->outputPanel.cachedProjectionSource = nullptr;
+	this->renderPanels();
+}
+
+void DataCrossSectionWidget::renderPanels()
 {
 	if (!this->isVisible()) {
 		this->pendingRefresh = true;

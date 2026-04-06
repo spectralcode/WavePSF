@@ -126,6 +126,10 @@ private:
 	bool hasPending;
 	bool computeHistogram;
 
+	QByteArray cachedProjectionBytes;
+	ProjectionMode cachedProjectionMode = ProjectionMode::Normal;
+	const ImageData* cachedProjectionSource = nullptr;
+
 signals:
 	void currentFrameChanged(int frameNr);
 	void currentWavelengthChanged(qreal wavelength);

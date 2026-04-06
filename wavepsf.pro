@@ -186,7 +186,8 @@ HEADERS += \
 	$$SOURCEDIR/gui/psfgridview/psfgriddock.h \
 	$$SOURCEDIR/gui/psfgridview/psfgridwidget.h \
 	$$SOURCEDIR/gui/lut.h \
-	$$SOURCEDIR/gui/imagesessionviewer/displaysettings.h
+	$$SOURCEDIR/gui/imagesessionviewer/displaysettings.h \
+	$$SOURCEDIR/gui/imagesessionviewer/projectionutils.h
 
 FORMS += \
 	$$SOURCEDIR/gui/mainwindow.ui

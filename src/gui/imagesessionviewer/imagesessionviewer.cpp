@@ -29,6 +29,7 @@ namespace {
 	const QString KEY_SYNC_VIEWS            = QStringLiteral("sync_views");
 	const QString KEY_HISTOGRAM_MODE       = QStringLiteral("histogram_mode");
 	const QString KEY_SLIDER_EXPANDED      = QStringLiteral("slider_expanded");
+	const QString KEY_PROJECTION_MODE      = QStringLiteral("projection_mode");
 
 	const int    DEF_AUTO_RANGE_MODE       = static_cast<int>(AutoRangeMode::PerFrame);
 	const double DEF_DISPLAY_RANGE_MIN     = 0.0;
@@ -38,6 +39,7 @@ namespace {
 	const bool   DEF_SYNC_VIEWS            = false;
 	const int    DEF_HISTOGRAM_MODE        = static_cast<int>(HistogramMode::Off);
 	const bool   DEF_SLIDER_EXPANDED      = false;
+	const int    DEF_PROJECTION_MODE      = static_cast<int>(ProjectionMode::Normal);
 	const int    DEF_PATCH_GRID_COLS       = 6;
 	const int    DEF_PATCH_GRID_ROWS       = 8;
 	const int    DEF_PATCH_BORDER_EXT      = 10;
@@ -92,6 +94,7 @@ QVariantMap ImageSessionViewer::getSettings() const
 	settingsMap.insert(KEY_DISPLAY_RANGE_MAX,  this->displaySettings.rangeMax);
 	settingsMap.insert(KEY_LOG_SCALE,          this->displaySettings.logScale);
 	settingsMap.insert(KEY_LUT_NAME,           this->displaySettings.lutName);
+	settingsMap.insert(KEY_PROJECTION_MODE,    static_cast<int>(this->displaySettings.projectionMode));
 	settingsMap.insert(KEY_SYNC_VIEWS,         this->viewSyncEnabled);
 	if (this->displayControlBar) {
 		settingsMap.insert(KEY_HISTOGRAM_MODE, static_cast<int>(this->displayControlBar->getHistogramMode()));
@@ -119,6 +122,7 @@ void ImageSessionViewer::setSettings(const QVariantMap& settingsMap)
 	ds.rangeMax  = settingsMap.value(KEY_DISPLAY_RANGE_MAX, DEF_DISPLAY_RANGE_MAX).toDouble();
 	ds.logScale  = settingsMap.value(KEY_LOG_SCALE,         DEF_LOG_SCALE).toBool();
 	ds.lutName   = settingsMap.value(KEY_LUT_NAME,          DEF_LUT_NAME).toString();
+	ds.projectionMode = static_cast<ProjectionMode>(settingsMap.value(KEY_PROJECTION_MODE, DEF_PROJECTION_MODE).toInt());
 	const bool   syncViews  = settingsMap.value(KEY_SYNC_VIEWS,         DEF_SYNC_VIEWS).toBool();
 	const int    cols       = settingsMap.value(KEY_PATCH_GRID_COLS,    DEF_PATCH_GRID_COLS).toInt();
 	const int    rows       = settingsMap.value(KEY_PATCH_GRID_ROWS,    DEF_PATCH_GRID_ROWS).toInt();

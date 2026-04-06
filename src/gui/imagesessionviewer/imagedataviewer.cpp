@@ -1,6 +1,7 @@
 #include "imagedataviewer.h"
 #include "data/imagedata.h"
 #include "data/patchlayout.h"
+#include "projectionutils.h"
 #include "utils/logging.h"
 
 #include <QVBoxLayout>
@@ -78,6 +79,9 @@ void ImageDataViewer::connectImageData(const ImageData* imageData)
 	this->imageData = imageData;
 	if (this->imageData != nullptr) {
 		this->dataChangedConn = connect(this->imageData, &ImageData::dataChanged, this, &ImageDataViewer::refresh);
+		this->cachedProjectionBytes.clear();
+		this->cachedProjectionMode = ProjectionMode::Normal;
+		this->cachedProjectionSource = nullptr;
 		this->currentFrame = 0;
 		this->displayFrame(0);
 		emit imageDataConnected();
@@ -91,8 +95,11 @@ void ImageDataViewer::disconnectImageData()
 		this->imageData = nullptr;
 	}
 
-	// Invalidate in-flight work (latest changes)
+	// Invalidate in-flight work and projection cache
 	this->latestRequestId.fetchAndAddOrdered(1);
+	this->cachedProjectionBytes.clear();
+	this->cachedProjectionMode = ProjectionMode::Normal;
+	this->cachedProjectionSource = nullptr;
 
 	this->currentFrame = -1;
 	this->showingReference = false;
@@ -220,10 +227,20 @@ void ImageDataViewer::displayFrame(int frameNr)
 	this->currentFrame = frameNr;
 
 	// Update bottom info immediately
-	QStringList frameNames = dataSource->getFrameNames();
-	this->labelFrameName->setText(validFrame < frameNames.size()
-		? frameNames[validFrame]
-		: QString("Frame %1").arg(validFrame));
+	if (this->displaySettings.projectionMode != ProjectionMode::Normal
+	    && dataSource->getFrames() > 1) {
+		switch (this->displaySettings.projectionMode) {
+			case ProjectionMode::MaxIntensity: this->labelFrameName->setText(tr("MIP (Z)")); break;
+			case ProjectionMode::MinIntensity: this->labelFrameName->setText(tr("Min (Z)")); break;
+			case ProjectionMode::Average:      this->labelFrameName->setText(tr("Average (Z)")); break;
+			default: break;
+		}
+	} else {
+		QStringList frameNames = dataSource->getFrameNames();
+		this->labelFrameName->setText(validFrame < frameNames.size()
+			? frameNames[validFrame]
+			: QString("Frame %1").arg(validFrame));
+	}
 
 	// Only emit frame/wavelength signals when showing primary data,
 	// not during temporary ground truth preview
@@ -256,12 +273,10 @@ void ImageDataViewer::dispatchRenderNow()
 		return;
 	}
 
-	const int renderFrame = this->getValidFrameForDataSource(this->currentFrame, dataSource);
-	void* framePtr = dataSource->getData(renderFrame);
-	if (!framePtr) { this->hasPending = false; return; }
-
 	const int count = w * h;
 	const EnviDataType dt = dataSource->getDataType();
+	const bool isProjection = (this->displaySettings.projectionMode != ProjectionMode::Normal
+	                           && dataSource->getFrames() > 1);
 
 	RenderRequest req;
 	req.width = w;
@@ -277,15 +292,34 @@ void ImageDataViewer::dispatchRenderNow()
 
 	// PerVolume: use global min/max as manual range
 	if (this->displaySettings.autoRangeMode == AutoRangeMode::PerVolume) {
-		const ImageData* ds = this->getCurrentDataSource();
-		if (ds) {
-			auto range = ds->getGlobalRange();
-			req.manualMin = range.first;
-			req.manualMax = range.second;
-		}
+		auto range = dataSource->getGlobalRange();
+		req.manualMin = range.first;
+		req.manualMax = range.second;
 	}
 
-	copyFrameToBytes(req.frameBytes, framePtr, count, dt);
+	if (isProjection) {
+		if (this->cachedProjectionSource == dataSource
+		    && this->cachedProjectionMode == this->displaySettings.projectionMode
+		    && !this->cachedProjectionBytes.isEmpty()) {
+			req.frameBytes = this->cachedProjectionBytes;
+		} else {
+			switch (this->displaySettings.projectionMode) {
+				case ProjectionMode::MaxIntensity: req.frameBytes = ProjectionUtils::computeMIPXY(dataSource); break;
+				case ProjectionMode::MinIntensity: req.frameBytes = ProjectionUtils::computeMinXY(dataSource); break;
+				case ProjectionMode::Average:      req.frameBytes = ProjectionUtils::computeAvgXY(dataSource); break;
+				default: break;
+			}
+			this->cachedProjectionBytes = req.frameBytes;
+			this->cachedProjectionMode = this->displaySettings.projectionMode;
+			this->cachedProjectionSource = dataSource;
+		}
+		if (req.frameBytes.isEmpty()) { this->hasPending = false; return; }
+	} else {
+		const int renderFrame = this->getValidFrameForDataSource(this->currentFrame, dataSource);
+		void* framePtr = dataSource->getData(renderFrame);
+		if (!framePtr) { this->hasPending = false; return; }
+		copyFrameToBytes(req.frameBytes, framePtr, count, dt);
+	}
 
 	const quint64 id = this->latestRequestId.fetchAndAddOrdered(1) + 1;
 	this->latestRequestId.storeRelease(id);
@@ -315,6 +349,9 @@ void ImageDataViewer::updateRenderedImage(const QImage& image, quint64 requestId
 
 void ImageDataViewer::refresh()
 {
+	this->cachedProjectionBytes.clear();
+	this->cachedProjectionMode = ProjectionMode::Normal;
+	this->cachedProjectionSource = nullptr;
 	if (this->currentFrame >= 0) {
 		this->displayFrame(this->currentFrame);
 	}
@@ -494,6 +531,9 @@ void ImageDataViewer::showReference(bool show)
 		return;
 	}
 	this->showingReference = show;
+	this->cachedProjectionBytes.clear();
+	this->cachedProjectionMode = ProjectionMode::Normal;
+	this->cachedProjectionSource = nullptr;
 	this->labelViewerName->setText(this->originalViewerName);
 	if (this->currentFrame >= 0) {
 		this->displayFrame(this->currentFrame);

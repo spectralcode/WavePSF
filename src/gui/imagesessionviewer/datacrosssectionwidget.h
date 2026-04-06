@@ -54,6 +54,10 @@ private:
 		QThread* renderThread = nullptr;
 		ImageRenderWorker* renderWorker = nullptr;
 		QAtomicInteger<quint64> latestRequestId;
+		// Projection cache
+		QByteArray cachedProjectionBytes;
+		ProjectionMode cachedProjectionMode = ProjectionMode::Normal;
+		const ImageData* cachedProjectionSource = nullptr;
 	};
 
 	void initPanel(Panel& panel, const QString& title);
@@ -67,6 +71,7 @@ private:
 	void setupUI();
 	void connectSignals();
 	void updateYControls();
+	void renderPanels();
 	void clearPanel(Panel& panel);
 	void syncPanelView(Panel& source, Panel& target);
 

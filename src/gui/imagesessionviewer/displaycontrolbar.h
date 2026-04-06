@@ -48,6 +48,7 @@ private:
 	void updateManualControlsEnabled();
 	void populateLutCombo();
 
+	QComboBox* projectionCombo;
 	QComboBox* lutCombo;
 	RangeSlider* rangeSlider;
 	QComboBox* autoRangeCombo;
