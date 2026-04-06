@@ -2,6 +2,7 @@
 #include "optimizationcontroller.h"
 #include "psffilecontroller.h"
 #include "coefficientworkspace.h"
+#include "deconvolutionorchestrator.h"
 #include "imagesession.h"
 #include "data/inputdatareader.h"
 #include "data/imagedata.h"
@@ -9,22 +10,18 @@
 #include "core/psf/psfmodule.h"
 #include "core/psf/ipsfgenerator.h"
 #include "core/optimization/optimizationjobbuilder.h"
-#include "core/processing/batchprocessor.h"
-#include "core/processing/volumetricprocessor.h"
 #include "core/interpolation/interpolationorchestrator.h"
 #include "core/psf/psfgridgenerator.h"
 #include "utils/logging.h"
 #include <QFileInfo>
 #include "utils/settingsfilemanager.h"
 #include "utils/afdevicemanager.h"
-#include <QProgressDialog>
-#include <QApplication>
 
 ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent), afDeviceManager(afDeviceManager), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
 	, coefficientWorkspace(nullptr), deconvolutionLiveMode(false)
 	, optimizationController(nullptr), suppressLiveDeconv(false), psfFileController(nullptr)
-	, interpolationOrchestrator(nullptr), batchProcessor(nullptr), psfGridGenerator(nullptr)
+	, interpolationOrchestrator(nullptr), deconvolutionOrchestrator(nullptr), psfGridGenerator(nullptr)
 {
 	this->initializeComponents();
 	this->connectSessionSignals();
@@ -127,7 +124,7 @@ void ApplicationController::setCurrentFrame(int frame)
 		// Re-deconvolve: input data changed (different frame).
 		// Skip for 3D algorithms — they process all frames at once.
 		if (this->deconvolutionLiveMode && !suppress3D) {
-			this->runDeconvolutionOnCurrentPatch();
+			this->deconvolutionOrchestrator->runOnCurrentPatch();
 		}
 	}
 }
@@ -146,7 +143,7 @@ void ApplicationController::setCurrentPatch(int x, int y)
 		this->suppressLiveDeconv = oldSuppress;
 
 		if (this->deconvolutionLiveMode) {
-			this->runDeconvolutionOnCurrentPatch();
+			this->deconvolutionOrchestrator->runOnCurrentPatch();
 		}
 	}
 }
@@ -348,161 +345,32 @@ void ApplicationController::setDeconvolutionLiveMode(bool enabled)
 	this->deconvolutionLiveMode = enabled;
 	if (enabled) {
 		this->suppressLiveDeconv = false;
-		this->runDeconvolutionOnCurrentPatch();
+		this->deconvolutionOrchestrator->runOnCurrentPatch();
 	}
 }
 
 void ApplicationController::requestDeconvolution()
 {
 	this->suppressLiveDeconv = false;
-	this->runDeconvolutionOnCurrentPatch();
+	this->deconvolutionOrchestrator->runOnCurrentPatch();
 }
 
 
 void ApplicationController::requestBatchDeconvolution()
 {
-	if (!this->hasInputData() || this->psfModule == nullptr || this->coefficientWorkspace->table() == nullptr) {
-		LOG_WARNING() << "Cannot run batch deconvolution: missing input data or parameters";
-		return;
-	}
-
-	this->coefficientWorkspace->store();
 	this->suppressLiveDeconv = true;
-	this->syncVoxelSizeFromPropagator();
-
-	this->batchProcessor->executeBatchDeconvolution(
-		this->imageSession, this->psfModule, this->coefficientWorkspace->table());
-
+	bool ok = this->deconvolutionOrchestrator->runBatch();
 	this->suppressLiveDeconv = false;
+	if (!ok) return;
 	this->coefficientWorkspace->loadForCurrentPatch();
 	emit batchDeconvolutionCompleted();
-}
-
-void ApplicationController::runDeconvolutionOnCurrentPatch()
-{
-	if (!this->hasInputData() || this->psfModule == nullptr) {
-		return;
-	}
-
-	if (this->psfModule->is3DAlgorithm()) {
-		this->runVolumetricDeconvolutionOnCurrentPatch();
-		return;
-	}
-
-	ImagePatch inputPatch = this->imageSession->getCurrentInputPatch();
-	if (!inputPatch.isValid()) {
-		LOG_WARNING() << "No valid input patch for deconvolution";
-		return;
-	}
-
-	af::array result = this->psfModule->deconvolve(inputPatch.data);
-	if (result.isempty()) {
-		return;
-	}
-
-	this->imageSession->setCurrentOutputPatch(result);
-}
-
-void ApplicationController::syncVoxelSizeFromPropagator()
-{
-	if (this->psfModule == nullptr || !this->psfModule->is3DAlgorithm()) {
-		return;
-	}
-	QVariantMap genSettings = this->psfModule->getGenerator()->serializeSettings();
-	float xyStep = genSettings.value("xy_step_nm", 1.0).toFloat();
-	float zStep = genSettings.value("z_step_nm", 1.0).toFloat();
-	if (xyStep > 0.0f && zStep > 0.0f) {
-		this->psfModule->setDeconvolutionVoxelSize(xyStep, xyStep, zStep);
-	}
-}
-
-void ApplicationController::runVolumetricDeconvolutionOnCurrentPatch()
-{
-	if (this->coefficientWorkspace->table() == nullptr || this->imageSession == nullptr) {
-		return;
-	}
-
-	int patchX = this->getCurrentPatchX();
-	int patchY = this->getCurrentPatchY();
-	int patchIdx = this->coefficientWorkspace->table()->patchIndex(patchX, patchY);
-	int frames = this->imageSession->getInputFrames();
-
-	af::array subvolume = VolumetricProcessor::assembleSubvolume(
-		this->imageSession, patchX, patchY);
-	if (subvolume.isempty()) {
-		LOG_WARNING() << "3D deconv: empty subvolume for patch" << patchX << patchY;
-		return;
-	}
-	LOG_INFO() << "3D deconv: subvolume" << subvolume.dims(0) << "x"
-			   << subvolume.dims(1) << "x" << subvolume.dims(2);
-
-	af::array psf3D = VolumetricProcessor::assemble3DPSF(
-		this->psfModule, this->coefficientWorkspace->table(),
-		patchIdx, frames);
-	if (psf3D.isempty()) {
-		LOG_WARNING() << "3D deconv: empty 3D PSF for patch" << patchX << patchY;
-		return;
-	}
-	LOG_INFO() << "3D deconv: PSF" << psf3D.dims(0) << "x"
-			   << psf3D.dims(1) << "x" << psf3D.dims(2);
-
-	this->syncVoxelSizeFromPropagator();
-
-	// Show progress dialog for 3D RL iterations
-	this->psfModule->resetDeconvolutionCancel();
-	QProgressDialog progress(tr("Preparing 3D deconvolution..."), tr("Cancel"), 0, 0);
-	progress.setWindowTitle(tr("3D Deconvolution"));
-	progress.setWindowModality(Qt::ApplicationModal);
-	progress.setMinimumDuration(0);
-	progress.show();
-	QApplication::processEvents();
-
-	connect(&progress, &QProgressDialog::canceled,
-			this, &ApplicationController::cancelDeconvolution);
-
-	QMetaObject::Connection iterConn = connect(this->psfModule,
-		&PSFModule::deconvolutionIterationCompleted,
-		[&progress](int curIter, int totalIter) {
-			if (progress.maximum() != totalIter) {
-				progress.setMaximum(totalIter);
-			}
-			progress.setValue(curIter);
-			progress.setLabelText(
-				QString("3D Richardson-Lucy: iteration %1 / %2")
-					.arg(curIter).arg(totalIter));
-			QApplication::processEvents();
-		});
-
-	af::array result = this->psfModule->deconvolve(subvolume, psf3D);
-
-	disconnect(iterConn);
-	progress.close();
-
-	if (result.isempty()) {
-		if (this->psfModule->wasDeconvolutionCancelled()) {
-			LOG_INFO() << "3D deconv: cancelled by user";
-		} else {
-			LOG_WARNING() << "3D deconv: deconvolution returned empty result";
-		}
-		return;
-	}
-	LOG_INFO() << "3D deconv: result" << result.dims(0) << "x"
-			   << result.dims(1) << "x" << result.dims(2);
-
-	VolumetricProcessor::writeSubvolumeToOutput(
-		this->imageSession, patchX, patchY, result);
-
-	// Trigger viewer refresh via the same signal chain as 2D:
-	// setCurrentOutputPatch → outputPatchUpdated → deconvolutionCompleted
-	this->imageSession->setCurrentOutputPatch(
-		result(af::span, af::span, this->getCurrentFrame()));
 }
 
 void ApplicationController::handlePSFUpdatedForDeconvolution(af::array psf)
 {
 	Q_UNUSED(psf);
 	if (this->deconvolutionLiveMode && !this->suppressLiveDeconv) {
-		this->runDeconvolutionOnCurrentPatch();
+		this->deconvolutionOrchestrator->runOnCurrentPatch();
 	}
 
 	// Auto-save PSF if enabled
@@ -516,7 +384,7 @@ void ApplicationController::handlePSFUpdatedForDeconvolution(af::array psf)
 void ApplicationController::handleDeconvolutionSettingsChanged()
 {
 	if (this->deconvolutionLiveMode) {
-		this->runDeconvolutionOnCurrentPatch();
+		this->deconvolutionOrchestrator->runOnCurrentPatch();
 	}
 }
 
@@ -676,7 +544,8 @@ void ApplicationController::initializeComponents()
 	this->coefficientWorkspace = new CoefficientWorkspace(this->psfModule, this->imageSession, this);
 	this->interpolationOrchestrator = new InterpolationOrchestrator(this);
 	this->psfFileController = new PSFFileController(this->psfModule, this);
-	this->batchProcessor = new BatchProcessor(this);
+	this->deconvolutionOrchestrator = new DeconvolutionOrchestrator(
+		this->psfModule, this->imageSession, this->coefficientWorkspace, this);
 	this->psfGridGenerator = new PSFGridGenerator(this);
 }
 
@@ -840,7 +709,7 @@ void ApplicationController::startOptimization(const OptimizationConfig& uiConfig
 
 void ApplicationController::cancelDeconvolution()
 {
-	this->psfModule->requestDeconvolutionCancel();
+	this->deconvolutionOrchestrator->cancel();
 }
 
 void ApplicationController::cancelOptimization()
@@ -868,7 +737,7 @@ void ApplicationController::handleOptimizationLivePreview(
 	this->imageSession->setCurrentFrame(frame);
 	this->imageSession->setCurrentPatch(patchX, patchY);
 	this->suppressLiveDeconv = oldSuppress;
-	this->runDeconvolutionOnCurrentPatch();
+	this->deconvolutionOrchestrator->runOnCurrentPatch();
 }
 
 void ApplicationController::handleOptimizationFinished(const OptimizationResult& result)
@@ -888,7 +757,7 @@ void ApplicationController::handleOptimizationFinished(const OptimizationResult&
 		this->imageSession->setCurrentFrame(jobResult.frameNr);
 		this->imageSession->setCurrentPatch(jobResult.patchX, jobResult.patchY);
 		this->suppressLiveDeconv = oldSuppress;
-		this->runDeconvolutionOnCurrentPatch();
+		this->deconvolutionOrchestrator->runOnCurrentPatch();
 	}
 
 	// Emit the last job's coefficients so the UI reflects the final state

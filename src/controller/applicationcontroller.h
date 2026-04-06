@@ -19,7 +19,7 @@ class PSFModule;
 class CoefficientWorkspace;
 class AFDeviceManager;
 class PSFFileController;
-class BatchProcessor;
+class DeconvolutionOrchestrator;
 class InterpolationOrchestrator;
 class OptimizationController;
 class PSFGridGenerator;
@@ -158,14 +158,7 @@ private:
 	void connectDeconvolutionSignals();
 	bool loadFileToSession(const QString& filePath, bool isGroundTruth);
 
-	// Deconvolution orchestration
-	void runDeconvolutionOnCurrentPatch();
-	void runVolumetricDeconvolutionOnCurrentPatch();
-
 	void syncNumZPlanesWithInput();
-
-	// Sync voxel size from propagator settings to 3D deconvolver
-	void syncVoxelSizeFromPropagator();
 
 	// Core components
 	AFDeviceManager* afDeviceManager;
@@ -187,8 +180,8 @@ private:
 	// PSF file management
 	PSFFileController* psfFileController;
 
-	// Batch processing
-	BatchProcessor* batchProcessor;
+	// Deconvolution orchestration
+	DeconvolutionOrchestrator* deconvolutionOrchestrator;
 
 	// PSF grid generation
 	PSFGridGenerator* psfGridGenerator;
