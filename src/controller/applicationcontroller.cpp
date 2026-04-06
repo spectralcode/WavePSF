@@ -1,6 +1,7 @@
 #include "applicationcontroller.h"
 #include "optimizationcontroller.h"
 #include "psffilecontroller.h"
+#include "coefficientworkspace.h"
 #include "imagesession.h"
 #include "data/inputdatareader.h"
 #include "data/imagedata.h"
@@ -21,8 +22,9 @@
 
 ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent), afDeviceManager(afDeviceManager), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
-	, parameterTable(nullptr), deconvolutionLiveMode(false)
+	, coefficientWorkspace(nullptr), deconvolutionLiveMode(false)
 	, optimizationController(nullptr), suppressLiveDeconv(false), psfFileController(nullptr)
+	, interpolationOrchestrator(nullptr), batchProcessor(nullptr), psfGridGenerator(nullptr)
 {
 	this->initializeComponents();
 	this->connectSessionSignals();
@@ -49,6 +51,12 @@ ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, Q
 	// PSF file controller (owns PSFFileManager, file-based PSF logic)
 	connect(this->psfFileController, &PSFFileController::filePSFInfoUpdated,
 			this, &ApplicationController::filePSFInfoUpdated);
+
+	// Coefficient workspace (owns parameter table, cached tables, clipboard/undo)
+	connect(this->coefficientWorkspace, &CoefficientWorkspace::coefficientsLoaded,
+			this, &ApplicationController::coefficientsLoaded);
+	connect(this->coefficientWorkspace, &CoefficientWorkspace::parametersLoaded,
+			this, &ApplicationController::parametersLoaded);
 
 	qRegisterMetaType<InterpolationResult>("InterpolationResult");
 }
@@ -98,7 +106,7 @@ bool ApplicationController::openGroundTruthFile(const QString& filePath)
 void ApplicationController::setCurrentFrame(int frame)
 {
 	if (this->imageSession != nullptr) {
-		this->storeCurrentCoefficients();
+		this->coefficientWorkspace->store();
 
 		bool suppress3D = this->deconvolutionLiveMode &&
 						  this->psfModule != nullptr &&
@@ -112,7 +120,7 @@ void ApplicationController::setCurrentFrame(int frame)
 		this->suppressLiveDeconv = true;
 
 		this->imageSession->setCurrentFrame(frame);
-		this->loadCoefficientsForCurrentPatch();
+		this->coefficientWorkspace->loadForCurrentPatch();
 
 		this->suppressLiveDeconv = oldSuppress;
 
@@ -127,13 +135,13 @@ void ApplicationController::setCurrentFrame(int frame)
 void ApplicationController::setCurrentPatch(int x, int y)
 {
 	if (this->imageSession != nullptr) {
-		this->storeCurrentCoefficients();
+		this->coefficientWorkspace->store();
 
 		bool oldSuppress = this->suppressLiveDeconv;
 		this->suppressLiveDeconv = true;
 
 		this->imageSession->setCurrentPatch(x, y);
-		this->loadCoefficientsForCurrentPatch();
+		this->coefficientWorkspace->loadForCurrentPatch();
 
 		this->suppressLiveDeconv = oldSuppress;
 
@@ -157,10 +165,8 @@ void ApplicationController::configurePatchGrid(int cols, int rows, int borderExt
 		this->imageSession->configurePatchGrid(cols, rows, borderExtension);
 
 		// Invalidate cached parameter tables (patch dimensions changed)
-		qDeleteAll(this->cachedParameterTables);
-		this->cachedParameterTables.clear();
-
-		this->resizeParameterTable();
+		this->coefficientWorkspace->clearCache();
+		this->coefficientWorkspace->resize();
 	}
 }
 
@@ -169,7 +175,7 @@ void ApplicationController::setPSFCoefficient(int id, double value)
 	if (this->psfModule != nullptr) {
 		this->psfModule->setCoefficient(id, value);
 	}
-	this->storeCurrentCoefficients();
+	this->coefficientWorkspace->store();
 }
 
 void ApplicationController::resetPSFCoefficients()
@@ -177,7 +183,7 @@ void ApplicationController::resetPSFCoefficients()
 	if (this->psfModule != nullptr) {
 		this->psfModule->resetCoefficients();
 	}
-	this->storeCurrentCoefficients();
+	this->coefficientWorkspace->store();
 	if (this->psfModule != nullptr) {
 		emit coefficientsLoaded(this->psfModule->getAllCoefficients());
 	}
@@ -185,69 +191,32 @@ void ApplicationController::resetPSFCoefficients()
 
 void ApplicationController::copyCoefficients()
 {
-	this->storeCurrentCoefficients();
-	if (this->psfModule != nullptr) {
-		this->coefficientClipboard = this->psfModule->getAllCoefficients();
-	}
+	this->coefficientWorkspace->copy();
 }
 
 void ApplicationController::pasteCoefficients()
 {
-	if (this->coefficientClipboard.isEmpty() || this->psfModule == nullptr) return;
-
-	// Save undo state before overwriting
-	this->undoCoefficients = this->psfModule->getAllCoefficients();
-	this->undoFrame = this->getCurrentFrame();
-	this->undoPatchX = this->getCurrentPatchX();
-	this->undoPatchY = this->getCurrentPatchY();
-
-	this->psfModule->setAllCoefficients(this->coefficientClipboard);
-	this->storeCurrentCoefficients();
-	emit coefficientsLoaded(this->coefficientClipboard);
+	this->coefficientWorkspace->paste();
 }
 
 void ApplicationController::undoPasteCoefficients()
 {
-	if (this->undoCoefficients.isEmpty() || this->psfModule == nullptr || this->parameterTable == nullptr) return;
-
-	// Write undo coefficients back to the parameter table
-	int patchIdx = this->parameterTable->patchIndex(this->undoPatchX, this->undoPatchY);
-	this->parameterTable->setCoefficients(this->undoFrame, patchIdx, this->undoCoefficients);
-
-	// If we're still on the same patch, update sliders + PSF
-	if (this->getCurrentFrame() == this->undoFrame &&
-	    this->getCurrentPatchX() == this->undoPatchX &&
-	    this->getCurrentPatchY() == this->undoPatchY) {
-		this->psfModule->setAllCoefficients(this->undoCoefficients);
-		emit coefficientsLoaded(this->undoCoefficients);
-	}
-
-	this->undoCoefficients.clear();
+	this->coefficientWorkspace->undoPaste();
 }
 
 void ApplicationController::resetAllCoefficients()
 {
-	if (this->parameterTable == nullptr) return;
-	this->parameterTable->resetAllCoefficients();
-	this->loadCoefficientsForCurrentPatch();
+	this->coefficientWorkspace->resetAll();
 }
 
 void ApplicationController::saveParametersToFile(const QString& filePath)
 {
-	this->storeCurrentCoefficients();
-	if (this->parameterTable != nullptr) {
-		this->parameterTable->saveToFile(filePath);
-	}
+	this->coefficientWorkspace->saveToFile(filePath);
 }
 
 void ApplicationController::loadParametersFromFile(const QString& filePath)
 {
-	if (this->parameterTable != nullptr) {
-		if (this->parameterTable->loadFromFile(filePath)) {
-			this->loadCoefficientsForCurrentPatch();
-			emit parametersLoaded();
-		}
-	}
+	this->coefficientWorkspace->loadFromFile(filePath);
 }
 
 void ApplicationController::applyPSFSettings(const PSFSettings& settings)
@@ -255,7 +224,7 @@ void ApplicationController::applyPSFSettings(const PSFSettings& settings)
 	if (this->psfModule != nullptr) {
 		this->psfModule->applyPSFSettings(settings);
 		// Resize parameter table if coefficient count changed
-		this->resizeParameterTable();
+		this->coefficientWorkspace->resize();
 		// Re-send current coefficients so UI sliders reflect actual values
 		// (parameterDescriptorsChanged rebuilds sliders to defaults)
 		emit coefficientsLoaded(this->psfModule->getAllCoefficients());
@@ -274,23 +243,15 @@ void ApplicationController::switchGenerator(const QString& typeName)
 		return;
 	}
 
-	// Save current coefficients and parameter table for the outgoing generator type
-	this->storeCurrentCoefficients();
-	if (this->parameterTable != nullptr) {
-		this->cachedParameterTables[oldTypeName] = this->parameterTable;
-		this->parameterTable = nullptr;
-	}
+	// Save current coefficients and cache the table for the outgoing generator type
+	this->coefficientWorkspace->store();
+	this->coefficientWorkspace->cacheCurrentTable(oldTypeName);
 
 	// Switch generator (PSFModule handles caching generator settings internally)
 	this->psfModule->switchGenerator(typeName);
 
 	// Restore or create parameter table for the new type
-	if (this->cachedParameterTables.contains(typeName)) {
-		this->parameterTable = this->cachedParameterTables.take(typeName);
-	} else {
-		this->parameterTable = new WavefrontParameterTable(this);
-		this->resizeParameterTable();
-	}
+	this->coefficientWorkspace->restoreOrCreateTable(typeName);
 
 	// Sync z-planes for 3D generators
 	this->syncNumZPlanesWithInput();
@@ -299,10 +260,10 @@ void ApplicationController::switchGenerator(const QString& typeName)
 	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
 
 	// Load coefficients for current patch from the restored/fresh table
-	this->loadCoefficientsForCurrentPatch();
+	this->coefficientWorkspace->loadForCurrentPatch();
 
 	// Ensure a PSF is generated even when no input data is loaded
-	// (loadCoefficientsForCurrentPatch early-returns without input data)
+	// (loadForCurrentPatch early-returns without input data)
 	if (this->psfModule->getCurrentPSF().isempty()) {
 		this->psfModule->refreshPSF();
 	}
@@ -400,20 +361,20 @@ void ApplicationController::requestDeconvolution()
 
 void ApplicationController::requestBatchDeconvolution()
 {
-	if (!this->hasInputData() || this->psfModule == nullptr || this->parameterTable == nullptr) {
+	if (!this->hasInputData() || this->psfModule == nullptr || this->coefficientWorkspace->table() == nullptr) {
 		LOG_WARNING() << "Cannot run batch deconvolution: missing input data or parameters";
 		return;
 	}
 
-	this->storeCurrentCoefficients();
+	this->coefficientWorkspace->store();
 	this->suppressLiveDeconv = true;
 	this->syncVoxelSizeFromPropagator();
 
 	this->batchProcessor->executeBatchDeconvolution(
-		this->imageSession, this->psfModule, this->parameterTable);
+		this->imageSession, this->psfModule, this->coefficientWorkspace->table());
 
 	this->suppressLiveDeconv = false;
-	this->loadCoefficientsForCurrentPatch();
+	this->coefficientWorkspace->loadForCurrentPatch();
 	emit batchDeconvolutionCompleted();
 }
 
@@ -457,13 +418,13 @@ void ApplicationController::syncVoxelSizeFromPropagator()
 
 void ApplicationController::runVolumetricDeconvolutionOnCurrentPatch()
 {
-	if (this->parameterTable == nullptr || this->imageSession == nullptr) {
+	if (this->coefficientWorkspace->table() == nullptr || this->imageSession == nullptr) {
 		return;
 	}
 
 	int patchX = this->getCurrentPatchX();
 	int patchY = this->getCurrentPatchY();
-	int patchIdx = this->parameterTable->patchIndex(patchX, patchY);
+	int patchIdx = this->coefficientWorkspace->table()->patchIndex(patchX, patchY);
 	int frames = this->imageSession->getInputFrames();
 
 	af::array subvolume = VolumetricProcessor::assembleSubvolume(
@@ -476,7 +437,7 @@ void ApplicationController::runVolumetricDeconvolutionOnCurrentPatch()
 			   << subvolume.dims(1) << "x" << subvolume.dims(2);
 
 	af::array psf3D = VolumetricProcessor::assemble3DPSF(
-		this->psfModule, this->parameterTable,
+		this->psfModule, this->coefficientWorkspace->table(),
 		patchIdx, frames);
 	if (psf3D.isempty()) {
 		LOG_WARNING() << "3D deconv: empty 3D PSF for patch" << patchX << patchY;
@@ -545,9 +506,9 @@ void ApplicationController::handlePSFUpdatedForDeconvolution(af::array psf)
 	}
 
 	// Auto-save PSF if enabled
-	if (this->hasInputData() && this->parameterTable != nullptr) {
+	if (this->hasInputData() && this->coefficientWorkspace->table() != nullptr) {
 		int frame = this->getCurrentFrame();
-		int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
+		int patchIdx = this->coefficientWorkspace->table()->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
 		this->psfFileController->autoSaveIfEnabled(frame, patchIdx);
 	}
 }
@@ -678,21 +639,20 @@ void ApplicationController::requestOpenGroundTruthFile(const QString& filePath)
 void ApplicationController::handleInputDataChanged()
 {
 	// Invalidate cached parameter tables (dimensions no longer valid)
-	qDeleteAll(this->cachedParameterTables);
-	this->cachedParameterTables.clear();
+	this->coefficientWorkspace->clearCache();
 
 	// Emit ImageSession changed so viewers can update their data connections
 	emit imageSessionChanged(this->imageSession);
 
 	// Resize parameter table to match new data dimensions
-	this->resizeParameterTable();
+	this->coefficientWorkspace->resize();
 
 	this->syncNumZPlanesWithInput();
 
 	// Reset psfModule and UI sliders to the new dataset's patch (0,0) values,
 	// preventing stale coefficients from the previous file's active patch from
 	// being written back on the next storeCurrentCoefficients() call.
-	this->loadCoefficientsForCurrentPatch();
+	this->coefficientWorkspace->loadForCurrentPatch();
 }
 
 void ApplicationController::handleOutputDataChanged()
@@ -713,7 +673,7 @@ void ApplicationController::initializeComponents()
 	this->imageSession = new ImageSession(this->afDeviceManager, this);
 	this->inputDataReader = new InputDataReader(this);
 	this->psfModule = new PSFModule(this->afDeviceManager, this);
-	this->parameterTable = new WavefrontParameterTable(this);
+	this->coefficientWorkspace = new CoefficientWorkspace(this->psfModule, this->imageSession, this);
 	this->interpolationOrchestrator = new InterpolationOrchestrator(this);
 	this->psfFileController = new PSFFileController(this->psfModule, this);
 	this->batchProcessor = new BatchProcessor(this);
@@ -758,10 +718,7 @@ void ApplicationController::connectPSFModuleSignals()
 
 		// When Noll indices change, parameter table must be cleared and resized
 		connect(this->psfModule, &PSFModule::nollIndicesChanged, this, [this]() {
-			if (this->parameterTable != nullptr) {
-				this->parameterTable->clear();
-				this->resizeParameterTable();
-			}
+			this->coefficientWorkspace->clearAndResize();
 		});
 	}
 }
@@ -789,51 +746,6 @@ void ApplicationController::connectDeconvolutionSignals()
 	}
 }
 
-int ApplicationController::coefficientFrame() const
-{
-	// In 3D generator mode, coefficients are frame-independent (shared wavefront)
-	if (this->psfModule != nullptr && this->psfModule->getGenerator()->is3D()) {
-		return 0;
-	}
-	return this->getCurrentFrame();
-}
-
-void ApplicationController::storeCurrentCoefficients()
-{
-	if (this->parameterTable == nullptr || this->psfModule == nullptr || this->imageSession == nullptr) {
-		return;
-	}
-	if (!this->hasInputData()) {
-		return;
-	}
-	int frame = this->coefficientFrame();
-	int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
-	this->parameterTable->setCoefficients(frame, patchIdx, this->psfModule->getAllCoefficients());
-}
-
-void ApplicationController::loadCoefficientsForCurrentPatch()
-{
-	if (this->parameterTable == nullptr || this->psfModule == nullptr || this->imageSession == nullptr) {
-		return;
-	}
-	if (!this->hasInputData()) {
-		return;
-	}
-
-	int frame = this->coefficientFrame();
-	int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
-	this->psfModule->setCurrentPatch(frame, patchIdx);
-
-	if (this->psfModule->getGenerator()->supportsCoefficients()) {
-		QVector<double> coeffs = this->parameterTable->getCoefficients(frame, patchIdx);
-		if (!coeffs.isEmpty()) {
-			this->psfModule->setAllCoefficients(coeffs);
-			emit coefficientsLoaded(coeffs);
-		}
-	} else {
-		this->psfModule->refreshPSF();
-	}
-}
 
 void ApplicationController::syncNumZPlanesWithInput()
 {
@@ -847,27 +759,6 @@ void ApplicationController::syncNumZPlanesWithInput()
 	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
 }
 
-void ApplicationController::resizeParameterTable()
-{
-	if (this->parameterTable == nullptr || this->psfModule == nullptr || this->imageSession == nullptr) {
-		return;
-	}
-	if (!this->hasInputData()) {
-		return;
-	}
-	int frames = this->imageSession->getInputFrames();
-	int cols = this->imageSession->getPatchGridCols();
-	int rows = this->imageSession->getPatchGridRows();
-	int coeffs = this->psfModule->getAllCoefficients().size();
-
-	// Only resize (and zero-fill) when dimensions actually changed
-	if (frames != this->parameterTable->getNumberOfFrames()
-		|| cols != this->parameterTable->getNumberOfPatchesInX()
-		|| rows != this->parameterTable->getNumberOfPatchesInY()
-		|| coeffs != this->parameterTable->getCoefficientsPerPatch()) {
-		this->parameterTable->resize(frames, cols, rows, coeffs);
-	}
-}
 
 bool ApplicationController::loadFileToSession(const QString& filePath, bool isGroundTruth)
 {
@@ -914,7 +805,7 @@ void ApplicationController::startOptimization(const OptimizationConfig& uiConfig
 	}
 
 	// Store current coefficients before starting
-	this->storeCurrentCoefficients();
+	this->coefficientWorkspace->store();
 
 	// Copy UI config and fill in controller-owned data
 	OptimizationConfig config = uiConfig;
@@ -937,7 +828,7 @@ void ApplicationController::startOptimization(const OptimizationConfig& uiConfig
 
 	// Build jobs
 	if (!OptimizationJobBuilder::buildJobs(config, this->imageSession, this->psfModule,
-			this->parameterTable, this->getCurrentFrame(), this->getCurrentPatchX(), this->getCurrentPatchY())) {
+			this->coefficientWorkspace->table(), this->getCurrentFrame(), this->getCurrentPatchX(), this->getCurrentPatchY())) {
 		LOG_WARNING() << "Failed to build optimization jobs";
 		return;
 	}
@@ -988,8 +879,8 @@ void ApplicationController::handleOptimizationFinished(const OptimizationResult&
 
 	// Store coefficients and write deconvolved output for every job
 	for (const OptimizationJobResult& jobResult : result.jobResults) {
-		int patchIdx = this->parameterTable->patchIndex(jobResult.patchX, jobResult.patchY);
-		this->parameterTable->setCoefficients(jobResult.frameNr, patchIdx, jobResult.bestCoefficients);
+		int patchIdx = this->coefficientWorkspace->table()->patchIndex(jobResult.patchX, jobResult.patchY);
+		this->coefficientWorkspace->table()->setCoefficients(jobResult.frameNr, patchIdx, jobResult.bestCoefficients);
 
 		bool oldSuppress = this->suppressLiveDeconv;
 		this->suppressLiveDeconv = true;
@@ -1044,15 +935,15 @@ void ApplicationController::setFilePSFSource(const QString& path)
 
 void ApplicationController::generatePSFGrid(int frame, int cropSize)
 {
-	if (!this->hasInputData() || this->psfModule == nullptr || this->parameterTable == nullptr) {
+	if (!this->hasInputData() || this->psfModule == nullptr || this->coefficientWorkspace->table() == nullptr) {
 		LOG_WARNING() << "Cannot generate PSF grid: missing input data or parameters";
 		return;
 	}
 
-	this->storeCurrentCoefficients();
+	this->coefficientWorkspace->store();
 
 	PSFGridResult result = this->psfGridGenerator->generate(
-		this->psfModule, this->parameterTable,
+		this->psfModule, this->coefficientWorkspace->table(),
 		frame, this->getPatchGridCols(), this->getPatchGridRows(),
 		cropSize);
 	emit psfGridGenerated(result);
@@ -1062,52 +953,48 @@ void ApplicationController::generatePSFGrid(int frame, int cropSize)
 
 void ApplicationController::interpolateCoefficientsInX()
 {
-	if (this->parameterTable == nullptr || !this->hasInputData()) return;
-	this->storeCurrentCoefficients();
+	if (this->coefficientWorkspace->table() == nullptr || !this->hasInputData()) return;
+	this->coefficientWorkspace->store();
 
 	InterpolationResult result = this->interpolationOrchestrator->interpolateInX(
-		this->parameterTable, this->getCurrentFrame(), this->getCurrentPatchX(), this->getCurrentPatchY());
+		this->coefficientWorkspace->table(), this->getCurrentFrame(), this->getCurrentPatchX(), this->getCurrentPatchY());
 
-	this->loadCoefficientsForCurrentPatch();
-	emit coefficientsLoaded(this->psfModule->getAllCoefficients());
+	this->coefficientWorkspace->loadForCurrentPatch();
 	emit interpolationCompleted(result);
 }
 
 void ApplicationController::interpolateCoefficientsInY()
 {
-	if (this->parameterTable == nullptr || !this->hasInputData()) return;
-	this->storeCurrentCoefficients();
+	if (this->coefficientWorkspace->table() == nullptr || !this->hasInputData()) return;
+	this->coefficientWorkspace->store();
 
 	InterpolationResult result = this->interpolationOrchestrator->interpolateInY(
-		this->parameterTable, this->getCurrentFrame(), this->getCurrentPatchX(), this->getCurrentPatchY());
+		this->coefficientWorkspace->table(), this->getCurrentFrame(), this->getCurrentPatchX(), this->getCurrentPatchY());
 
-	this->loadCoefficientsForCurrentPatch();
-	emit coefficientsLoaded(this->psfModule->getAllCoefficients());
+	this->coefficientWorkspace->loadForCurrentPatch();
 	emit interpolationCompleted(result);
 }
 
 void ApplicationController::interpolateCoefficientsInZ()
 {
-	if (this->parameterTable == nullptr || !this->hasInputData()) return;
-	this->storeCurrentCoefficients();
+	if (this->coefficientWorkspace->table() == nullptr || !this->hasInputData()) return;
+	this->coefficientWorkspace->store();
 
 	InterpolationResult result = this->interpolationOrchestrator->interpolateInZ(
-		this->parameterTable, this->getCurrentPatchX(), this->getCurrentPatchY());
+		this->coefficientWorkspace->table(), this->getCurrentPatchX(), this->getCurrentPatchY());
 
-	this->loadCoefficientsForCurrentPatch();
-	emit coefficientsLoaded(this->psfModule->getAllCoefficients());
+	this->coefficientWorkspace->loadForCurrentPatch();
 	emit interpolationCompleted(result);
 }
 
 void ApplicationController::interpolateAllCoefficientsInZ()
 {
-	if (this->parameterTable == nullptr || !this->hasInputData()) return;
-	this->storeCurrentCoefficients();
+	if (this->coefficientWorkspace->table() == nullptr || !this->hasInputData()) return;
+	this->coefficientWorkspace->store();
 
-	this->interpolationOrchestrator->interpolateAllInZ(this->parameterTable);
+	this->interpolationOrchestrator->interpolateAllInZ(this->coefficientWorkspace->table());
 
-	this->loadCoefficientsForCurrentPatch();
-	emit coefficientsLoaded(this->psfModule->getAllCoefficients());
+	this->coefficientWorkspace->loadForCurrentPatch();
 }
 
 void ApplicationController::setInterpolationPolynomialOrder(int order)

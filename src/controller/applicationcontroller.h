@@ -4,7 +4,6 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
-#include <QMap>
 #include <arrayfire.h>
 #include "core/psf/wavefrontparameter.h"
 #include "core/psf/psfsettings.h"
@@ -17,7 +16,7 @@
 class ImageSession;
 class InputDataReader;
 class PSFModule;
-class WavefrontParameterTable;
+class CoefficientWorkspace;
 class AFDeviceManager;
 class PSFFileController;
 class BatchProcessor;
@@ -163,11 +162,6 @@ private:
 	void runDeconvolutionOnCurrentPatch();
 	void runVolumetricDeconvolutionOnCurrentPatch();
 
-	// Parameter table orchestration
-	int coefficientFrame() const;
-	void storeCurrentCoefficients();
-	void loadCoefficientsForCurrentPatch();
-	void resizeParameterTable();
 	void syncNumZPlanesWithInput();
 
 	// Sync voxel size from propagator settings to 3D deconvolver
@@ -178,7 +172,7 @@ private:
 	ImageSession* imageSession;
 	InputDataReader* inputDataReader;
 	PSFModule* psfModule;
-	WavefrontParameterTable* parameterTable;
+	CoefficientWorkspace* coefficientWorkspace;
 
 	// Deconvolution state
 	bool deconvolutionLiveMode;
@@ -186,13 +180,6 @@ private:
 	// Optimization (delegated to OptimizationController)
 	OptimizationController* optimizationController;
 	bool suppressLiveDeconv;
-
-	// Coefficient clipboard and undo
-	QVector<double> coefficientClipboard;
-	QVector<double> undoCoefficients;
-	int undoFrame;
-	int undoPatchX;
-	int undoPatchY;
 
 	// Interpolation
 	InterpolationOrchestrator* interpolationOrchestrator;
@@ -205,9 +192,6 @@ private:
 
 	// PSF grid generation
 	PSFGridGenerator* psfGridGenerator;
-
-	// Parameter table cache: preserves per-patch coefficients when switching between generator types
-	QMap<QString, WavefrontParameterTable*> cachedParameterTables;
 
 signals:
 	// File loading results

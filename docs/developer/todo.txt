@@ -156,3 +156,5 @@
 - add option for custom (non-square) psf grid size
 
 [done] bug fix: when rotating input/output viewer position line is also rotated but mouse symbol (when above position line) is not adjusted
+
+- rename WavefrontParameterTable to WavefrontCoefficientTable
