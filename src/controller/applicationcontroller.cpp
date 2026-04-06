@@ -1,4 +1,5 @@
 #include "applicationcontroller.h"
+#include "optimizationcontroller.h"
 #include "imagesession.h"
 #include "data/inputdatareader.h"
 #include "data/imagedata.h"
@@ -22,15 +23,12 @@
 ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent), afDeviceManager(afDeviceManager), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
 	, parameterTable(nullptr), deconvolutionLiveMode(false)
-	, optimizationThread(nullptr), optimizationWorker(nullptr)
-	, optimizationLivePreview(false), optimizationLivePreviewInterval(10), optimizationProgressCounter(0)
-	, suppressLiveDeconv(false)
+	, optimizationController(nullptr), suppressLiveDeconv(false)
 {
 	this->initializeComponents();
 	this->connectSessionSignals();
 	this->connectPSFModuleSignals();
 	this->connectDeconvolutionSignals();
-	this->initializeOptimizationThread();
 
 	// React to device changes from AFDeviceManager (each component clears its own caches via self-connection)
 	connect(this->afDeviceManager, &AFDeviceManager::deviceChanged, this, [this]() {
@@ -38,22 +36,23 @@ ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, Q
 			this->psfModule->applyPSFSettings(this->psfModule->getPSFSettings());
 	});
 
-	qRegisterMetaType<OptimizationConfig>("OptimizationConfig");
-	qRegisterMetaType<OptimizationProgress>("OptimizationProgress");
-	qRegisterMetaType<OptimizationResult>("OptimizationResult");
+	// Optimization controller (owns worker thread and progress throttling)
+	this->optimizationController = new OptimizationController(this);
+	connect(this->optimizationController, &OptimizationController::started,
+			this, &ApplicationController::optimizationStarted);
+	connect(this->optimizationController, &OptimizationController::progressUpdated,
+			this, &ApplicationController::optimizationProgressUpdated);
+	connect(this->optimizationController, &OptimizationController::livePreviewReady,
+			this, &ApplicationController::handleOptimizationLivePreview);
+	connect(this->optimizationController, &OptimizationController::finished,
+			this, &ApplicationController::handleOptimizationFinished);
+
 	qRegisterMetaType<InterpolationResult>("InterpolationResult");
 	qRegisterMetaType<PSFFileInfo>("PSFFileInfo");
 }
 
 ApplicationController::~ApplicationController()
 {
-	if (this->optimizationThread) {
-		this->optimizationWorker->requestCancel();
-		this->optimizationThread->quit();
-		this->optimizationThread->wait();
-		this->optimizationThread = nullptr;
-		this->optimizationWorker = nullptr;  // deleted by QThread::finished → deleteLater
-	}
 }
 
 bool ApplicationController::openInputFile(const QString& filePath)
@@ -905,31 +904,6 @@ bool ApplicationController::loadFileToSession(const QString& filePath, bool isGr
 
 // --- Optimization ---
 
-void ApplicationController::initializeOptimizationThread()
-{
-	this->optimizationThread = new QThread(this);
-	this->optimizationWorker = new OptimizationWorker();
-	this->optimizationWorker->moveToThread(this->optimizationThread);
-
-	connect(this->optimizationThread, &QThread::finished,
-			this->optimizationWorker, &QObject::deleteLater);
-
-	// Controller → Worker (queued)
-	connect(this, &ApplicationController::runOptimizationOnWorker,
-			this->optimizationWorker, &OptimizationWorker::runOptimization,
-			Qt::QueuedConnection);
-
-	// Worker → Controller (queued, routed through slot for live preview)
-	connect(this->optimizationWorker, &OptimizationWorker::progressUpdated,
-			this, &ApplicationController::handleOptimizationProgress,
-			Qt::QueuedConnection);
-	connect(this->optimizationWorker, &OptimizationWorker::optimizationFinished,
-			this, &ApplicationController::handleOptimizationFinished,
-			Qt::QueuedConnection);
-
-	this->optimizationThread->start();
-}
-
 void ApplicationController::startOptimization(const OptimizationConfig& uiConfig)
 {
 	if (!this->hasInputData() || this->psfModule == nullptr) {
@@ -950,10 +924,6 @@ void ApplicationController::startOptimization(const OptimizationConfig& uiConfig
 	// PSF settings
 	config.psfSettings = this->psfModule->getPSFSettings();
 
-	// Deconvolution settings from current PSFModule/Deconvolver
-	// (read via PSFModule which owns the Deconvolver)
-	// These are stored in the config struct with defaults that match the UI
-
 	// Per-coefficient bounds from parameter descriptors
 	QVector<WavefrontParameter> descriptors = this->psfModule->getParameterDescriptors();
 	config.minBounds.resize(descriptors.size());
@@ -972,15 +942,7 @@ void ApplicationController::startOptimization(const OptimizationConfig& uiConfig
 
 	LOG_INFO() << "Starting optimization with" << config.jobs.size() << "jobs";
 
-	// Store live preview settings
-	this->optimizationLivePreview = config.livePreview;
-	this->optimizationLivePreviewInterval = config.livePreviewInterval;
-	this->optimizationProgressCounter = 0;
-	this->progressUpdateTimer.start();
-
-	// Worker resets cancelRequested to 0 at the start of runOptimization()
-	emit optimizationStarted();
-	emit runOptimizationOnWorker(config);
+	this->optimizationController->start(config);
 }
 
 void ApplicationController::cancelDeconvolution()
@@ -990,57 +952,30 @@ void ApplicationController::cancelDeconvolution()
 
 void ApplicationController::cancelOptimization()
 {
-	if (this->optimizationWorker != nullptr) {
-		this->optimizationWorker->requestCancel();
-		LOG_INFO() << "Optimization cancellation requested";
-	}
+	this->optimizationController->cancel();
 }
 
 void ApplicationController::updateOptimizationLivePreview(bool enabled, int interval)
 {
-	this->optimizationLivePreview = enabled;
-	this->optimizationLivePreviewInterval = interval;
-	if (enabled) {
-		this->optimizationProgressCounter = 0;
-		this->progressUpdateTimer.restart();
-	}
+	this->optimizationController->setLivePreview(enabled, interval);
 }
 
 void ApplicationController::updateOptimizationAlgorithmParameters(const QVariantMap& params)
 {
-	if (this->optimizationWorker != nullptr) {
-		this->optimizationWorker->updateLiveAlgorithmParameters(params);
-	}
+	this->optimizationController->updateAlgorithmParameters(params);
 }
 
-void ApplicationController::handleOptimizationProgress(const OptimizationProgress& progress)
+void ApplicationController::handleOptimizationLivePreview(
+	const QVector<double>& coefficients, int frame, int patchX, int patchY)
 {
-	// Always forward to GUI (data accumulation + label updates are cheap;
-	// the widget throttles the expensive replot() call itself)
-	emit optimizationProgressUpdated(progress);
-
-	// Live preview: throttle GPU work (setAllCoefficients + deconvolution)
-	if (this->optimizationLivePreview) {
-		this->optimizationProgressCounter++;
-		if (this->optimizationProgressCounter >= this->optimizationLivePreviewInterval &&
-			this->progressUpdateTimer.elapsed() >= 200) {
-			this->optimizationProgressCounter = 0;
-			this->progressUpdateTimer.restart();
-
-			if (!progress.currentCoefficients.isEmpty()) {
-				// Suppress live-deconv trigger from psfUpdated signal to avoid
-				// double deconvolution (we call runDeconvolution explicitly below)
-				this->suppressLiveDeconv = true;
-				this->psfModule->setAllCoefficients(progress.currentCoefficients);
-				emit coefficientsLoaded(progress.currentCoefficients);
-				this->suppressLiveDeconv = false;
-				// Navigate viewer to current job's patch so the live preview reflects it
-				this->imageSession->setCurrentFrame(progress.currentFrameNr);
-				this->imageSession->setCurrentPatch(progress.currentPatchX, progress.currentPatchY);
-				this->runDeconvolutionOnCurrentPatch();
-			}
-		}
-	}
+	bool oldSuppress = this->suppressLiveDeconv;
+	this->suppressLiveDeconv = true;
+	this->psfModule->setAllCoefficients(coefficients);
+	emit coefficientsLoaded(coefficients);
+	this->imageSession->setCurrentFrame(frame);
+	this->imageSession->setCurrentPatch(patchX, patchY);
+	this->suppressLiveDeconv = oldSuppress;
+	this->runDeconvolutionOnCurrentPatch();
 }
 
 void ApplicationController::handleOptimizationFinished(const OptimizationResult& result)
@@ -1054,11 +989,12 @@ void ApplicationController::handleOptimizationFinished(const OptimizationResult&
 		int patchIdx = this->parameterTable->patchIndex(jobResult.patchX, jobResult.patchY);
 		this->parameterTable->setCoefficients(jobResult.frameNr, patchIdx, jobResult.bestCoefficients);
 
+		bool oldSuppress = this->suppressLiveDeconv;
 		this->suppressLiveDeconv = true;
 		this->psfModule->setAllCoefficients(jobResult.bestCoefficients);
-		this->suppressLiveDeconv = false;
 		this->imageSession->setCurrentFrame(jobResult.frameNr);
 		this->imageSession->setCurrentPatch(jobResult.patchX, jobResult.patchY);
+		this->suppressLiveDeconv = oldSuppress;
 		this->runDeconvolutionOnCurrentPatch();
 	}
 

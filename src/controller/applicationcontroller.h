@@ -4,8 +4,6 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
-#include <QThread>
-#include <QElapsedTimer>
 #include <QMap>
 #include <arrayfire.h>
 #include "core/psf/wavefrontparameter.h"
@@ -24,6 +22,7 @@ class AFDeviceManager;
 class PSFFileManager;
 class BatchProcessor;
 class InterpolationOrchestrator;
+class OptimizationController;
 class PSFGridGenerator;
 
 class ApplicationController : public QObject
@@ -145,7 +144,7 @@ private slots:
 	void handleDeconvolutionSettingsChanged();
 
 	// Optimization handling
-	void handleOptimizationProgress(const OptimizationProgress& progress);
+	void handleOptimizationLivePreview(const QVector<double>& coefficients, int frame, int patchX, int patchY);
 	void handleOptimizationFinished(const OptimizationResult& result);
 
 private:
@@ -163,9 +162,6 @@ private:
 	// Deconvolution orchestration
 	void runDeconvolutionOnCurrentPatch();
 	void runVolumetricDeconvolutionOnCurrentPatch();
-
-	// Optimization orchestration
-	void initializeOptimizationThread();
 
 	// Parameter table orchestration
 	int coefficientFrame() const;
@@ -187,15 +183,8 @@ private:
 	// Deconvolution state
 	bool deconvolutionLiveMode;
 
-	// Optimization threading
-	QThread* optimizationThread;
-	OptimizationWorker* optimizationWorker;
-
-	// Optimization live preview state
-	bool optimizationLivePreview;
-	int optimizationLivePreviewInterval;
-	int optimizationProgressCounter;
-	QElapsedTimer progressUpdateTimer;
+	// Optimization (delegated to OptimizationController)
+	OptimizationController* optimizationController;
 	bool suppressLiveDeconv;
 
 	// Coefficient clipboard and undo
@@ -258,7 +247,6 @@ signals:
 	void optimizationStarted();
 	void optimizationProgressUpdated(OptimizationProgress progress);
 	void optimizationFinished(OptimizationResult result);
-	void runOptimizationOnWorker(OptimizationConfig config);
 
 	// Batch processing
 	void parametersLoaded();
