@@ -2,13 +2,16 @@
 #define PROJECTIONUTILS_H
 
 #include <QByteArray>
-#include <algorithm>
+#include <QVector>
 #include <cmath>
 #include <cstring>
 #include <type_traits>
 #include "data/imagedata.h"
 
 namespace ProjectionUtils {
+
+// Minimum number of output pixels before enabling OpenMP parallelization 
+static constexpr int OMP_PIXEL_THRESHOLD = 65535; //1048576; // 256x256=65536 seems to be good. ImageRenderWorker however uses 1024x1024. todo: maybe use same values in both places. but there is no right/wrong because it depends on data size as well as used hardware
 
 // MIP across z (all frames) → one XY image.
 // For each pixel (x,y): result = max over all frames.
@@ -21,18 +24,23 @@ static QByteArray computeMIPXYTyped(const ImageData* data)
 	const int frames = data->getFrames();
 	const int count = width * height;
 
+	QVector<const T*> framePtrs(frames, nullptr);
+	for (int f = 0; f < frames; ++f) {
+		framePtrs[f] = static_cast<const T*>(data->getData(f));
+	}
+	if (!framePtrs[0]) return QByteArray();
+
 	QByteArray result(count * static_cast<int>(sizeof(T)), '\0');
 	T* dst = reinterpret_cast<T*>(result.data());
 
 	// Initialize from first frame
-	const T* first = static_cast<const T*>(data->getData(0));
-	if (!first) return QByteArray();
-	std::memcpy(dst, first, count * sizeof(T));
+	std::memcpy(dst, framePtrs[0], count * sizeof(T));
 
-	// Max with remaining frames
+	// Max with remaining frames — sequential over frames, parallel over pixels
 	for (int f = 1; f < frames; ++f) {
-		const T* src = static_cast<const T*>(data->getData(f));
-		if (!src) continue;
+		if (!framePtrs[f]) continue;
+		const T* src = framePtrs[f];
+		#pragma omp parallel for if(count >= OMP_PIXEL_THRESHOLD) schedule(static)
 		for (int i = 0; i < count; ++i) {
 			if (src[i] > dst[i]) dst[i] = src[i];
 		}
@@ -49,17 +57,25 @@ static QByteArray computeMIPXZTyped(const ImageData* data)
 	const int width = data->getWidth();
 	const int height = data->getHeight();
 	const int frames = data->getFrames();
+	const int total = width * frames;
 
-	QByteArray result(width * frames * static_cast<int>(sizeof(T)), '\0');
+	QVector<const T*> framePtrs(frames, nullptr);
+	for (int f = 0; f < frames; ++f) {
+		framePtrs[f] = static_cast<const T*>(data->getData(f));
+	}
+
+	QByteArray result(total * static_cast<int>(sizeof(T)), '\0');
 	T* dst = reinterpret_cast<T*>(result.data());
 
+	// Each frame z writes to independent output row — parallel over z
+	#pragma omp parallel for if(total >= OMP_PIXEL_THRESHOLD) schedule(static)
 	for (int z = 0; z < frames; ++z) {
-		const T* frame = static_cast<const T*>(data->getData(z));
+		const T* frame = framePtrs[z];
 		if (!frame) continue;
 		T* row = dst + z * width;
-		// Initialize from first row
+		// Initialize from first row of frame
 		std::memcpy(row, frame, width * sizeof(T));
-		// Max with remaining rows
+		// Max with remaining rows — sequential, cache-friendly row access
 		for (int y = 1; y < height; ++y) {
 			const T* src = frame + y * width;
 			for (int x = 0; x < width; ++x) {
@@ -79,16 +95,21 @@ static QByteArray computeMinXYTyped(const ImageData* data)
 	const int frames = data->getFrames();
 	const int count = width * height;
 
+	QVector<const T*> framePtrs(frames, nullptr);
+	for (int f = 0; f < frames; ++f) {
+		framePtrs[f] = static_cast<const T*>(data->getData(f));
+	}
+	if (!framePtrs[0]) return QByteArray();
+
 	QByteArray result(count * static_cast<int>(sizeof(T)), '\0');
 	T* dst = reinterpret_cast<T*>(result.data());
 
-	const T* first = static_cast<const T*>(data->getData(0));
-	if (!first) return QByteArray();
-	std::memcpy(dst, first, count * sizeof(T));
+	std::memcpy(dst, framePtrs[0], count * sizeof(T));
 
 	for (int f = 1; f < frames; ++f) {
-		const T* src = static_cast<const T*>(data->getData(f));
-		if (!src) continue;
+		if (!framePtrs[f]) continue;
+		const T* src = framePtrs[f];
+		#pragma omp parallel for if(count >= OMP_PIXEL_THRESHOLD) schedule(static)
 		for (int i = 0; i < count; ++i) {
 			if (src[i] < dst[i]) dst[i] = src[i];
 		}
@@ -103,12 +124,19 @@ static QByteArray computeMinXZTyped(const ImageData* data)
 	const int width = data->getWidth();
 	const int height = data->getHeight();
 	const int frames = data->getFrames();
+	const int total = width * frames;
 
-	QByteArray result(width * frames * static_cast<int>(sizeof(T)), '\0');
+	QVector<const T*> framePtrs(frames, nullptr);
+	for (int f = 0; f < frames; ++f) {
+		framePtrs[f] = static_cast<const T*>(data->getData(f));
+	}
+
+	QByteArray result(total * static_cast<int>(sizeof(T)), '\0');
 	T* dst = reinterpret_cast<T*>(result.data());
 
+	#pragma omp parallel for if(total >= OMP_PIXEL_THRESHOLD) schedule(static)
 	for (int z = 0; z < frames; ++z) {
-		const T* frame = static_cast<const T*>(data->getData(z));
+		const T* frame = framePtrs[z];
 		if (!frame) continue;
 		T* row = dst + z * width;
 		std::memcpy(row, frame, width * sizeof(T));
@@ -131,18 +159,34 @@ static QByteArray computeAvgXYTyped(const ImageData* data)
 	const int frames = data->getFrames();
 	const int count = width * height;
 
+	QVector<const T*> framePtrs(frames, nullptr);
+	for (int f = 0; f < frames; ++f) {
+		framePtrs[f] = static_cast<const T*>(data->getData(f));
+	}
+	if (!framePtrs[0]) return QByteArray();
+
+	int validCount = 0;
+	for (int f = 0; f < frames; ++f) {
+		if (framePtrs[f]) ++validCount;
+	}
+	if (validCount == 0) return QByteArray();
+	const double divisor = static_cast<double>(validCount);
+
+	// Accumulate — sequential over frames, parallel over pixels
 	QVector<double> acc(count, 0.0);
 	for (int f = 0; f < frames; ++f) {
-		const T* src = static_cast<const T*>(data->getData(f));
-		if (!src) continue;
+		if (!framePtrs[f]) continue;
+		const T* src = framePtrs[f];
+		#pragma omp parallel for if(count >= OMP_PIXEL_THRESHOLD) schedule(static)
 		for (int i = 0; i < count; ++i) {
 			acc[i] += static_cast<double>(src[i]);
 		}
 	}
 
+	// Divide and store
 	QByteArray result(count * static_cast<int>(sizeof(T)), '\0');
 	T* dst = reinterpret_cast<T*>(result.data());
-	const double divisor = static_cast<double>(frames);
+	#pragma omp parallel for if(count >= OMP_PIXEL_THRESHOLD) schedule(static)
 	for (int i = 0; i < count; ++i) {
 		double avg = acc[i] / divisor;
 		if (std::is_integral<T>::value) {
@@ -161,30 +205,38 @@ static QByteArray computeAvgXZTyped(const ImageData* data)
 	const int width = data->getWidth();
 	const int height = data->getHeight();
 	const int frames = data->getFrames();
+	const int total = width * frames;
 
-	QVector<double> acc(width * frames, 0.0);
+	QVector<const T*> framePtrs(frames, nullptr);
+	for (int f = 0; f < frames; ++f) {
+		framePtrs[f] = static_cast<const T*>(data->getData(f));
+	}
+	const double divisor = static_cast<double>(height);
+
+	QByteArray result(total * static_cast<int>(sizeof(T)), '\0');
+	T* dst = reinterpret_cast<T*>(result.data());
+
+	// Each frame z writes to independent output row — parallel over z
+	#pragma omp parallel for if(total >= OMP_PIXEL_THRESHOLD) schedule(static)
 	for (int z = 0; z < frames; ++z) {
-		const T* frame = static_cast<const T*>(data->getData(z));
+		const T* frame = framePtrs[z];
 		if (!frame) continue;
-		double* accRow = acc.data() + z * width;
+		T* outRow = dst + z * width;
+		// Thread-local accumulator — sequential row access within frame
+		QVector<double> acc(width, 0.0);
 		for (int y = 0; y < height; ++y) {
 			const T* src = frame + y * width;
 			for (int x = 0; x < width; ++x) {
-				accRow[x] += static_cast<double>(src[x]);
+				acc[x] += static_cast<double>(src[x]);
 			}
 		}
-	}
-
-	QByteArray result(width * frames * static_cast<int>(sizeof(T)), '\0');
-	T* dst = reinterpret_cast<T*>(result.data());
-	const double divisor = static_cast<double>(height);
-	const int total = width * frames;
-	for (int i = 0; i < total; ++i) {
-		double avg = acc[i] / divisor;
-		if (std::is_integral<T>::value) {
-			dst[i] = static_cast<T>(std::round(avg));
-		} else {
-			dst[i] = static_cast<T>(avg);
+		for (int x = 0; x < width; ++x) {
+			double avg = acc[x] / divisor;
+			if (std::is_integral<T>::value) {
+				outRow[x] = static_cast<T>(std::round(avg));
+			} else {
+				outRow[x] = static_cast<T>(avg);
+			}
 		}
 	}
 	return result;
