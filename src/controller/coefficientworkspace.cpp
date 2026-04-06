@@ -46,12 +46,15 @@ void CoefficientWorkspace::loadForCurrentPatch()
 		return;
 	}
 
-	int frame = this->coefficientFrame();
+	int coeffFrame = this->coefficientFrame();
+	int displayFrame = this->imageSession->getCurrentFrame();
 	int patchIdx = this->currentTable->patchIndex(this->imageSession->getCurrentPatch().x(), this->imageSession->getCurrentPatch().y());
-	this->psfModule->setCurrentPatch(frame, patchIdx);
+	// For 3D generators, coefficients are shared across frames, but 2D deconvolution
+	// still needs the PSF slice matching the currently displayed frame.
+	this->psfModule->setCurrentPatch(displayFrame, patchIdx);
 
 	if (this->psfModule->getGenerator()->supportsCoefficients()) {
-		QVector<double> coeffs = this->currentTable->getCoefficients(frame, patchIdx);
+		QVector<double> coeffs = this->currentTable->getCoefficients(coeffFrame, patchIdx);
 		if (!coeffs.isEmpty()) {
 			this->psfModule->setAllCoefficients(coeffs);
 			emit coefficientsLoaded(coeffs);
