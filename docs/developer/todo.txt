@@ -158,3 +158,5 @@
 [done] bug fix: when rotating input/output viewer position line is also rotated but mouse symbol (when above position line) is not adjusted
 
 - rename WavefrontParameterTable to WavefrontCoefficientTable
+
+- in sync mode pixel value output should also be synced. this makes it easier to compare specific pixel values between input and output images
