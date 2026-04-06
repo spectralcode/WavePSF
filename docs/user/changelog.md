@@ -19,6 +19,7 @@
 - "Auto (Stack)" display range no longer causes slowdowns during deconvolution
 
 
+
 ## Version 1.2.0 (2026-04-01)
 
 ### Added
