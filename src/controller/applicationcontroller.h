@@ -19,7 +19,7 @@ class InputDataReader;
 class PSFModule;
 class WavefrontParameterTable;
 class AFDeviceManager;
-class PSFFileManager;
+class PSFFileController;
 class BatchProcessor;
 class InterpolationOrchestrator;
 class OptimizationController;
@@ -198,16 +198,13 @@ private:
 	InterpolationOrchestrator* interpolationOrchestrator;
 
 	// PSF file management
-	PSFFileManager* psfFileManager;
+	PSFFileController* psfFileController;
 
 	// Batch processing
 	BatchProcessor* batchProcessor;
 
 	// PSF grid generation
 	PSFGridGenerator* psfGridGenerator;
-
-	// File PSF info helper
-	void emitFileInfoIfApplicable();
 
 	// Parameter table cache: preserves per-patch coefficients when switching between generator types
 	QMap<QString, WavefrontParameterTable*> cachedParameterTables;

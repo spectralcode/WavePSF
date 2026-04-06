@@ -1,13 +1,12 @@
 #include "applicationcontroller.h"
 #include "optimizationcontroller.h"
+#include "psffilecontroller.h"
 #include "imagesession.h"
 #include "data/inputdatareader.h"
 #include "data/imagedata.h"
 #include "data/wavefrontparametertable.h"
 #include "core/psf/psfmodule.h"
 #include "core/psf/ipsfgenerator.h"
-#include "core/psf/psffilemanager.h"
-#include "core/psf/filepsfgenerator.h"
 #include "core/optimization/optimizationjobbuilder.h"
 #include "core/processing/batchprocessor.h"
 #include "core/processing/volumetricprocessor.h"
@@ -23,7 +22,7 @@
 ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent), afDeviceManager(afDeviceManager), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
 	, parameterTable(nullptr), deconvolutionLiveMode(false)
-	, optimizationController(nullptr), suppressLiveDeconv(false)
+	, optimizationController(nullptr), suppressLiveDeconv(false), psfFileController(nullptr)
 {
 	this->initializeComponents();
 	this->connectSessionSignals();
@@ -47,8 +46,11 @@ ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, Q
 	connect(this->optimizationController, &OptimizationController::finished,
 			this, &ApplicationController::handleOptimizationFinished);
 
+	// PSF file controller (owns PSFFileManager, file-based PSF logic)
+	connect(this->psfFileController, &PSFFileController::filePSFInfoUpdated,
+			this, &ApplicationController::filePSFInfoUpdated);
+
 	qRegisterMetaType<InterpolationResult>("InterpolationResult");
-	qRegisterMetaType<PSFFileInfo>("PSFFileInfo");
 }
 
 ApplicationController::~ApplicationController()
@@ -259,7 +261,7 @@ void ApplicationController::applyPSFSettings(const PSFSettings& settings)
 		emit coefficientsLoaded(this->psfModule->getAllCoefficients());
 	}
 	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
-	this->emitFileInfoIfApplicable();
+	this->psfFileController->refreshFileInfo();
 }
 
 void ApplicationController::switchGenerator(const QString& typeName)
@@ -305,7 +307,7 @@ void ApplicationController::switchGenerator(const QString& typeName)
 		this->psfModule->refreshPSF();
 	}
 
-	this->emitFileInfoIfApplicable();
+	this->psfFileController->refreshFileInfo();
 }
 
 void ApplicationController::applyInlineSettings(const QVariantMap& settings)
@@ -546,7 +548,7 @@ void ApplicationController::handlePSFUpdatedForDeconvolution(af::array psf)
 	if (this->hasInputData() && this->parameterTable != nullptr) {
 		int frame = this->getCurrentFrame();
 		int patchIdx = this->parameterTable->patchIndex(this->getCurrentPatchX(), this->getCurrentPatchY());
-		this->psfFileManager->autoSaveIfEnabled(frame, patchIdx, this->psfModule);
+		this->psfFileController->autoSaveIfEnabled(frame, patchIdx);
 	}
 }
 
@@ -713,7 +715,7 @@ void ApplicationController::initializeComponents()
 	this->psfModule = new PSFModule(this->afDeviceManager, this);
 	this->parameterTable = new WavefrontParameterTable(this);
 	this->interpolationOrchestrator = new InterpolationOrchestrator(this);
-	this->psfFileManager = new PSFFileManager(this);
+	this->psfFileController = new PSFFileController(this->psfModule, this);
 	this->batchProcessor = new BatchProcessor(this);
 	this->psfGridGenerator = new PSFGridGenerator(this);
 }
@@ -1020,39 +1022,22 @@ void ApplicationController::saveOutputToFile(const QString& filePath)
 
 void ApplicationController::savePSFToFile(const QString& filePath)
 {
-	this->psfFileManager->savePSFToFile(filePath, this->psfModule);
+	this->psfFileController->savePSFToFile(filePath);
 }
 
 void ApplicationController::setAutoSavePSF(bool enabled)
 {
-	this->psfFileManager->setAutoSavePSF(enabled);
+	this->psfFileController->setAutoSavePSF(enabled);
 }
 
 void ApplicationController::setPSFSaveFolder(const QString& folder)
 {
-	this->psfFileManager->setPSFSaveFolder(folder);
+	this->psfFileController->setPSFSaveFolder(folder);
 }
 
 void ApplicationController::setFilePSFSource(const QString& path)
 {
-	if (this->psfModule == nullptr) {
-		return;
-	}
-	FilePSFGenerator* fileGen = dynamic_cast<FilePSFGenerator*>(this->psfModule->getGenerator());
-	if (fileGen == nullptr) {
-		return;
-	}
-	fileGen->setSource(path);
-	this->psfModule->refreshPSF();
-	this->emitFileInfoIfApplicable();
-}
-
-void ApplicationController::emitFileInfoIfApplicable()
-{
-	FilePSFGenerator* fileGen = dynamic_cast<FilePSFGenerator*>(this->psfModule->getGenerator());
-	if (fileGen != nullptr) {
-		emit filePSFInfoUpdated(fileGen->getFileInfo());
-	}
+	this->psfFileController->setFilePSFSource(path);
 }
 
 // --- PSF Grid ---

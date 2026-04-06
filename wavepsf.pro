@@ -38,6 +38,7 @@ SOURCES += \
 	$$SOURCEDIR/controller/imagesession.cpp \
 	$$SOURCEDIR/controller/applicationcontroller.cpp \
 	$$SOURCEDIR/controller/optimizationcontroller.cpp \
+	$$SOURCEDIR/controller/psffilecontroller.cpp \
 	$$SOURCEDIR/gui/imagesessionviewer/graphicsview.cpp \
 	$$SOURCEDIR/gui/imagesessionviewer/rectitem.cpp \
 	$$SOURCEDIR/gui/imagesessionviewer/rectitemgroup.cpp \
@@ -113,6 +114,7 @@ HEADERS += \
 	$$SOURCEDIR/controller/imagesession.h \
 	$$SOURCEDIR/controller/applicationcontroller.h \
 	$$SOURCEDIR/controller/optimizationcontroller.h \
+	$$SOURCEDIR/controller/psffilecontroller.h \
 	$$SOURCEDIR/gui/imagesessionviewer/graphicsview.h \
 	$$SOURCEDIR/gui/imagesessionviewer/rectitem.h \
 	$$SOURCEDIR/gui/imagesessionviewer/rectitemgroup.h \
