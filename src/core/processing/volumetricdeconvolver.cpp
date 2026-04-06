@@ -151,11 +151,18 @@ af::array VolumetricDeconvolver::preparePSF(const af::array& psf,
 	int pW = psf.dims(1);
 	int pD = psf.dims(2);
 
-	// Zero-pad PSF to volume size
-	af::array padded = af::constant(0.0f, volH, volW, volD);
-	padded(af::seq(pH), af::seq(pW), af::seq(pD)) = psf;
+	af::array padded;
+	if (this->paddingMode == MIRROR_PAD) {
+		padded = mirrorPad3D(psf, volH, volW, volD);
+		float s = af::sum<float>(af::flat(padded));
+		if (s > 0.0f) {
+			padded /= s; //todo: think about if (re)normalization really makes sense here
+		} 
+	} else {
+		padded = af::constant(0.0f, volH, volW, volD);
+		padded(af::seq(pH), af::seq(pW), af::seq(pD)) = psf;
+	}
 
-	// Shift PSF center to origin for correct FFT-based convolution
 	padded = af::shift(padded, -(pH / 2), -(pW / 2), -(pD / 2));
 
 	return padded;
