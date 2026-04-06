@@ -287,6 +287,27 @@ void PSFModule::setAccelerationMode(int mode)
 	emit deconvolutionSettingsChanged();
 }
 
+void PSFModule::setRegularizer3D(int mode)
+{
+	this->deconvolver->setRegularizer3D(mode);
+	emit deconvolutionSettingsChanged();
+}
+
+void PSFModule::setRegularizationWeight(float weight)
+{
+	this->deconvolver->setRegularizationWeight(weight);
+	emit deconvolutionSettingsChanged();
+}
+
+void PSFModule::setDeconvolutionVoxelSize(float sizeY, float sizeX, float sizeZ)
+{
+	// No signal: voxel size is derived from propagator settings, not a
+	// user-editable parameter.  Emitting deconvolutionSettingsChanged()
+	// here would cause recursion in live mode (the 3D deconv path sets
+	// voxel size just before running, which would re-trigger itself).
+	this->deconvolver->setVoxelSize(sizeY, sizeX, sizeZ);
+}
+
 void PSFModule::requestDeconvolutionCancel()
 {
 	this->deconvolver->requestDeconvolutionCancel();

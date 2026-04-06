@@ -120,7 +120,7 @@
 	- https://www.sciencedirect.com/science/article/pii/S1046202316305096
 	- https://imagej.net/imaging/deconvolution 
 
-- add option to select what initial estimate should be used for 3d deconvolution
+- add option to select what initial estimate should be used for 3d deconvolution. add as first estimate option "measured 3D image, scaled by a value equal to the mean of the image stack", see "Dey, Nicolas, et al. "Richardson–Lucy algorithm with total variation regularization for 3D confocal microscope deconvolution." Microscopy research and technique 69.4 (2006): 260-266." 
 
 [dismissed] add 3d PSF generator: input frame above focal plane with user defined zernike coeffs, frame nr of focal plane --> coeffs of start frame, and user defined or 0.0. coeffs in focal plane frame, are then used to make linear or maybe parabolic fit to generate 3d PSF
 -> instead I decided to use a vectorial Richards-Wolf PSF model and Zernike wavefront for optical aberrations.

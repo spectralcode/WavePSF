@@ -31,6 +31,8 @@ signals:
 	void noiseToSignalFactorChanged(float factor);
 	void paddingModeChanged(int mode);
 	void accelerationModeChanged(int mode);
+	void regularizer3DChanged(int mode);
+	void regularizationWeightChanged(float weight);
 	void liveModeChanged(bool enabled);
 	void deconvolutionRequested();
 
@@ -62,6 +64,10 @@ private:
 	QComboBox* paddingModeComboBox;
 	QLabel* accelerationModeLabel;
 	QComboBox* accelerationModeComboBox;
+	QLabel* regularizerLabel;
+	QComboBox* regularizerComboBox;
+	QLabel* regularizationWeightLabel;
+	QDoubleSpinBox* regularizationWeightSpinBox;
 };
 
 #endif // DECONVOLUTIONSETTINGSWIDGET_H

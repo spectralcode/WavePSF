@@ -367,6 +367,20 @@ void ApplicationController::setAccelerationMode(int mode)
 	}
 }
 
+void ApplicationController::setRegularizer3D(int mode)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->setRegularizer3D(mode);
+	}
+}
+
+void ApplicationController::setRegularizationWeight(float weight)
+{
+	if (this->psfModule != nullptr) {
+		this->psfModule->setRegularizationWeight(weight);
+	}
+}
+
 void ApplicationController::setDeconvolutionLiveMode(bool enabled)
 {
 	this->deconvolutionLiveMode = enabled;
@@ -392,6 +406,7 @@ void ApplicationController::requestBatchDeconvolution()
 
 	this->storeCurrentCoefficients();
 	this->suppressLiveDeconv = true;
+	this->syncVoxelSizeFromPropagator();
 
 	this->batchProcessor->executeBatchDeconvolution(
 		this->imageSession, this->psfModule, this->parameterTable);
@@ -426,6 +441,19 @@ void ApplicationController::runDeconvolutionOnCurrentPatch()
 	this->imageSession->setCurrentOutputPatch(result);
 }
 
+void ApplicationController::syncVoxelSizeFromPropagator()
+{
+	if (this->psfModule == nullptr || !this->psfModule->is3DAlgorithm()) {
+		return;
+	}
+	QVariantMap genSettings = this->psfModule->getGenerator()->serializeSettings();
+	float xyStep = genSettings.value("xy_step_nm", 1.0).toFloat();
+	float zStep = genSettings.value("z_step_nm", 1.0).toFloat();
+	if (xyStep > 0.0f && zStep > 0.0f) {
+		this->psfModule->setDeconvolutionVoxelSize(xyStep, xyStep, zStep);
+	}
+}
+
 void ApplicationController::runVolumetricDeconvolutionOnCurrentPatch()
 {
 	if (this->parameterTable == nullptr || this->imageSession == nullptr) {
@@ -455,6 +483,8 @@ void ApplicationController::runVolumetricDeconvolutionOnCurrentPatch()
 	}
 	LOG_INFO() << "3D deconv: PSF" << psf3D.dims(0) << "x"
 			   << psf3D.dims(1) << "x" << psf3D.dims(2);
+
+	this->syncVoxelSizeFromPropagator();
 
 	// Show progress dialog for 3D RL iterations
 	this->psfModule->resetDeconvolutionCancel();

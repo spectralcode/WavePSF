@@ -139,6 +139,22 @@ void Deconvolver::setAccelerationMode(int mode)
 		static_cast<VolumetricDeconvolver::AccelerationMode>(mode));
 }
 
+void Deconvolver::setRegularizer3D(int mode)
+{
+	this->volumetricDeconvolver->setRegularizer(
+		static_cast<VolumetricDeconvolver::RegularizerMode>(mode));
+}
+
+void Deconvolver::setRegularizationWeight(float weight)
+{
+	this->volumetricDeconvolver->setRegularizationWeight(weight);
+}
+
+void Deconvolver::setVoxelSize(float sizeY, float sizeX, float sizeZ)
+{
+	this->volumetricDeconvolver->setVoxelSize(sizeY, sizeX, sizeZ);
+}
+
 void Deconvolver::requestDeconvolutionCancel()
 {
 	this->volumetricDeconvolver->requestCancel();

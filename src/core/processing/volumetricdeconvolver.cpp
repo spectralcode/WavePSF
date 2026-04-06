@@ -8,6 +8,11 @@ VolumetricDeconvolver::VolumetricDeconvolver(QObject* parent)
 	: QObject(parent)
 	, paddingMode(MIRROR_PAD)
 	, accelerationMode(ACCEL_BIGGS_ANDREWS)
+	, regularizer(REGULARIZER_NONE)
+	, regularizationWeight(DEFAULT_REGULARIZATION_WEIGHT)
+	, voxelSizeY(1.0f)
+	, voxelSizeX(1.0f)
+	, voxelSizeZ(1.0f)
 	, cancelRequested(false)
 {
 }
@@ -37,6 +42,23 @@ void VolumetricDeconvolver::setAccelerationMode(AccelerationMode mode)
 	this->accelerationMode = mode;
 }
 
+void VolumetricDeconvolver::setRegularizer(RegularizerMode mode)
+{
+	this->regularizer = mode;
+}
+
+void VolumetricDeconvolver::setRegularizationWeight(float weight)
+{
+	this->regularizationWeight = weight;
+}
+
+void VolumetricDeconvolver::setVoxelSize(float sizeY, float sizeX, float sizeZ)
+{
+	this->voxelSizeY = (std::max)(sizeY, 1e-6f);
+	this->voxelSizeX = (std::max)(sizeX, 1e-6f);
+	this->voxelSizeZ = (std::max)(sizeZ, 1e-6f);
+}
+
 QStringList VolumetricDeconvolver::getAccelerationModeNames()
 {
 	return QStringList {
@@ -51,6 +73,59 @@ QStringList VolumetricDeconvolver::getPaddingModeNames()
 		"Zero Padding",
 		"Mirror Padding"
 	};
+}
+
+QStringList VolumetricDeconvolver::getRegularizerNames()
+{
+	return QStringList {
+		"None",
+		"Total Variation"
+	};
+}
+
+af::array VolumetricDeconvolver::computeRegularizationDenominator3D(const af::array& x) const
+{
+	//see: Dey et al, "Richardson–Lucy algorithm with total variation regularization for 3D confocal microscope deconvolution"
+	const float eps = 1e-8f;
+	int H = x.dims(0);
+	int W = x.dims(1);
+	int D = x.dims(2);
+
+	float invVY = 1.0f / this->voxelSizeY;
+	float invVX = 1.0f / this->voxelSizeX;
+	float invVZ = 1.0f / this->voxelSizeZ;
+
+	// forward differences
+	af::array dfy = (af::shift(x, -1, 0, 0) - x) * invVY;
+	dfy(af::seq(H - 1, H - 1), af::span, af::span) = 0.0f;
+
+	af::array dfx = (af::shift(x, 0, -1, 0) - x) * invVX;
+	dfx(af::span, af::seq(W - 1, W - 1), af::span) = 0.0f;
+
+	af::array dfz = (af::shift(x, 0, 0, -1) - x) * invVZ;
+	dfz(af::span, af::span, af::seq(D - 1, D - 1)) = 0.0f;
+
+	// Gradient magnitude
+	af::array norm = af::sqrt(dfy * dfy + dfx * dfx + dfz * dfz + eps);
+
+	// Normalized gradient (TV)
+	af::array ny = dfy / norm;
+	af::array nx = dfx / norm;
+	af::array nz = dfz / norm;
+
+	// backward differences: d(n)/di = n[i] - n[i-1]
+	af::array divY = (ny - af::shift(ny, 1, 0, 0)) * invVY;
+	divY(af::seq(0, 0), af::span, af::span) = 0.0f;
+
+	af::array divX = (nx - af::shift(nx, 0, 1, 0)) * invVX;
+	divX(af::span, af::seq(0, 0), af::span) = 0.0f;
+
+	af::array divZ = (nz - af::shift(nz, 0, 0, 1)) * invVZ;
+	divZ(af::span, af::span, af::seq(0, 0)) = 0.0f;
+
+	af::array divN = divY + divX + divZ;
+
+	return af::max(1.0f - this->regularizationWeight * divN, 0.001f); //clamped to stay positive
 }
 
 int VolumetricDeconvolver::nextGoodFFTSize(int n)
@@ -216,7 +291,7 @@ af::array VolumetricDeconvolver::deconvolve(const af::array& volume,
 			af::array target = estimate;
 			if (this->accelerationMode == ACCEL_BIGGS_ANDREWS
 				&& i >= 1 && !prevEstimate.isempty()) {
-				target = af::max(estimate + lambda * (estimate - prevEstimate), 0.0f); //similar to pydecon, deconvlucy.m: https://github.com/david-hoffman/pyDecon/blob/master/notebooks/deconvlucy.m 
+				target = af::max(estimate + lambda * (estimate - prevEstimate), 0.0f);
 				af::eval(target);
 			}
 
@@ -224,7 +299,15 @@ af::array VolumetricDeconvolver::deconvolve(const af::array& volume,
 			temp = af::real(af::ifft3(otf * af::fft3(target)));
 			temp = input / af::max(temp, epsilon);
 			temp = af::real(af::ifft3(otfConj * af::fft3(temp)));
-			af::array rlResult = af::max(target * temp, 0.0f);
+
+			// --- Optional regularization ---
+			af::array rlResult;
+			if (this->regularizer == REGULARIZER_TOTAL_VARIATION) {
+				af::array regDenom = this->computeRegularizationDenominator3D(target);
+				rlResult = af::max((target / regDenom) * temp, 0.0f);
+			} else {
+				rlResult = af::max(target * temp, 0.0f);
+			}
 			temp = af::array();
 
 			// --- Acceleration update ---

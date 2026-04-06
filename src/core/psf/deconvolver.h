@@ -32,6 +32,9 @@ public:
 	void setNoiseToSignalFactor(float factor);
 	void setVolumePaddingMode(int mode);
 	void setAccelerationMode(int mode);
+	void setRegularizer3D(int mode);
+	void setRegularizationWeight(float weight);
+	void setVoxelSize(float sizeY, float sizeX, float sizeZ);
 
 	void requestDeconvolutionCancel();
 	void resetDeconvolutionCancel();

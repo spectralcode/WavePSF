@@ -63,6 +63,9 @@ public slots:
 	void setDeconvolutionNoiseToSignalFactor(float factor);
 	void setVolumePaddingMode(int mode);
 	void setAccelerationMode(int mode);
+	void setRegularizer3D(int mode);
+	void setRegularizationWeight(float weight);
+	void setDeconvolutionVoxelSize(float sizeY, float sizeX, float sizeZ);
 
 	// Cooperative deconvolution cancellation
 	void requestDeconvolutionCancel();

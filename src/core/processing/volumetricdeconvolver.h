@@ -19,6 +19,13 @@ public:
 		ACCEL_BIGGS_ANDREWS
 	};
 
+	enum RegularizerMode {
+		REGULARIZER_NONE = 0,
+		REGULARIZER_TOTAL_VARIATION
+	};
+
+	static constexpr float DEFAULT_REGULARIZATION_WEIGHT = 0.0001f;
+
 	explicit VolumetricDeconvolver(QObject* parent = nullptr);
 
 	// 3D Richardson-Lucy deconvolution.
@@ -27,6 +34,9 @@ public:
 
 	void setPaddingMode(PaddingMode mode);
 	void setAccelerationMode(AccelerationMode mode);
+	void setRegularizer(RegularizerMode mode);
+	void setRegularizationWeight(float weight);
+	void setVoxelSize(float sizeY, float sizeX, float sizeZ);
 
 	void requestCancel();
 	void resetCancel();
@@ -34,6 +44,7 @@ public:
 
 	static QStringList getAccelerationModeNames();
 	static QStringList getPaddingModeNames();
+	static QStringList getRegularizerNames();
 
 signals:
 	void iterationCompleted(int currentIteration, int totalIterations);
@@ -52,8 +63,16 @@ private:
 	// Find the next FFT-friendly size (factorable into 2, 3, 5, 7)
 	static int nextGoodFFTSize(int n);
 
+	// Compute total variation regularization
+	af::array computeRegularizationDenominator3D(const af::array& x) const;
+
 	PaddingMode paddingMode;
 	AccelerationMode accelerationMode;
+	RegularizerMode regularizer;
+	float regularizationWeight;
+	float voxelSizeY;
+	float voxelSizeX;
+	float voxelSizeZ;
 	bool cancelRequested;
 };
 

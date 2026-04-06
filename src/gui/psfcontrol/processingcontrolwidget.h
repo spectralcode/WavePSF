@@ -46,6 +46,8 @@ signals:
 	void deconvNoiseToSignalFactorChanged(float factor);
 	void deconvPaddingModeChanged(int mode);
 	void deconvAccelerationModeChanged(int mode);
+	void deconvRegularizer3DChanged(int mode);
+	void deconvRegularizationWeightChanged(float weight);
 	void deconvLiveModeChanged(bool enabled);
 	void deconvolutionRequested();
 

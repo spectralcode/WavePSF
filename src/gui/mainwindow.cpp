@@ -629,6 +629,10 @@ void MainWindow::connectProcessingControlWidget() {
 			this->applicationController, &ApplicationController::setVolumePaddingMode);
 	connect(ctrl, &ProcessingControlWidget::deconvAccelerationModeChanged,
 			this->applicationController, &ApplicationController::setAccelerationMode);
+	connect(ctrl, &ProcessingControlWidget::deconvRegularizer3DChanged,
+			this->applicationController, &ApplicationController::setRegularizer3D);
+	connect(ctrl, &ProcessingControlWidget::deconvRegularizationWeightChanged,
+			this->applicationController, &ApplicationController::setRegularizationWeight);
 	connect(ctrl, &ProcessingControlWidget::deconvLiveModeChanged,
 			this->applicationController, &ApplicationController::setDeconvolutionLiveMode);
 	connect(ctrl, &ProcessingControlWidget::deconvolutionRequested,

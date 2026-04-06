@@ -89,6 +89,8 @@ public slots:
 	void setDeconvolutionNoiseToSignalFactor(float factor);
 	void setVolumePaddingMode(int mode);
 	void setAccelerationMode(int mode);
+	void setRegularizer3D(int mode);
+	void setRegularizationWeight(float weight);
 	void setDeconvolutionLiveMode(bool enabled);
 	void requestDeconvolution();
 
@@ -171,6 +173,9 @@ private:
 	void loadCoefficientsForCurrentPatch();
 	void resizeParameterTable();
 	void syncNumZPlanesWithInput();
+
+	// Sync voxel size from propagator settings to 3D deconvolver
+	void syncVoxelSizeFromPropagator();
 
 	// Core components
 	AFDeviceManager* afDeviceManager;

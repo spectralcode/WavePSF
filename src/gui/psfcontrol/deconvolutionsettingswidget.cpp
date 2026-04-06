@@ -28,6 +28,8 @@ namespace {
 	const QString KEY_NOISE_TO_SIGNAL       = QStringLiteral("noise_to_signal_factor");
 	const QString KEY_PADDING_MODE          = QStringLiteral("padding_mode");
 	const QString KEY_ACCELERATION          = QStringLiteral("acceleration_enabled");
+	const QString KEY_REGULARIZER_3D        = QStringLiteral("regularizer_3d");
+	const QString KEY_REGULARIZATION_WEIGHT_3D = QStringLiteral("regularization_weight_3d");
 	const QString KEY_LIVE_MODE             = QStringLiteral("live_mode");
 
 	// Default values
@@ -41,6 +43,8 @@ namespace {
 	const double DEF_NOISE_TO_SIGNAL       = 0.01;
 	const int    DEF_PADDING_MODE          = VolumetricDeconvolver::MIRROR_PAD;
 	const int    DEF_ACCELERATION          = VolumetricDeconvolver::ACCEL_BIGGS_ANDREWS;
+	const int    DEF_REGULARIZER_3D        = VolumetricDeconvolver::REGULARIZER_NONE;
+	const double DEF_REGULARIZATION_WEIGHT_3D = VolumetricDeconvolver::DEFAULT_REGULARIZATION_WEIGHT;
 	const bool   DEF_LIVE_MODE             = true;
 }
 
@@ -130,6 +134,24 @@ void DeconvolutionSettingsWidget::setupUI()
 	this->installScrollGuard(this->accelerationModeComboBox);
 	formLayout->addRow(this->accelerationModeLabel, this->accelerationModeComboBox);
 
+	// Regularizer (3D RL only)
+	this->regularizerLabel = new QLabel(tr("Regularization:"), controlsWidget);
+	this->regularizerComboBox = new QComboBox(controlsWidget);
+	this->regularizerComboBox->addItems(VolumetricDeconvolver::getRegularizerNames());
+	this->regularizerComboBox->setCurrentIndex(DEF_REGULARIZER_3D);
+	this->installScrollGuard(this->regularizerComboBox);
+	formLayout->addRow(this->regularizerLabel, this->regularizerComboBox);
+
+	// Regularization weight (3D RL, when regularizer != None)
+	this->regularizationWeightLabel = new QLabel(QString::fromUtf8("Reg. Weight:"), controlsWidget);
+	this->regularizationWeightSpinBox = new QDoubleSpinBox(controlsWidget);
+	this->regularizationWeightSpinBox->setRange(0.00001, 1.0);
+	this->regularizationWeightSpinBox->setDecimals(5);
+	this->regularizationWeightSpinBox->setValue(DEF_REGULARIZATION_WEIGHT_3D);
+	this->regularizationWeightSpinBox->setSingleStep(0.001);
+	this->installScrollGuard(this->regularizationWeightSpinBox);
+	formLayout->addRow(this->regularizationWeightLabel, this->regularizationWeightSpinBox);
+
 	controlsLayout->addLayout(formLayout);
 	controlsLayout->addStretch();
 
@@ -173,6 +195,15 @@ void DeconvolutionSettingsWidget::setupUI()
 	connect(this->accelerationModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
 			this, &DeconvolutionSettingsWidget::accelerationModeChanged);
 
+	connect(this->regularizerComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, [this](int index) {
+				this->updateParameterVisibility(this->algorithmComboBox->currentIndex());
+				emit this->regularizer3DChanged(index);
+			});
+
+	connect(this->regularizationWeightSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, [this](double value) { emit this->regularizationWeightChanged(static_cast<float>(value)); });
+
 	connect(this->liveModeCheckBox, &QCheckBox::toggled,
 			this, [this](bool checked) {
 				this->deconvolveButton->setEnabled(!checked);
@@ -214,6 +245,10 @@ void DeconvolutionSettingsWidget::updateParameterVisibility(int algorithmIndex)
 	this->paddingModeComboBox->setVisible(false);
 	this->accelerationModeLabel->setVisible(false);
 	this->accelerationModeComboBox->setVisible(false);
+	this->regularizerLabel->setVisible(false);
+	this->regularizerComboBox->setVisible(false);
+	this->regularizationWeightLabel->setVisible(false);
+	this->regularizationWeightSpinBox->setVisible(false);
 
 	// Iterations are used by RL, Landweber, and 3D RL
 	bool showIterations = (algorithmIndex == Deconvolver::RICHARDSON_LUCY ||
@@ -241,6 +276,13 @@ void DeconvolutionSettingsWidget::updateParameterVisibility(int algorithmIndex)
 			this->paddingModeComboBox->setVisible(true);
 			this->accelerationModeLabel->setVisible(true);
 			this->accelerationModeComboBox->setVisible(true);
+			this->regularizerLabel->setVisible(true);
+			this->regularizerComboBox->setVisible(true);
+			{
+				bool hasRegularizer = (this->regularizerComboBox->currentIndex() != VolumetricDeconvolver::REGULARIZER_NONE);
+				this->regularizationWeightLabel->setVisible(hasRegularizer);
+				this->regularizationWeightSpinBox->setVisible(hasRegularizer);
+			}
 			break;
 		default:
 			break;
@@ -265,6 +307,8 @@ QVariantMap DeconvolutionSettingsWidget::getSettings() const
 	settings.insert(KEY_NOISE_TO_SIGNAL,       this->noiseToSignalFactorSpinBox->value());
 	settings.insert(KEY_PADDING_MODE,          this->paddingModeComboBox->currentIndex());
 	settings.insert(KEY_ACCELERATION,          this->accelerationModeComboBox->currentIndex());
+	settings.insert(KEY_REGULARIZER_3D,        this->regularizerComboBox->currentIndex());
+	settings.insert(KEY_REGULARIZATION_WEIGHT_3D, this->regularizationWeightSpinBox->value());
 	settings.insert(KEY_LIVE_MODE,             this->liveModeCheckBox->isChecked());
 	return settings;
 }
@@ -284,6 +328,8 @@ void DeconvolutionSettingsWidget::setSettings(const QVariantMap& settings)
 	this->noiseToSignalFactorSpinBox->setValue(    settings.value(KEY_NOISE_TO_SIGNAL,        DEF_NOISE_TO_SIGNAL).toDouble());
 	this->paddingModeComboBox->setCurrentIndex(   settings.value(KEY_PADDING_MODE,           DEF_PADDING_MODE).toInt());
 	this->accelerationModeComboBox->setCurrentIndex(settings.value(KEY_ACCELERATION,          DEF_ACCELERATION).toInt());
+	this->regularizerComboBox->setCurrentIndex(    settings.value(KEY_REGULARIZER_3D,        DEF_REGULARIZER_3D).toInt());
+	this->regularizationWeightSpinBox->setValue(   settings.value(KEY_REGULARIZATION_WEIGHT_3D, DEF_REGULARIZATION_WEIGHT_3D).toDouble());
 	this->liveModeCheckBox->setChecked(            settings.value(KEY_LIVE_MODE,              DEF_LIVE_MODE).toBool());
 }
 
