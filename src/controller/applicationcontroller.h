@@ -8,6 +8,7 @@
 #include "core/psf/wavefrontparameter.h"
 #include "core/psf/psfsettings.h"
 #include "core/optimization/optimizationworker.h"
+#include "core/processing/deconvolutiontypes.h"
 #include "core/interpolation/tableinterpolator.h"
 #include "core/psf/psfgridgenerator.h"
 #include "core/psf/psffileinfo.h"
@@ -20,6 +21,7 @@ class CoefficientWorkspace;
 class AFDeviceManager;
 class PSFFileController;
 class DeconvolutionOrchestrator;
+class DeconvolutionController;
 class InterpolationOrchestrator;
 class OptimizationController;
 class PSFGridGenerator;
@@ -169,6 +171,7 @@ private:
 
 	// Deconvolution state
 	bool deconvolutionLiveMode;
+	DeconvolutionController* deconvolutionController;
 
 	// Optimization (delegated to OptimizationController)
 	OptimizationController* optimizationController;
@@ -210,6 +213,10 @@ signals:
 
 	// Deconvolution results
 	void deconvolutionCompleted();
+	void deconvolutionStarted();
+	void deconvolutionCancellationRequested();
+	void deconvolutionProgressUpdated(DeconvolutionProgress progress);
+	void deconvolutionFinished(DeconvolutionRunResult result);
 
 	// Coefficient loading (for GUI update)
 	void coefficientsLoaded(QVector<double> coefficients);

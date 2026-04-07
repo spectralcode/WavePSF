@@ -1,4 +1,5 @@
 #include "applicationcontroller.h"
+#include "deconvolutioncontroller.h"
 #include "optimizationcontroller.h"
 #include "psffilecontroller.h"
 #include "coefficientworkspace.h"
@@ -20,7 +21,7 @@
 ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent), afDeviceManager(afDeviceManager), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
 	, coefficientWorkspace(nullptr), deconvolutionLiveMode(false)
-	, optimizationController(nullptr), suppressLiveDeconv(false), psfFileController(nullptr)
+	, deconvolutionController(nullptr), optimizationController(nullptr), suppressLiveDeconv(false), psfFileController(nullptr)
 	, interpolationOrchestrator(nullptr), deconvolutionOrchestrator(nullptr), psfGridGenerator(nullptr)
 {
 	this->initializeComponents();
@@ -44,6 +45,15 @@ ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, Q
 			this, &ApplicationController::handleOptimizationLivePreview);
 	connect(this->optimizationController, &OptimizationController::finished,
 			this, &ApplicationController::handleOptimizationFinished);
+
+	// Deconvolution controller (worker thread scaffold for future async execution paths)
+	this->deconvolutionController = new DeconvolutionController(this);
+	connect(this->deconvolutionController, &DeconvolutionController::started,
+			this, &ApplicationController::deconvolutionStarted);
+	connect(this->deconvolutionController, &DeconvolutionController::progressUpdated,
+			this, &ApplicationController::deconvolutionProgressUpdated);
+	connect(this->deconvolutionController, &DeconvolutionController::finished,
+			this, &ApplicationController::deconvolutionFinished);
 
 	// PSF file controller (owns PSFFileManager, file-based PSF logic)
 	connect(this->psfFileController, &PSFFileController::filePSFInfoUpdated,
@@ -710,6 +720,10 @@ void ApplicationController::startOptimization(const OptimizationConfig& uiConfig
 
 void ApplicationController::cancelDeconvolution()
 {
+	if (this->deconvolutionController != nullptr) {
+		this->deconvolutionController->cancel();
+	}
+	emit deconvolutionCancellationRequested();
 	this->deconvolutionOrchestrator->cancel();
 }
 

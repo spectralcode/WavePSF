@@ -37,6 +37,7 @@ SOURCES += \
 	$$SOURCEDIR/data/imagedataaccessor.cpp \
 	$$SOURCEDIR/controller/imagesession.cpp \
 	$$SOURCEDIR/controller/applicationcontroller.cpp \
+	$$SOURCEDIR/controller/deconvolutioncontroller.cpp \
 	$$SOURCEDIR/controller/optimizationcontroller.cpp \
 	$$SOURCEDIR/controller/psffilecontroller.cpp \
 	$$SOURCEDIR/controller/coefficientworkspace.cpp \
@@ -89,6 +90,7 @@ SOURCES += \
 	$$SOURCEDIR/core/psf/psffilemanager.cpp \
 	$$SOURCEDIR/core/psf/filepsfgenerator.cpp \
 	$$SOURCEDIR/core/processing/batchprocessor.cpp \
+	$$SOURCEDIR/core/processing/deconvolutionworker.cpp \
 	$$SOURCEDIR/core/processing/volumetricdeconvolver.cpp \
 	$$SOURCEDIR/core/processing/volumetricprocessor.cpp \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.cpp \
@@ -115,6 +117,7 @@ HEADERS += \
 	$$SOURCEDIR/utils/logging.h \
 	$$SOURCEDIR/controller/imagesession.h \
 	$$SOURCEDIR/controller/applicationcontroller.h \
+	$$SOURCEDIR/controller/deconvolutioncontroller.h \
 	$$SOURCEDIR/controller/optimizationcontroller.h \
 	$$SOURCEDIR/controller/psffilecontroller.h \
 	$$SOURCEDIR/controller/coefficientworkspace.h \
@@ -175,6 +178,8 @@ HEADERS += \
 	$$SOURCEDIR/core/psf/filepsfgenerator.h \
 	$$SOURCEDIR/core/psf/psffileinfo.h \
 	$$SOURCEDIR/core/processing/batchprocessor.h \
+	$$SOURCEDIR/core/processing/deconvolutiontypes.h \
+	$$SOURCEDIR/core/processing/deconvolutionworker.h \
 	$$SOURCEDIR/core/processing/volumetricdeconvolver.h \
 	$$SOURCEDIR/core/processing/volumetricprocessor.h \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.h \
