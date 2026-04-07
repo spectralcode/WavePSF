@@ -2,75 +2,114 @@
 
 ## Overview
 
-WavePSF follows a layered MVC pattern. GUI widgets never call business logic directly — all communication goes through `ApplicationController` via Qt signals and slots.
+WavePSF is organized as a layered Qt desktop application with a strong separation between GUI widgets and the computational core.
 
-```
-┌──────────────────────────────────────────────────┐
-│                  GUI Layer (Qt 5)                 │
-│  MainWindow · ImageSessionViewer · PSFControlWidget│
-│  MessageConsoleWidget · AboutDialog               │
-├──────────────────────────────────────────────────┤
-│             ApplicationController                 │
-│  Lightweight coordinator — no algorithms          │
-├──────────────────────────────────────────────────┤
-│  ImageSession │ PSFModule │ OptimizationWorker    │
-├──────────────────────────────────────────────────┤
-│  ImageData / ImageDataAccessor                   │
-│  IPSFGenerator · ComposedPSFGenerator · Deconvolver│
-│  IWavefrontGenerator · IPSFPropagator             │
-│  WavefrontParameterTable · TableInterpolator      │
-└──────────────────────────────────────────────────┘
+Most widget actions flow through `ApplicationController`, while `MainWindow` is responsible for wiring widgets to controller slots and controller signals back to the widgets. One important current exception is that `ImageSessionViewer` receives an `ImageSession*` as a read-model style session reference.
+
+```text
++-------------------------------------------------------------+
+| GUI Layer (Qt 5)                                            |
+| MainWindow · ImageSessionViewer · PSFGenerationWidget       |
+| ProcessingControlWidget · PSFGridWidget · Message Console   |
++-------------------------------------------------------------+
+| Coordination Layer                                          |
+| ApplicationController                                       |
+|   |- CoefficientWorkspace                                   |
+|   |- OptimizationController -> OptimizationWorker (QThread) |
+|   |- DeconvolutionOrchestrator -> BatchProcessor            |
+|   |- PSFFileController                                      |
+|   `- InterpolationOrchestrator                              |
++-------------------------------------------------------------+
+| Domain / Compute Layer                                      |
+| ImageSession · PSFModule · WavefrontParameterTable          |
+| IPSFGenerator · IWavefrontGenerator · IPSFPropagator        |
+| Deconvolver · ImageMetricCalculator · Optimizers            |
+| VolumetricProcessor · PSFGridGenerator                      |
++-------------------------------------------------------------+
+| Data / I/O Layer                                            |
+| ImageData · ImageDataAccessor · InputDataReader             |
++-------------------------------------------------------------+
 ```
 
 ## Communication Pattern
 
-```
-GUI Widgets ←signal/slot→ ApplicationController ←direct calls→ Business Logic
+```text
+Widget signals / selected direct UI calls
+    -> MainWindow wiring
+    -> ApplicationController
+    -> domain objects / orchestrators
+    -> controller signals
+    -> widgets
 ```
 
-- GUI → Controller: signals only, never direct calls
-- Controller → Business: direct method calls
-- Business → Controller → GUI: signal forwarding (mostly signal-to-signal)
-- MainWindow wires all connections and owns the controller
-
+- Most GUI-to-controller communication uses Qt signals/slots wired in `MainWindow`.
+- A few UI actions still call controller methods directly from `MainWindow` for convenience, for example applying settings during startup and handling global copy/paste/delete shortcuts.
+- Controller-to-domain communication is mostly direct method calls.
+- Domain-to-GUI communication is routed back through `ApplicationController` signals.
+- `MainWindow` wires the connections, but it does **not** own the controller instance. The controller is created in [`src/main.cpp`](/c:/Users/Miro/Documents/GitHub/WavePSF/src/main.cpp).
 
 ## Key Components
 
-### Data Layer
-- **`ImageData`** — raw pixel buffer + metadata (width, height, frames, bit depth)
-- **`ImageDataAccessor`** — patch grid management, extended patch extraction with borders, write-back and sync to output buffer
-- **`WavefrontParameterTable`** — 3D coefficient store (frame × patch × coefficient), CSV save/load
-- **`InputDataReader`** — loads ENVI HSI and TIFF files (libtiff backend by default)
+### GUI Layer
 
-### PSF Pipeline
-- **`IPSFGenerator`** — top-level interface for PSF generation. `ComposedPSFGenerator` implements it by combining an `IWavefrontGenerator` (phase from coefficients) with an `IPSFPropagator` (phase → PSF intensity). `PSFGeneratorFactory` creates generators by type name. See [psf_generator_architecture.md](psf_generator_architecture.md).
-- **`Deconvolver`** — applies one of 5 algorithms (Richardson-Lucy, Landweber, Tikhonov, Wiener, Convolution) to a patch
-- **`PSFModule`** — orchestrates generator + deconvolver; owned by `ApplicationController`
+- **`MainWindow`**: creates top-level widgets, menus, docks, and signal wiring.
+- **`ImageSessionViewer`**: input/output/ground-truth viewing and patch interaction.
+- **`PSFGenerationWidget`**: generator selection, coefficients, inline generator settings.
+- **`ProcessingControlWidget`**: deconvolution, optimization, interpolation, and patch-grid controls.
+- **`PSFGridWidget`**: overview of PSFs across the patch grid.
 
-### Optimization
-- **`IOptimizer`** — interface for optimization algorithms
-- **`SimulatedAnnealingOptimizer`** — Metropolis acceptance, configurable temperature schedule and perturbation
-- **`OptimizationWorker`** — runs `IOptimizer` on a `QThread`; emits progress signals back to GUI
-- **`ImageMetricCalculator`** — 10 single-image metrics (variance, Laplacian, entropy, …) + 4 reference metrics (NCC, SSD, …)
+### Coordination Layer
 
-### Settings & Logging
-- **`SettingsFileManager`** — reads/writes `wavepsf.ini` via QSettings. Only `MainWindow` calls it directly; each widget exposes `getName()` / `getSettings()` / `setSettings()`.
-- **`logging.h`** — `LOG_INFO()`, `LOG_WARNING()`, `LOG_ERROR()`, `LOG_DEBUG()`, `LOG_DEBUG_THIS()` macros routing to the Message Console. See [logging_usage_guide.md](logging_usage_guide.md).
+- **`ApplicationController`**: central coordinator. 
+- **`CoefficientWorkspace`**: owns the active `WavefrontParameterTable`, clipboard/undo behavior, and per-generator table caching.
+- **`OptimizationController`**: manages the optimization worker thread and throttled live preview updates.
+- **`DeconvolutionOrchestrator`**: chooses between 2D and 3D deconvolution flows and synchronizes voxel size for volumetric runs.
+- **`PSFFileController`**: save/load and auto-save behavior for PSF files and file-based PSF mode metadata.
+- **`InterpolationOrchestrator`**: interpolation operations on coefficient tables.
 
+### Domain / Compute Layer
+
+- **`ImageSession`**: current input/output/ground-truth dataset, current frame, current patch, and patch-grid configuration.
+- **`PSFModule`**: current generator instance, current PSF cache, deconvolver settings, and PSF regeneration.
+- **`IPSFGenerator` / `ComposedPSFGenerator`**: top-level PSF generation abstraction and composed implementation.
+- **`IWavefrontGenerator`**: phase/wavefront generation from coefficients.
+- **`IPSFPropagator`**: wavefront-to-PSF propagation.
+- **`Deconvolver`**: 2D and 3D deconvolution algorithms.
+- **`ImageMetricCalculator`** and **optimizers**: optimization objective evaluation and parameter search.
+- **`VolumetricProcessor`**: subvolume assembly and write-back for 3D processing.
+- **`PSFGridGenerator`**: builds PSF overview grids for the UI.
+
+### Data / I/O Layer
+
+- **`ImageData`**: raw frame storage plus metadata.
+- **`ImageDataAccessor`**: cached frame access, patch extraction with border extension, and patch/frame write-back.
+- **`InputDataReader`**: ENVI, TIFF, standard image, and folder-stack loading.
+- **`WavefrontParameterTable`**: coefficient storage across frame and patch dimensions.
 
 ## Threading
 
 | Thread | Responsibility |
 |---|---|
-| Main (GUI) thread | All UI, event handling, ArrayFire PSF/deconvolution calls |
-| OptimizationWorker thread | Long-running optimization loop only |
+| Main (GUI) thread | UI, PSF preview generation, normal deconvolution, batch deconvolution, most file I/O orchestration |
+| Optimization worker thread | Optimization loop with its own ArrayFire backend/device context |
 
-All ArrayFire compute happens on the main thread except during optimization. Qt signal-slot with `Qt::QueuedConnection` bridges the worker thread back to the GUI.
+Important current behavior:
 
+- Optimization is the only major workflow that runs on a dedicated worker thread.
+- Regular deconvolution and batch deconvolution still run on the GUI thread. However, it does not block the UI if GPU backend is used. (todo: refactor to move all compute off the GUI thread.)
+- Batch and volumetric workflows currently use `QProgressDialog` and `QApplication::processEvents()`, so the compute layer is not fully decoupled from Qt UI concerns. (todo: refactor!)
+- ArrayFire state is thread-local, so the optimization worker explicitly restores backend/device selection before running.
+
+## Settings and Ownership Notes
+
+- `SettingsFileManager` is used by `MainWindow`, but it is also passed to `AFDeviceManager` and `StyleManager` during application startup.
+- `ApplicationController` is instantiated in `main.cpp` and passed into `MainWindow`.
+- Most objects use Qt parent ownership. Some components also replace sub-objects manually, such as `PSFModule` replacing the active generator when switching generator type.
 
 ## Extension Points
 
-- **New PSF generator**: implement `IWavefrontGenerator` and/or `IPSFPropagator`, register in `PSFGeneratorFactory`. See [psf_generator_architecture.md](psf_generator_architecture.md).
-- **New optimizer**: implement `IOptimizer`, add to algorithm selection in `OptimizationWidget`
-- **New deconvolution algorithm**: extend `Deconvolver::DeconvolutionAlgo` enum and add a case in `deconvolve()`
-- **New settings-aware widget**: implement `getName()` / `getSettings()` / `setSettings()`, register in `MainWindow::loadSettings()` / `saveSettings()`. See [settings_usage_guide.md](settings_usage_guide.md).
+- **New PSF generator**: implement `IWavefrontGenerator` and/or `IPSFPropagator`, register the combination in `PSFGeneratorFactory`.
+- **New optimizer**: implement `IOptimizer`, register it in `OptimizerFactory`, and expose it in the optimization UI.
+- **New deconvolution algorithm**: extend `Deconvolver` and the deconvolution settings UI.
+- **New controller-managed workflow**: prefer adding a focused orchestrator/controller helper instead of growing `ApplicationController` further.
+- **New settings-aware widget**: implement `getName()` / `getSettings()` / `setSettings()` and register it in `MainWindow::loadSettings()` / `saveSettings()`.

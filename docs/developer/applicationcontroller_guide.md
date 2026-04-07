@@ -2,97 +2,114 @@
 
 ## General Concept
 
-ApplicationController serves as a coordinator between GUI widgets and business logic. It maintains strict separation: GUI never directly calls business methods, and business logic never directly updates GUI.
+`ApplicationController` is the central application coordinator between the GUI and the domain layer. It keeps most widgets away from `PSFModule`, optimization internals, and coefficient storage details, while forwarding state changes back to the GUI through signals. The main current exception is `ImageSessionViewer`, which receives an `ImageSession*` for viewing/state synchronization.
 
-## Architecture Pattern
 
+## Current Architecture Pattern
+
+```text
+Widgets
+  -> signals and a few direct MainWindow calls
+  -> ApplicationController
+  -> helper controllers / orchestrators
+  -> domain objects
+  -> ApplicationController signals
+  -> widgets
 ```
-GUI Widgets ←signal/slot→ ApplicationController ←direct calls→ Business Logic
-```
 
-- **GUI → ApplicationController**: Signal-only communication
-- **ApplicationController → Business**: Direct method calls
-- **Business → ApplicationController → GUI**: Signal forwarding
+- **GUI -> ApplicationController**: mostly signal-slot communication wired in `MainWindow`
+- **GUI -> ApplicationController direct calls**: still used in a few places from `MainWindow` where emitting a custom signal would add little value
+- **ApplicationController -> business/domain layer**: direct method calls
+- **Business/domain layer -> GUI**: routed back through controller signals
 
-## Key Responsibilities
+## What ApplicationController Owns Today
 
-1. **Owns business modules**: ImageSession, PSFModule, WavefrontParameterTable, OptimizationWorker, TableInterpolator
-2. **Translates requests**: Receives GUI signals, calls business methods
-3. **Forwards notifications**: Business signals → GUI signals (mostly direct signal-to-signal)
-4. **Coordinates initialization**: Broadcasts current state to GUI after connections
+Core domain-facing members:
+
+- `ImageSession`
+- `InputDataReader`
+- `PSFModule`
+- `CoefficientWorkspace`
+- `PSFGridGenerator`
+
+Workflow helpers:
+
+- `OptimizationController`
+- `DeconvolutionOrchestrator`
+- `InterpolationOrchestrator`
+- `PSFFileController`
+
+This is different from the older simplified description of "ImageSession, PSFModule, WavefrontParameterTable, OptimizationWorker, TableInterpolator". Those are no longer the direct ownership boundaries in the code.
+
+## Responsibilities
+
+1. Receive requests from the UI.
+2. Keep frame/patch selection and coefficient storage in sync.
+3. Forward state changes from `ImageSession` and `PSFModule`.
+4. Start optimization and apply the results back into the session.
+5. Trigger deconvolution workflows, including live mode.
+6. Coordinate PSF-file behavior, interpolation, and PSF-grid generation.
+7. Broadcast current application state after all UI connections are established.
+
+## What It Should Not Become
+
+`ApplicationController` should not accumulate more heavy algorithmic code, long-running loops, or UI widgets. When a workflow becomes substantial, prefer extracting it into a focused helper like:
+
+- `OptimizationController`
+- `DeconvolutionOrchestrator`
+- `PSFFileController`
+- `InterpolationOrchestrator`
+
+That pattern is already paying off and should continue.
 
 ## Signal Forwarding Strategy
 
-**Direct forwarding** (signal-to-signal):
+Use direct signal-to-signal forwarding when no transformation is needed:
+
 ```cpp
 connect(imageSession, &ImageSession::frameChanged,
         this, &ApplicationController::frameChanged);
 ```
 
-**Transformation slots** (only when needed):
+Use transformation slots when controller state must also be updated:
+
 ```cpp
 connect(imageSession, &ImageSession::inputDataChanged,
         this, &ApplicationController::handleInputDataChanged);
 ```
 
-## Adding New Components
+Use explicit workflow methods when multiple modules must stay in sync, for example frame switching:
 
-### 1. Add Business Module to ApplicationController
-
-**Header (.h):**
 ```cpp
-private:
-	PSFModule* psfModule;  // Add new business module
-
-signals:
-	void psfParametersChanged(const QVector<double>& coefficients);  // Add relevant signals
-```
-
-**Implementation (.cpp):**
-```cpp
-// In initializeComponents()
-this->psfModule = new PSFModule(this);
-
-// In connectSessionSignals() or new connectPSFModuleSignals()
-connect(this->psfModule, &PSFModule::psfUpdated,
-        this, &ApplicationController::psfUpdated);
-```
-
-### 2. Create GUI Widget
-
-Create widget without any business logic references:
-```cpp
-class PSFWidget : public QWidget {
-signals:
-	void coefficientChangeRequested(int nollIndex, double value);
-	void generatePSFRequested();
-
-public slots:
-	void updateCoefficients(const QVector<double>& coefficients);
-};
-```
-
-### 3. Connect in MainWindow
-
-Add connection method:
-```cpp
-void MainWindow::connectPSFWidget() {
-	// Widget → Controller
-	connect(psfWidget, &PSFWidget::coefficientChangeRequested,
-	        applicationController, &ApplicationController::setPSFCoefficient);
-	        
-	// Controller → Widget  
-	connect(applicationController, &ApplicationController::psfParametersChanged,
-	        psfWidget, &PSFWidget::updateCoefficients);
+void ApplicationController::setCurrentFrame(int frame)
+{
+    coefficientWorkspace->store();
+    imageSession->setCurrentFrame(frame);
+    coefficientWorkspace->loadForCurrentPatch();
+    deconvolutionOrchestrator->runOnCurrentPatch();
 }
 ```
 
-Call in MainWindow constructor after `broadcastCurrentState()`.
+The real implementation contains extra guards for 3D mode and live-deconvolution suppression, but this is the important pattern.
 
-## Key Principles
+## Adding a New Component
 
-- **No direct references** between GUI and business logic
-- **ApplicationController stays lightweight** - no complex algorithms
-- **Business modules access each other directly** when needed
-- **MainWindow coordinates all connections**
-- **Push-based state management** - widgets cache received data
+### Add a new workflow helper
+
+1. Create a focused helper class with a narrow responsibility.
+2. Instantiate it in `ApplicationController::initializeComponents()`.
+3. Connect its outgoing signals to controller signals or controller slots.
+4. Expose only the controller API that the GUI actually needs.
+
+### Add a new widget
+
+1. Keep the widget free of direct business-layer references.
+2. Add signals for user intent.
+3. Add slots for state updates.
+4. Wire it in `MainWindow`.
+5. If startup state matters, make sure `broadcastCurrentState()` or another initial sync path covers it.
+
+## Practical Guidance
+
+- If you are about to add another large block of logic to `ApplicationController`, pause and ask whether it belongs in an orchestrator/helper instead.
+- If a change introduces direct GUI dependence into batch processing or compute code, consider whether that logic should move upward toward the GUI layer.
