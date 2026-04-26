@@ -35,13 +35,14 @@ SOURCES += \
 	$$SOURCEDIR/data/imagedata.cpp \
 	$$SOURCEDIR/data/inputdatareader.cpp \
 	$$SOURCEDIR/data/imagedataaccessor.cpp \
+	$$SOURCEDIR/data/patchextractor.cpp \
 	$$SOURCEDIR/controller/imagesession.cpp \
 	$$SOURCEDIR/controller/applicationcontroller.cpp \
 	$$SOURCEDIR/controller/deconvolutioncontroller.cpp \
+	$$SOURCEDIR/controller/deconvolutionworkercontroller.cpp \
 	$$SOURCEDIR/controller/optimizationcontroller.cpp \
 	$$SOURCEDIR/controller/psffilecontroller.cpp \
 	$$SOURCEDIR/controller/coefficientworkspace.cpp \
-	$$SOURCEDIR/controller/deconvolutionorchestrator.cpp \
 	$$SOURCEDIR/gui/imagesessionviewer/graphicsview.cpp \
 	$$SOURCEDIR/gui/imagesessionviewer/rectitem.cpp \
 	$$SOURCEDIR/gui/imagesessionviewer/rectitemgroup.cpp \
@@ -90,7 +91,10 @@ SOURCES += \
 	$$SOURCEDIR/core/psf/psffilemanager.cpp \
 	$$SOURCEDIR/core/psf/filepsfgenerator.cpp \
 	$$SOURCEDIR/core/processing/batchprocessor.cpp \
+	$$SOURCEDIR/core/processing/deconvolutionjobbuilder.cpp \
+	$$SOURCEDIR/core/processing/patchdeconvolutionprocessor.cpp \
 	$$SOURCEDIR/core/processing/deconvolutionworker.cpp \
+	$$SOURCEDIR/core/processing/volumedeconvolutionprocessor.cpp \
 	$$SOURCEDIR/core/processing/volumetricdeconvolver.cpp \
 	$$SOURCEDIR/core/processing/volumetricprocessor.cpp \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.cpp \
@@ -113,15 +117,17 @@ HEADERS += \
 	$$SOURCEDIR/data/imagedata.h \
 	$$SOURCEDIR/data/inputdatareader.h \
 	$$SOURCEDIR/data/imagedataaccessor.h \
+	$$SOURCEDIR/data/imagepatch.h \
 	$$SOURCEDIR/data/patchlayout.h \
+	$$SOURCEDIR/data/patchextractor.h \
 	$$SOURCEDIR/utils/logging.h \
 	$$SOURCEDIR/controller/imagesession.h \
 	$$SOURCEDIR/controller/applicationcontroller.h \
 	$$SOURCEDIR/controller/deconvolutioncontroller.h \
+	$$SOURCEDIR/controller/deconvolutionworkercontroller.h \
 	$$SOURCEDIR/controller/optimizationcontroller.h \
 	$$SOURCEDIR/controller/psffilecontroller.h \
 	$$SOURCEDIR/controller/coefficientworkspace.h \
-	$$SOURCEDIR/controller/deconvolutionorchestrator.h \
 	$$SOURCEDIR/gui/imagesessionviewer/graphicsview.h \
 	$$SOURCEDIR/gui/imagesessionviewer/rectitem.h \
 	$$SOURCEDIR/gui/imagesessionviewer/rectitemgroup.h \
@@ -145,6 +151,7 @@ HEADERS += \
 	$$SOURCEDIR/core/psf/richardswolfcalculator.h \
 	$$SOURCEDIR/core/psf/apertureutils.h \
 	$$SOURCEDIR/core/psf/deconvolver.h \
+	$$SOURCEDIR/core/psf/deconvolutionsettings.h \
 	$$SOURCEDIR/core/psf/ipsfpropagator.h \
 	$$SOURCEDIR/core/psf/ipsfgenerator.h \
 	$$SOURCEDIR/core/psf/composedpsfgenerator.h \
@@ -178,8 +185,11 @@ HEADERS += \
 	$$SOURCEDIR/core/psf/filepsfgenerator.h \
 	$$SOURCEDIR/core/psf/psffileinfo.h \
 	$$SOURCEDIR/core/processing/batchprocessor.h \
+	$$SOURCEDIR/core/processing/deconvolutionjobbuilder.h \
+	$$SOURCEDIR/core/processing/patchdeconvolutionprocessor.h \
 	$$SOURCEDIR/core/processing/deconvolutiontypes.h \
 	$$SOURCEDIR/core/processing/deconvolutionworker.h \
+	$$SOURCEDIR/core/processing/volumedeconvolutionprocessor.h \
 	$$SOURCEDIR/core/processing/volumetricdeconvolver.h \
 	$$SOURCEDIR/core/processing/volumetricprocessor.h \
 	$$SOURCEDIR/gui/psfcontrol/interpolationwidget.h \

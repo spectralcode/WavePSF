@@ -2,6 +2,8 @@
 #include "ipsfgenerator.h"
 #include "psfgeneratorfactory.h"
 #include "deconvolver.h"
+#include "core/processing/patchdeconvolutionprocessor.h"
+#include "core/processing/volumedeconvolutionprocessor.h"
 #include "utils/afdevicemanager.h"
 #include "utils/logging.h"
 
@@ -67,12 +69,7 @@ QStringList PSFModule::availablePSFModes()
 
 af::array PSFModule::extractFrame(const af::array& psf, int frame)
 {
-	if (psf.numdims() > 2 && psf.dims(2) > 1) {
-		int maxZ = static_cast<int>(psf.dims(2)) - 1;
-		int z = qBound(0, frame, maxZ);
-		return psf(af::span, af::span, z);
-	}
-	return psf;
+	return PatchDeconvolutionProcessor::extractPSFFrame(psf, frame);
 }
 
 int PSFModule::getCurrentFrame() const
@@ -101,6 +98,11 @@ PSFSettings PSFModule::getPSFSettings() const
 QString PSFModule::getGeneratorTypeName() const
 {
 	return this->generator->typeName();
+}
+
+DeconvolutionSettings PSFModule::getDeconvolutionSettings() const
+{
+	return this->deconvolver->getSettings();
 }
 
 QVector<double> PSFModule::getAllCoefficients() const
@@ -150,17 +152,57 @@ void PSFModule::setGridSize(int size)
 
 af::array PSFModule::deconvolve(const af::array& input)
 {
-	af::array psf = PSFModule::extractFrame(this->getCurrentPSF(), this->currentFrame);
+	af::array psf = this->getCurrentPSF();
 	if (psf.isempty()) {
 		emit error(tr("No PSF available for deconvolution."));
 		return af::array();
 	}
-	return this->deconvolver->deconvolve(input, psf);
+
+	if (this->deconvolver->is3DAlgorithm()) {
+		VolumeDeconvolutionInput request;
+		request.inputVolume = input;
+		request.psfVolume = psf;
+		return VolumeDeconvolutionProcessor::process(
+			request,
+			this->deconvolver);
+	}
+
+	PatchDeconvolutionInput request;
+	request.inputPatch = input;
+	request.psf = psf;
+	request.frameNr = this->currentFrame;
+
+	return PatchDeconvolutionProcessor::process(
+		request,
+		this->generator,
+		this->deconvolver);
 }
 
 af::array PSFModule::deconvolve(const af::array& input, const af::array& psf)
 {
-	return this->deconvolver->deconvolve(input, psf);
+	if (psf.isempty()) {
+		emit error(tr("PSF kernel is empty."));
+		return af::array();
+	}
+
+	if (this->deconvolver->is3DAlgorithm()) {
+		VolumeDeconvolutionInput request;
+		request.inputVolume = input;
+		request.psfVolume = psf;
+		return VolumeDeconvolutionProcessor::process(
+			request,
+			this->deconvolver);
+	}
+
+	PatchDeconvolutionInput request;
+	request.inputPatch = input;
+	request.psf = psf;
+	request.frameNr = this->currentFrame;
+
+	return PatchDeconvolutionProcessor::process(
+		request,
+		this->generator,
+		this->deconvolver);
 }
 
 bool PSFModule::is3DAlgorithm() const
@@ -263,15 +305,15 @@ void PSFModule::setDeconvolutionRelaxationFactor(float factor)
 	emit deconvolutionSettingsChanged();
 }
 
-void PSFModule::setDeconvolutionRegularizationFactor(float factor)
+void PSFModule::setDeconvolutionTikhonovRegularizationFactor(float factor)
 {
-	this->deconvolver->setRegularizationFactor(factor);
+	this->deconvolver->setTikhonovRegularizationFactor(factor);
 	emit deconvolutionSettingsChanged();
 }
 
-void PSFModule::setDeconvolutionNoiseToSignalFactor(float factor)
+void PSFModule::setDeconvolutionWienerNoiseToSignalFactor(float factor)
 {
-	this->deconvolver->setNoiseToSignalFactor(factor);
+	this->deconvolver->setWienerNoiseToSignalFactor(factor);
 	emit deconvolutionSettingsChanged();
 }
 

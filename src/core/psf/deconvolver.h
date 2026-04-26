@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QStringList>
 #include <arrayfire.h>
+#include "deconvolutionsettings.h"
 
 class VolumetricDeconvolver;
 
@@ -28,13 +29,15 @@ public:
 	void setAlgorithm(Algorithm algo);
 	void setIterations(int iterations);
 	void setRelaxationFactor(float factor);
-	void setRegularizationFactor(float factor);
-	void setNoiseToSignalFactor(float factor);
+	void setTikhonovRegularizationFactor(float factor);
+	void setWienerNoiseToSignalFactor(float factor);
 	void setVolumePaddingMode(int mode);
 	void setAccelerationMode(int mode);
 	void setRegularizer3D(int mode);
 	void setRegularizationWeight(float weight);
 	void setVoxelSize(float sizeY, float sizeX, float sizeZ);
+	DeconvolutionSettings getSettings() const;
+	void applySettings(const DeconvolutionSettings& settings);
 
 	void requestDeconvolutionCancel();
 	void resetDeconvolutionCancel();
@@ -49,11 +52,7 @@ signals:
 	void iterationCompleted(int currentIteration, int totalIterations);
 
 private:
-	Algorithm algorithm;
-	int iterations;
-	float landweberRelaxationFactor;
-	float tikhonovRegularizationFactor;
-	float wienerNoiseToSignalFactor;
+	DeconvolutionSettings settings;
 
 	VolumetricDeconvolver* volumetricDeconvolver;
 

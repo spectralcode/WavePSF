@@ -20,7 +20,6 @@ class PSFModule;
 class CoefficientWorkspace;
 class AFDeviceManager;
 class PSFFileController;
-class DeconvolutionOrchestrator;
 class DeconvolutionController;
 class InterpolationOrchestrator;
 class OptimizationController;
@@ -85,8 +84,8 @@ public slots:
 	void setDeconvolutionAlgorithm(int algorithm);
 	void setDeconvolutionIterations(int iterations);
 	void setDeconvolutionRelaxationFactor(float factor);
-	void setDeconvolutionRegularizationFactor(float factor);
-	void setDeconvolutionNoiseToSignalFactor(float factor);
+	void setDeconvolutionTikhonovRegularizationFactor(float factor);
+	void setDeconvolutionWienerNoiseToSignalFactor(float factor);
 	void setVolumePaddingMode(int mode);
 	void setAccelerationMode(int mode);
 	void setRegularizer3D(int mode);
@@ -171,7 +170,6 @@ private:
 
 	// Deconvolution state
 	bool deconvolutionLiveMode;
-	DeconvolutionController* deconvolutionController;
 
 	// Optimization (delegated to OptimizationController)
 	OptimizationController* optimizationController;
@@ -184,7 +182,7 @@ private:
 	PSFFileController* psfFileController;
 
 	// Deconvolution orchestration
-	DeconvolutionOrchestrator* deconvolutionOrchestrator;
+	DeconvolutionController* deconvolutionController;
 
 	// PSF grid generation
 	PSFGridGenerator* psfGridGenerator;
@@ -212,11 +210,11 @@ signals:
 	void psfModeChanged(QString modeName);
 
 	// Deconvolution results
-	void deconvolutionCompleted();
-	void deconvolutionStarted();
-	void deconvolutionCancellationRequested();
-	void deconvolutionProgressUpdated(DeconvolutionProgress progress);
-	void deconvolutionFinished(DeconvolutionRunResult result);
+	void deconvolutionRunStarted();
+	void deconvolutionRunCancellationRequested();
+	void deconvolutionRunProgressUpdated(DeconvolutionProgress progress);
+	void deconvolutionRunFinished(DeconvolutionRunResult result);
+	void deconvolutionOutputUpdated();
 
 	// Coefficient loading (for GUI update)
 	void coefficientsLoaded(QVector<double> coefficients);
@@ -231,7 +229,6 @@ signals:
 
 	// Batch processing
 	void parametersLoaded();
-	void batchDeconvolutionCompleted();
 
 	// Interpolation results
 	void interpolationCompleted(InterpolationResult result);

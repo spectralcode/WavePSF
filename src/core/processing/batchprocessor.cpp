@@ -1,235 +1,446 @@
 #include "batchprocessor.h"
 #include "volumetricprocessor.h"
-#include "controller/imagesession.h"
-#include "core/psf/psfmodule.h"
+#include "volumedeconvolutionprocessor.h"
+#include "patchdeconvolutionprocessor.h"
+#include "core/psf/deconvolver.h"
 #include "core/psf/ipsfgenerator.h"
-#include "data/wavefrontparametertable.h"
+#include "data/patchextractor.h"
 #include "utils/logging.h"
-#include <QProgressDialog>
-#include <QApplication>
+#include <QtGlobal>
 
 BatchProcessor::BatchProcessor(QObject* parent)
 	: QObject(parent)
 {
 }
 
-bool BatchProcessor::executeBatchDeconvolution(
-	ImageSession* imageSession,
-	PSFModule* psfModule,
-	WavefrontParameterTable* parameterTable,
-	QWidget* parentWidget)
+DeconvolutionRunResult BatchProcessor::executeBatchDeconvolution(
+	const DeconvolutionRequest& request,
+	IPSFGenerator* generator,
+	Deconvolver* deconvolver,
+	const DeconvolutionCancelToken* cancelToken)
 {
-	// Delegate to volumetric batch if 3D algorithm is selected
-	if (psfModule->is3DAlgorithm()) {
-		return this->executeBatchVolumetricDeconvolution(
-			imageSession, psfModule, parameterTable, parentWidget);
+	DeconvolutionRunResult result;
+	result.operationKind = request.operationKind;
+
+	if (generator == nullptr || deconvolver == nullptr) {
+		result.status = DeconvolutionRunStatus::FAILED;
+		result.message = QStringLiteral("Missing generator or deconvolver for batch execution.");
+		return result;
 	}
 
-	int frames = imageSession->getInputFrames();
-	int cols = imageSession->getPatchGridCols();
-	int rows = imageSession->getPatchGridRows();
-	int totalSteps = frames * rows * cols;
-
-	if (totalSteps == 0) {
-		LOG_WARNING() << "Cannot run batch deconvolution: no patches to process";
-		return false;
+	if (request.inputFrames.isEmpty()) {
+		result.status = DeconvolutionRunStatus::FAILED;
+		result.message = QStringLiteral("No input frames available for batch execution.");
+		return result;
+	}
+	if (request.patchGridCols <= 0 || request.patchGridRows <= 0) {
+		result.status = DeconvolutionRunStatus::FAILED;
+		result.message = QStringLiteral("Invalid patch layout for batch execution.");
+		return result;
 	}
 
-	// Block PSFModule signals to prevent GUI flickering during batch
-	bool oldBlockState = psfModule->blockSignals(true);
-
-	// Create progress dialog
-	QProgressDialog progressDialog("Initializing batch deconvolution...", "Cancel", 0, totalSteps, parentWidget);
-	progressDialog.setWindowTitle("Batch Deconvolution");
-	progressDialog.setWindowModality(Qt::ApplicationModal);
-	progressDialog.setMinimumDuration(0);
-	progressDialog.setValue(0);
-
-	LOG_INFO() << "Starting batch deconvolution:" << frames << "frames," << cols << "x" << rows << "patches";
-
-	bool supportsCoeffs = psfModule->getGenerator()->supportsCoefficients();
-	int step = 0;
-	bool cancelled = false;
-
-	for (int frame = 0; frame < frames && !cancelled; frame++) {
-		for (int y = 0; y < rows && !cancelled; y++) {
-			for (int x = 0; x < cols && !cancelled; x++) {
-				// Update progress label
-				progressDialog.setLabelText(
-					QString("Processing frame %1/%2, patch (%3,%4)...")
-						.arg(frame + 1).arg(frames).arg(x).arg(y));
-
-				int patchIdx = parameterTable->patchIndex(x, y);
-				psfModule->setCurrentPatch(frame, patchIdx);
-
-				if (supportsCoeffs) {
-					QVector<double> coeffs = parameterTable->getCoefficients(frame, patchIdx);
-					if (coeffs.isEmpty()) {
-						step++;
-						progressDialog.setValue(step);
-						QApplication::processEvents();
-						if (progressDialog.wasCanceled()) { cancelled = true; }
-						continue;
-					}
-					psfModule->setAllCoefficients(coeffs);
-				} else {
-					psfModule->refreshPSF();
-				}
-
-				// Get input patch
-				ImagePatch inputPatch = imageSession->getInputPatch(frame, x, y);
-				if (!inputPatch.isValid()) {
-					step++;
-					progressDialog.setValue(step);
-					QApplication::processEvents();
-					if (progressDialog.wasCanceled()) { cancelled = true; }
-					continue;
-				}
-
-				// Deconvolve
-				af::array result = psfModule->deconvolve(inputPatch.data);
-				if (!result.isempty()) {
-					imageSession->setOutputPatch(frame, x, y, result);
-				}
-
-				step++;
-				progressDialog.setValue(step);
-				QApplication::processEvents();
-				if (progressDialog.wasCanceled()) {
-					cancelled = true;
-				}
-			}
-		}
+	const PatchLayout patchLayout{
+		static_cast<int>(request.inputFrames.first().dims(0)),
+		static_cast<int>(request.inputFrames.first().dims(1)),
+		request.patchGridCols,
+		request.patchGridRows
+	};
+	if (!patchLayout.isValid()) {
+		result.status = DeconvolutionRunStatus::FAILED;
+		result.message = QStringLiteral("Invalid frame dimensions for batch execution.");
+		return result;
 	}
 
-	// Flush last frame to CPU
-	imageSession->flushOutput();
-
-	psfModule->blockSignals(oldBlockState);
-
-	if (cancelled) {
-		LOG_INFO() << "Batch deconvolution cancelled at step" << step << "of" << totalSteps;
-	} else {
-		LOG_INFO() << "Batch deconvolution completed:" << totalSteps << "patches processed";
+	if (request.operationKind == DeconvolutionOperationKind::BATCH_2D) {
+		return this->executeBatch2D(
+			request,
+			patchLayout,
+			generator,
+			deconvolver,
+			cancelToken);
 	}
 
-	return !cancelled;
+	if (request.operationKind == DeconvolutionOperationKind::BATCH_3D
+		|| request.operationKind == DeconvolutionOperationKind::SINGLE_PATCH_3D) {
+		return this->executeVolumeJobs(
+			request,
+			patchLayout,
+			generator,
+			deconvolver,
+			cancelToken);
+	}
+
+	result.status = DeconvolutionRunStatus::FAILED;
+	result.message = QStringLiteral("Unsupported batch deconvolution operation.");
+	return result;
 }
 
-bool BatchProcessor::executeBatchVolumetricDeconvolution(
-	ImageSession* imageSession,
-	PSFModule* psfModule,
-	WavefrontParameterTable* parameterTable,
-	QWidget* parentWidget)
+DeconvolutionRunResult BatchProcessor::executeBatch2D(
+	const DeconvolutionRequest& request,
+	const PatchLayout& patchLayout,
+	IPSFGenerator* generator,
+	Deconvolver* deconvolver,
+	const DeconvolutionCancelToken* cancelToken)
 {
-	int frames = imageSession->getInputFrames();
-	int cols = imageSession->getPatchGridCols();
-	int rows = imageSession->getPatchGridRows();
-	int totalPatches = cols * rows;
+	DeconvolutionRunResult result;
+	result.operationKind = request.operationKind;
+	result.totalUnits = request.patchJobs.size();
 
-	if (totalPatches == 0 || frames == 0) {
-		LOG_WARNING() << "Cannot run volumetric batch deconvolution: no patches or frames";
-		return false;
+	if (request.patchJobs.isEmpty()) {
+		result.status = DeconvolutionRunStatus::FAILED;
+		result.message = QStringLiteral("No batch 2D deconvolution jobs specified.");
+		return result;
 	}
 
-	// Block PSFModule signals to prevent GUI flickering during batch
-	bool oldBlockState = psfModule->blockSignals(true);
+	const int totalFrames = request.inputFrames.size();
+	auto emitProgress = [&](const QString& message,
+							int completedUnits,
+							int frameNr,
+							int patchX,
+							int patchY) {
+		DeconvolutionProgress progress;
+		progress.operationKind = request.operationKind;
+		progress.phase = QStringLiteral("batch_2d");
+		progress.message = message;
+		progress.completedUnits = completedUnits;
+		progress.totalUnits = request.patchJobs.size();
+		progress.currentFrameNr = frameNr;
+		progress.currentPatchX = patchX;
+		progress.currentPatchY = patchY;
+		progress.isCancellable = true;
+		emit this->progressUpdated(progress);
+	};
 
-	// Create progress dialog
-	QProgressDialog progressDialog("Initializing volumetric batch deconvolution...", "Cancel", 0, totalPatches, parentWidget);
-	progressDialog.setWindowTitle("Batch Deconvolution (3D)");
-	progressDialog.setWindowModality(Qt::ApplicationModal);
-	progressDialog.setMinimumDuration(0);
-	progressDialog.setValue(0);
+	LOG_INFO() << "Starting batch 2D deconvolution with" << request.patchJobs.size() << "jobs";
+	emitProgress(QStringLiteral("Initializing batch deconvolution..."), 0, -1, -1, -1);
 
-	// Connect iteration progress for per-patch RL tracking
-	int patchStep = 0;
-	QMetaObject::Connection iterConn = connect(psfModule, &PSFModule::deconvolutionIterationCompleted,
-		[&](int curIter, int totalIter) {
-			progressDialog.setLabelText(
-				QString("Patch %1/%2: iteration %3/%4")
-					.arg(patchStep + 1).arg(totalPatches).arg(curIter).arg(totalIter));
-			QApplication::processEvents();
-			if (progressDialog.wasCanceled()) {
-				psfModule->requestDeconvolutionCancel();
+	for (int jobIndex = 0; jobIndex < request.patchJobs.size(); ++jobIndex) {
+		if (cancelToken != nullptr && cancelToken->isCancellationRequested()) {
+			result.status = DeconvolutionRunStatus::CANCELLED;
+			result.message = QStringLiteral("Batch deconvolution cancelled.");
+			result.completedUnits = jobIndex;
+			LOG_INFO() << "Batch 2D deconvolution cancelled at job" << jobIndex
+					   << "of" << request.patchJobs.size();
+			return result;
+		}
+
+		const DeconvolutionPatchJob& job = request.patchJobs[jobIndex];
+		const QString progressMessage = QString("Processing frame %1/%2, patch (%3,%4)...")
+			.arg(job.frameNr + 1)
+			.arg(qMax(1, totalFrames))
+			.arg(job.patchX)
+			.arg(job.patchY);
+		emitProgress(progressMessage, jobIndex, job.frameNr, job.patchX, job.patchY);
+
+		if (job.frameNr < 0 || job.frameNr >= request.inputFrames.size()) {
+			result.completedUnits = jobIndex + 1;
+			emitProgress(progressMessage, result.completedUnits, job.frameNr, job.patchX, job.patchY);
+			continue;
+		}
+
+		ImagePatch inputPatch = PatchExtractor::extractExtendedPatch(
+			request.inputFrames[job.frameNr],
+			patchLayout,
+			job.patchX,
+			job.patchY,
+			request.patchBorderExtension);
+		if (!inputPatch.isValid()) {
+			result.completedUnits = jobIndex + 1;
+			emitProgress(progressMessage, result.completedUnits, job.frameNr, job.patchX, job.patchY);
+			continue;
+		}
+
+		try {
+			PatchDeconvolutionInput patchRequest;
+			patchRequest.inputPatch = inputPatch.data;
+			patchRequest.frameNr = job.frameNr;
+			patchRequest.patchIdx = job.patchIdx;
+			patchRequest.gridSize = request.psfSettings.gridSize;
+			patchRequest.coefficients = job.coefficients;
+			patchRequest.generatePSFIfMissing = true;
+
+			af::array outputPatch = PatchDeconvolutionProcessor::process(
+				patchRequest,
+				generator,
+				deconvolver);
+			if (outputPatch.isempty()) {
+				LOG_WARNING() << "Batch 2D deconvolution returned empty result at frame"
+							  << job.frameNr << "patch (" << job.patchX << "," << job.patchY << ")";
+				result.completedUnits = jobIndex + 1;
+				emitProgress(progressMessage, result.completedUnits, job.frameNr, job.patchX, job.patchY);
+				continue;
 			}
+
+			DeconvolutionPatchOutput output;
+			output.frameNr = job.frameNr;
+			output.patchX = job.patchX;
+			output.patchY = job.patchY;
+			output.outputPatch = outputPatch;
+
+			emit this->patchOutputReady(output);
+		} catch (const af::exception& e) {
+			LOG_WARNING() << "Batch 2D deconvolution failed at frame" << job.frameNr
+						  << "patch (" << job.patchX << "," << job.patchY << "):"
+						  << e.what();
+		}
+
+		result.completedUnits = jobIndex + 1;
+		emitProgress(progressMessage, result.completedUnits, job.frameNr, job.patchX, job.patchY);
+	}
+
+	result.status = DeconvolutionRunStatus::COMPLETED;
+	result.message = QStringLiteral("Batch deconvolution completed.");
+	LOG_INFO() << "Batch 2D deconvolution completed:" << result.completedUnits << "jobs processed";
+	return result;
+}
+
+DeconvolutionRunResult BatchProcessor::executeVolumeJobs(
+	const DeconvolutionRequest& request,
+	const PatchLayout& patchLayout,
+	IPSFGenerator* generator,
+	Deconvolver* deconvolver,
+	const DeconvolutionCancelToken* cancelToken)
+{
+	DeconvolutionRunResult result;
+	result.operationKind = request.operationKind;
+	result.totalUnits = request.volumeJobs.size();
+
+	if (request.volumeJobs.isEmpty()) {
+		result.status = DeconvolutionRunStatus::FAILED;
+		result.message = QStringLiteral("No 3D deconvolution jobs specified.");
+		return result;
+	}
+
+	const bool singlePatch3D = request.operationKind == DeconvolutionOperationKind::SINGLE_PATCH_3D;
+	auto isCancelled = [&]() {
+		return cancelToken != nullptr && cancelToken->isCancellationRequested();
+	};
+	auto finishCancelled = [&](int completedUnits) {
+		result.status = DeconvolutionRunStatus::CANCELLED;
+		result.message = singlePatch3D
+			? QStringLiteral("3D deconvolution cancelled.")
+			: QStringLiteral("Batch deconvolution cancelled.");
+		result.completedUnits = completedUnits;
+		return result;
+	};
+	auto emitProgress = [&](const QString& message,
+							int completedUnits,
+							int patchX,
+							int patchY,
+							int displayFrame,
+							int currentIteration = 0,
+							int totalIterations = 0) {
+		DeconvolutionProgress progress;
+		progress.operationKind = request.operationKind;
+		progress.phase = singlePatch3D
+			? QStringLiteral("single_patch_3d")
+			: QStringLiteral("batch_3d");
+		progress.message = message;
+		progress.completedUnits = singlePatch3D
+			? (currentIteration > 0 ? currentIteration : 0)
+			: completedUnits;
+		progress.totalUnits = singlePatch3D
+			? (totalIterations > 0 ? totalIterations : qMax(0, request.deconvolutionSettings.iterations))
+			: request.volumeJobs.size();
+		progress.currentIteration = currentIteration;
+		progress.totalIterations = totalIterations;
+		progress.currentFrameNr = displayFrame;
+		progress.currentPatchX = patchX;
+		progress.currentPatchY = patchY;
+		progress.isCancellable = true;
+		emit this->progressUpdated(progress);
+	};
+
+	int currentJobIndex = -1;
+	QMetaObject::Connection iterationConnection = QObject::connect(
+		deconvolver,
+		&Deconvolver::iterationCompleted,
+		[&](int currentIteration, int totalIterations) {
+			if (cancelToken != nullptr && cancelToken->isCancellationRequested()) {
+				deconvolver->requestDeconvolutionCancel();
+			}
+
+			if (currentJobIndex < 0 || currentJobIndex >= request.volumeJobs.size()) {
+				return;
+			}
+
+			const DeconvolutionVolumeJob& job = request.volumeJobs[currentJobIndex];
+			const QString message = QString("Patch %1/%2: iteration %3/%4")
+				.arg(currentJobIndex + 1)
+				.arg(request.volumeJobs.size())
+				.arg(currentIteration)
+				.arg(totalIterations);
+			emitProgress(
+				message,
+				currentJobIndex,
+				job.patchX,
+				job.patchY,
+				job.displayFrame,
+				currentIteration,
+				totalIterations);
 		});
 
-	// Temporarily unblock signals so iteration progress comes through
-	psfModule->blockSignals(false);
+	LOG_INFO() << "Starting" << (singlePatch3D ? "single-patch" : "batch")
+			   << "3D deconvolution with" << request.volumeJobs.size() << "jobs";
+	emitProgress(
+		singlePatch3D
+			? QStringLiteral("Preparing 3D deconvolution...")
+			: QStringLiteral("Initializing batch deconvolution..."),
+		0, -1, -1, -1);
 
-	LOG_INFO() << "Starting volumetric batch deconvolution:" << totalPatches << "patches," << frames << "frames";
+	for (int jobIndex = 0; jobIndex < request.volumeJobs.size(); ++jobIndex) {
+		if (isCancelled()) {
+			QObject::disconnect(iterationConnection);
+			LOG_INFO() << "Batch 3D deconvolution cancelled at job" << jobIndex
+					   << "of" << request.volumeJobs.size();
+			return finishCancelled(jobIndex);
+		}
 
-	bool cancelled = false;
+		currentJobIndex = jobIndex;
+		const DeconvolutionVolumeJob& job = request.volumeJobs[jobIndex];
+		const QString patchPrefix = QString("Patch %1/%2")
+			.arg(jobIndex + 1)
+			.arg(request.volumeJobs.size());
 
-	for (int y = 0; y < rows && !cancelled; y++) {
-		for (int x = 0; x < cols && !cancelled; x++) {
-			int patchIdx = parameterTable->patchIndex(x, y);
+		emitProgress(
+			patchPrefix + QStringLiteral(": assembling subvolume..."),
+			jobIndex,
+			job.patchX,
+			job.patchY,
+			job.displayFrame);
 
-			progressDialog.setLabelText(
-				QString("Patch %1/%2: assembling subvolume...")
-					.arg(patchStep + 1).arg(totalPatches));
-			QApplication::processEvents();
+		try {
+			af::array inputVolume = VolumetricProcessor::assembleSubvolume(
+				request.inputFrames,
+				patchLayout,
+				job.patchX,
+				job.patchY,
+				request.patchBorderExtension);
+			if (inputVolume.isempty()) {
+				LOG_WARNING() << "Skipping batch 3D patch (" << job.patchX << "," << job.patchY
+							  << "): empty subvolume";
+				result.completedUnits = jobIndex + 1;
+				emitProgress(
+					patchPrefix + QStringLiteral(": skipped empty subvolume"),
+					result.completedUnits,
+					job.patchX,
+					job.patchY,
+					job.displayFrame);
+				continue;
+			}
+			if (isCancelled()) {
+				QObject::disconnect(iterationConnection);
+				LOG_INFO() << "Batch 3D deconvolution cancelled after subvolume assembly at patch"
+						   << job.patchX << job.patchY;
+				return finishCancelled(jobIndex);
+			}
 
-			af::array subvolume = VolumetricProcessor::assembleSubvolume(imageSession, x, y);
-			if (subvolume.isempty()) {
-				LOG_WARNING() << "Skipping patch (" << x << "," << y << "): empty subvolume";
-				patchStep++;
-				progressDialog.setValue(patchStep);
+			emitProgress(
+				patchPrefix + QStringLiteral(": assembling 3D PSF..."),
+				jobIndex,
+				job.patchX,
+				job.patchY,
+				job.displayFrame);
+
+			af::array psfVolume = VolumetricProcessor::assemble3DPSF(
+				generator,
+				request.psfSettings.gridSize,
+				job.patchIdx,
+				request.inputFrames.size(),
+				job.coefficientsByFrame);
+			if (psfVolume.isempty()) {
+				LOG_WARNING() << "Skipping batch 3D patch (" << job.patchX << "," << job.patchY
+							  << "): empty PSF volume";
+				result.completedUnits = jobIndex + 1;
+				emitProgress(
+					patchPrefix + QStringLiteral(": skipped empty PSF"),
+					result.completedUnits,
+					job.patchX,
+					job.patchY,
+					job.displayFrame);
+				continue;
+			}
+			if (isCancelled()) {
+				QObject::disconnect(iterationConnection);
+				LOG_INFO() << "Batch 3D deconvolution cancelled after PSF assembly at patch"
+						   << job.patchX << job.patchY;
+				return finishCancelled(jobIndex);
+			}
+
+			deconvolver->resetDeconvolutionCancel();
+
+			VolumeDeconvolutionInput volumeRequest;
+			volumeRequest.inputVolume = inputVolume;
+			volumeRequest.psfVolume = psfVolume;
+			af::array outputVolume = VolumeDeconvolutionProcessor::process(
+				volumeRequest,
+				deconvolver);
+			if (outputVolume.isempty()) {
+				const bool wasCancelled =
+					isCancelled()
+					|| deconvolver->wasDeconvolutionCancelled();
+				if (wasCancelled) {
+					QObject::disconnect(iterationConnection);
+					LOG_INFO() << "Batch 3D deconvolution cancelled at patch"
+							   << job.patchX << job.patchY;
+					return finishCancelled(jobIndex);
+				}
+
+				LOG_WARNING() << "Batch 3D deconvolution returned empty result at patch ("
+							  << job.patchX << "," << job.patchY << ")";
+				result.completedUnits = jobIndex + 1;
+				emitProgress(
+					patchPrefix + QStringLiteral(": deconvolution returned empty result"),
+					result.completedUnits,
+					job.patchX,
+					job.patchY,
+					job.displayFrame);
+				af::deviceGC();
 				continue;
 			}
 
-			af::array psf3D = VolumetricProcessor::assemble3DPSF(
-				psfModule, parameterTable, patchIdx, frames);
-			if (psf3D.isempty()) {
-				LOG_WARNING() << "Skipping patch (" << x << "," << y << "): no 3D PSF available";
-				patchStep++;
-				progressDialog.setValue(patchStep);
-				continue;
-			}
+			DeconvolutionVolumeOutput output;
+			output.patchX = job.patchX;
+			output.patchY = job.patchY;
+			output.displayFrame = job.displayFrame;
+			output.outputVolume = outputVolume;
 
-			LOG_INFO() << "Patch (" << x << "," << y << "): subvolume"
-				   << subvolume.dims(0) << "x" << subvolume.dims(1) << "x" << subvolume.dims(2)
-				   << "PSF" << psf3D.dims(0) << "x" << psf3D.dims(1) << "x" << psf3D.dims(2);
+			emit this->volumeOutputReady(output);
 
-			psfModule->resetDeconvolutionCancel();
-			af::array result = psfModule->deconvolve(subvolume, psf3D);
-			if (!result.isempty()) {
-				VolumetricProcessor::writeSubvolumeToOutput(imageSession, x, y, result);
-			} else if (psfModule->wasDeconvolutionCancelled()) {
-				LOG_INFO() << "Patch (" << x << "," << y << "): cancelled by user";
-				cancelled = true;
-			} else {
-				LOG_WARNING() << "Patch (" << x << "," << y << "): deconvolution returned empty result";
-			}
-
-			// Free GPU memory between patches
-			subvolume = af::array();
-			psf3D = af::array();
-			result = af::array();
+			inputVolume = af::array();
+			psfVolume = af::array();
+			outputVolume = af::array();
 			af::deviceGC();
 
-			patchStep++;
-			progressDialog.setValue(patchStep);
-			QApplication::processEvents();
-			if (progressDialog.wasCanceled()) {
-				cancelled = true;
-			}
+			result.completedUnits = jobIndex + 1;
+			emitProgress(
+				patchPrefix + QStringLiteral(": completed"),
+				result.completedUnits,
+				job.patchX,
+				job.patchY,
+				job.displayFrame,
+				singlePatch3D ? request.deconvolutionSettings.iterations : 0,
+				singlePatch3D ? request.deconvolutionSettings.iterations : 0);
+		} catch (const af::exception& e) {
+			LOG_WARNING() << "Batch 3D deconvolution failed at patch (" << job.patchX
+						  << "," << job.patchY << "):" << e.what();
+			result.completedUnits = jobIndex + 1;
+			emitProgress(
+				patchPrefix + QStringLiteral(": failed"),
+				result.completedUnits,
+				job.patchX,
+				job.patchY,
+				job.displayFrame);
+			af::deviceGC();
 		}
 	}
 
-	// Flush output to CPU
-	imageSession->flushOutput();
-
-	// Disconnect iteration progress and restore signal state
-	disconnect(iterConn);
-	psfModule->blockSignals(oldBlockState);
-
-	if (cancelled) {
-		LOG_INFO() << "Volumetric batch deconvolution cancelled at patch" << patchStep << "of" << totalPatches;
-	} else {
-		LOG_INFO() << "Volumetric batch deconvolution completed:" << totalPatches << "patches processed";
-	}
-
-	return !cancelled;
+	QObject::disconnect(iterationConnection);
+	result.status = DeconvolutionRunStatus::COMPLETED;
+	result.message = singlePatch3D
+		? QStringLiteral("3D deconvolution completed.")
+		: QStringLiteral("Batch deconvolution completed.");
+	LOG_INFO() << (singlePatch3D ? "Single-patch" : "Batch")
+			   << "3D deconvolution completed:" << result.completedUnits << "jobs processed";
+	return result;
 }

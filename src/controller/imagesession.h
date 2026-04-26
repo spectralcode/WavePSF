@@ -37,6 +37,9 @@ public:
 	ImagePatch getInputPatch(int frameNr, int patchX, int patchY);
 	ImagePatch getGroundTruthPatch(int frameNr, int patchX, int patchY);
 	void setOutputPatch(int frameNr, int patchX, int patchY, const af::array& processedExtendedData);
+	void setOutputPatches(int frameNr, const QList<QPoint>& patchCoords, const QList<af::array>& patchData);
+	void setOutputPatchResults(int frameNr, const QList<QPoint>& patchCoords, const QList<af::array>& processedExtendedData);
+	void setOutputSubvolume(int patchX, int patchY, const af::array& resultVolume);
 	void flushOutput();
 
 	// Frame-level access

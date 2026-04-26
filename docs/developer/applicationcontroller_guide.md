@@ -34,8 +34,8 @@ Core domain-facing members:
 
 Workflow helpers:
 
+- `DeconvolutionController`
 - `OptimizationController`
-- `DeconvolutionOrchestrator`
 - `InterpolationOrchestrator`
 - `PSFFileController`
 
@@ -47,7 +47,7 @@ This is different from the older simplified description of "ImageSession, PSFMod
 2. Keep frame/patch selection and coefficient storage in sync.
 3. Forward state changes from `ImageSession` and `PSFModule`.
 4. Start optimization and apply the results back into the session.
-5. Trigger deconvolution workflows, including live mode.
+5. Trigger deconvolution workflows, including live mode and async batch/3D execution.
 6. Coordinate PSF-file behavior, interpolation, and PSF-grid generation.
 7. Broadcast current application state after all UI connections are established.
 
@@ -56,7 +56,7 @@ This is different from the older simplified description of "ImageSession, PSFMod
 `ApplicationController` should not accumulate more heavy algorithmic code, long-running loops, or UI widgets. When a workflow becomes substantial, prefer extracting it into a focused helper like:
 
 - `OptimizationController`
-- `DeconvolutionOrchestrator`
+- `DeconvolutionController`
 - `PSFFileController`
 - `InterpolationOrchestrator`
 
@@ -86,11 +86,23 @@ void ApplicationController::setCurrentFrame(int frame)
     coefficientWorkspace->store();
     imageSession->setCurrentFrame(frame);
     coefficientWorkspace->loadForCurrentPatch();
-    deconvolutionOrchestrator->runOnCurrentPatch();
+    deconvolutionController->requestCurrentDeconvolution();
 }
 ```
 
 The real implementation contains extra guards for 3D mode and live-deconvolution suppression, but this is the important pattern.
+
+## Deconvolution Pattern
+
+The deconvolution workflow is split across three layers:
+
+- `DeconvolutionController`: handles synchronous 2D patch execution, builds async 3D/batch requests, writes patch/volume outputs back into `ImageSession`, and forwards lifecycle/progress signals.
+- `DeconvolutionWorkerController`: owns the worker thread and queued worker dispatch.
+- `DeconvolutionWorker` / `BatchProcessor`: run batch and 3D compute work on the deconvolution worker thread.
+
+`ApplicationController` requests deconvolution and forwards GUI-facing lifecycle signals.
+
+`MainWindow` remains responsible for the progress dialog. The compute/controller layers only emit typed progress and cancellation signals.
 
 ## Adding a New Component
 

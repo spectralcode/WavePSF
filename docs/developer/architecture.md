@@ -16,7 +16,7 @@ Most widget actions flow through `ApplicationController`, while `MainWindow` is 
 | ApplicationController                                       |
 |   |- CoefficientWorkspace                                   |
 |   |- OptimizationController -> OptimizationWorker (QThread) |
-|   |- DeconvolutionOrchestrator -> BatchProcessor            |
+|   |- DeconvolutionController -> DeconvolutionWorker         |
 |   |- PSFFileController                                      |
 |   `- InterpolationOrchestrator                              |
 +-------------------------------------------------------------+
@@ -24,7 +24,9 @@ Most widget actions flow through `ApplicationController`, while `MainWindow` is 
 | ImageSession · PSFModule · WavefrontParameterTable          |
 | IPSFGenerator · IWavefrontGenerator · IPSFPropagator        |
 | Deconvolver · ImageMetricCalculator · Optimizers            |
-| VolumetricProcessor · PSFGridGenerator                      |
+| BatchProcessor · PatchDeconvolutionProcessor                |
+| VolumeDeconvolutionProcessor · VolumetricProcessor          |
+| PSFGridGenerator                                            |
 +-------------------------------------------------------------+
 | Data / I/O Layer                                            |
 | ImageData · ImageDataAccessor · InputDataReader             |
@@ -63,7 +65,7 @@ Widget signals / selected direct UI calls
 - **`ApplicationController`**: central coordinator. 
 - **`CoefficientWorkspace`**: owns the active `WavefrontParameterTable`, clipboard/undo behavior, and per-generator table caching.
 - **`OptimizationController`**: manages the optimization worker thread and throttled live preview updates.
-- **`DeconvolutionOrchestrator`**: chooses between 2D and 3D deconvolution flows and synchronizes voxel size for volumetric runs.
+- **`DeconvolutionController`**: handles synchronous 2D patch execution, builds async 3D/batch requests, owns the deconvolution worker controller, writes outputs back to the session, and forwards progress.
 - **`PSFFileController`**: save/load and auto-save behavior for PSF files and file-based PSF mode metadata.
 - **`InterpolationOrchestrator`**: interpolation operations on coefficient tables.
 
@@ -76,7 +78,10 @@ Widget signals / selected direct UI calls
 - **`IPSFPropagator`**: wavefront-to-PSF propagation.
 - **`Deconvolver`**: 2D and 3D deconvolution algorithms.
 - **`ImageMetricCalculator`** and **optimizers**: optimization objective evaluation and parameter search.
-- **`VolumetricProcessor`**: subvolume assembly and write-back for 3D processing.
+- **`BatchProcessor`**: GUI-free batch loop with cancellation and typed progress/output signals.
+- **`PatchDeconvolutionProcessor`**: shared per-patch 2D execution helper.
+- **`VolumeDeconvolutionProcessor`**: shared per-volume 3D execution helper.
+- **`VolumetricProcessor`**: worker-safe subvolume and PSF-volume assembly helpers for 3D processing.
 - **`PSFGridGenerator`**: builds PSF overview grids for the UI.
 
 ### Data / I/O Layer
@@ -90,15 +95,16 @@ Widget signals / selected direct UI calls
 
 | Thread | Responsibility |
 |---|---|
-| Main (GUI) thread | UI, PSF preview generation, normal deconvolution, batch deconvolution, most file I/O orchestration |
+| Main (GUI) thread | UI, PSF preview generation, normal 2D patch deconvolution, batch request building, most file I/O orchestration |
+| Deconvolution worker thread | Batch 2D, batch 3D, and single-patch 3D deconvolution with its own ArrayFire backend/device context |
 | Optimization worker thread | Optimization loop with its own ArrayFire backend/device context |
 
 Important current behavior:
 
-- Optimization is the only major workflow that runs on a dedicated worker thread.
-- Regular deconvolution and batch deconvolution still run on the GUI thread. However, it does not block the UI if GPU backend is used. (todo: refactor to move all compute off the GUI thread.)
-- Batch and volumetric workflows currently use `QProgressDialog` and `QApplication::processEvents()`, so the compute layer is not fully decoupled from Qt UI concerns. (todo: refactor!)
-- ArrayFire state is thread-local, so the optimization worker explicitly restores backend/device selection before running.
+- Optimization and long-running deconvolution workflows now run on dedicated worker threads.
+- Manual 2D patch deconvolution still runs synchronously on the GUI thread.
+- `MainWindow` owns the `QProgressDialog` for long-running deconvolution. Compute-side code no longer creates progress dialogs or calls `QApplication::processEvents()`.
+- ArrayFire state is thread-local, so both optimization and deconvolution workers explicitly restore backend/device selection before running.
 
 ## Settings and Ownership Notes
 

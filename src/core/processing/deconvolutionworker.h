@@ -2,8 +2,9 @@
 #define DECONVOLUTIONWORKER_H
 
 #include <QObject>
-#include <QAtomicInt>
 #include "deconvolutiontypes.h"
+
+class Deconvolver;
 
 class DeconvolutionWorker : public QObject
 {
@@ -26,7 +27,10 @@ signals:
 	void error(QString message);
 
 private:
-	QAtomicInt cancelRequested;
+	DeconvolutionRunResult runBatch2D(const DeconvolutionRequest& request);
+	DeconvolutionRunResult runVolumeJobs(const DeconvolutionRequest& request);
+
+	DeconvolutionCancelToken cancelToken;
 };
 
 #endif // DECONVOLUTIONWORKER_H

@@ -99,24 +99,24 @@ void DeconvolutionSettingsWidget::setupUI()
 	formLayout->addRow(this->relaxationLabel, this->relaxationFactorSpinBox);
 
 	// Regularization factor (Tikhonov)
-	this->regularizationLabel = new QLabel(tr("Regularization:"), controlsWidget);
-	this->regularizationFactorSpinBox = new QDoubleSpinBox(controlsWidget);
-	this->regularizationFactorSpinBox->setRange(0.0001, 1.0);
-	this->regularizationFactorSpinBox->setDecimals(4);
-	this->regularizationFactorSpinBox->setValue(DEF_REGULARIZATION_FACTOR);
-	this->regularizationFactorSpinBox->setSingleStep(0.001);
-	this->installScrollGuard(this->regularizationFactorSpinBox);
-	formLayout->addRow(this->regularizationLabel, this->regularizationFactorSpinBox);
+	this->tikhonovRegularizationLabel = new QLabel(tr("Regularization:"), controlsWidget);
+	this->tikhonovRegularizationFactorSpinBox = new QDoubleSpinBox(controlsWidget);
+	this->tikhonovRegularizationFactorSpinBox->setRange(0.0001, 1.0);
+	this->tikhonovRegularizationFactorSpinBox->setDecimals(4);
+	this->tikhonovRegularizationFactorSpinBox->setValue(DEF_REGULARIZATION_FACTOR);
+	this->tikhonovRegularizationFactorSpinBox->setSingleStep(0.001);
+	this->installScrollGuard(this->tikhonovRegularizationFactorSpinBox);
+	formLayout->addRow(this->tikhonovRegularizationLabel, this->tikhonovRegularizationFactorSpinBox);
 
 	// Noise-to-signal factor (Wiener)
-	this->noiseToSignalLabel = new QLabel(tr("NSR Factor:"), controlsWidget);
-	this->noiseToSignalFactorSpinBox = new QDoubleSpinBox(controlsWidget);
-	this->noiseToSignalFactorSpinBox->setRange(0.0001, 1.0);
-	this->noiseToSignalFactorSpinBox->setDecimals(4);
-	this->noiseToSignalFactorSpinBox->setValue(DEF_NOISE_TO_SIGNAL);
-	this->noiseToSignalFactorSpinBox->setSingleStep(0.001);
-	this->installScrollGuard(this->noiseToSignalFactorSpinBox);
-	formLayout->addRow(this->noiseToSignalLabel, this->noiseToSignalFactorSpinBox);
+	this->wienerNoiseToSignalLabel = new QLabel(tr("NSR Factor:"), controlsWidget);
+	this->wienerNoiseToSignalFactorSpinBox = new QDoubleSpinBox(controlsWidget);
+	this->wienerNoiseToSignalFactorSpinBox->setRange(0.0001, 1.0);
+	this->wienerNoiseToSignalFactorSpinBox->setDecimals(4);
+	this->wienerNoiseToSignalFactorSpinBox->setValue(DEF_NOISE_TO_SIGNAL);
+	this->wienerNoiseToSignalFactorSpinBox->setSingleStep(0.001);
+	this->installScrollGuard(this->wienerNoiseToSignalFactorSpinBox);
+	formLayout->addRow(this->wienerNoiseToSignalLabel, this->wienerNoiseToSignalFactorSpinBox);
 
 	// Volume padding mode (3D RL only)
 	this->paddingModeLabel = new QLabel(tr("Volume Padding:"), controlsWidget);
@@ -183,11 +183,11 @@ void DeconvolutionSettingsWidget::setupUI()
 	connect(this->relaxationFactorSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
 			this, [this](double value) { emit this->relaxationFactorChanged(static_cast<float>(value)); });
 
-	connect(this->regularizationFactorSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-			this, [this](double value) { emit this->regularizationFactorChanged(static_cast<float>(value)); });
+	connect(this->tikhonovRegularizationFactorSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, [this](double value) { emit this->tikhonovRegularizationFactorChanged(static_cast<float>(value)); });
 
-	connect(this->noiseToSignalFactorSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-			this, [this](double value) { emit this->noiseToSignalFactorChanged(static_cast<float>(value)); });
+	connect(this->wienerNoiseToSignalFactorSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+			this, [this](double value) { emit this->wienerNoiseToSignalFactorChanged(static_cast<float>(value)); });
 
 	connect(this->paddingModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
 			this, &DeconvolutionSettingsWidget::paddingModeChanged);
@@ -206,7 +206,7 @@ void DeconvolutionSettingsWidget::setupUI()
 
 	connect(this->liveModeCheckBox, &QCheckBox::toggled,
 			this, [this](bool checked) {
-				this->deconvolveButton->setEnabled(!checked);
+				this->deconvolveButton->setEnabled(!checked && !this->deconvolutionRunning);
 				emit this->liveModeChanged(checked);
 			});
 
@@ -237,10 +237,10 @@ void DeconvolutionSettingsWidget::updateParameterVisibility(int algorithmIndex)
 	// Hide all algorithm-specific parameters first
 	this->relaxationLabel->setVisible(false);
 	this->relaxationFactorSpinBox->setVisible(false);
-	this->regularizationLabel->setVisible(false);
-	this->regularizationFactorSpinBox->setVisible(false);
-	this->noiseToSignalLabel->setVisible(false);
-	this->noiseToSignalFactorSpinBox->setVisible(false);
+	this->tikhonovRegularizationLabel->setVisible(false);
+	this->tikhonovRegularizationFactorSpinBox->setVisible(false);
+	this->wienerNoiseToSignalLabel->setVisible(false);
+	this->wienerNoiseToSignalFactorSpinBox->setVisible(false);
 	this->paddingModeLabel->setVisible(false);
 	this->paddingModeComboBox->setVisible(false);
 	this->accelerationModeLabel->setVisible(false);
@@ -264,12 +264,12 @@ void DeconvolutionSettingsWidget::updateParameterVisibility(int algorithmIndex)
 			this->relaxationFactorSpinBox->setVisible(true);
 			break;
 		case Deconvolver::TIKHONOV:
-			this->regularizationLabel->setVisible(true);
-			this->regularizationFactorSpinBox->setVisible(true);
+			this->tikhonovRegularizationLabel->setVisible(true);
+			this->tikhonovRegularizationFactorSpinBox->setVisible(true);
 			break;
 		case Deconvolver::WIENER:
-			this->noiseToSignalLabel->setVisible(true);
-			this->noiseToSignalFactorSpinBox->setVisible(true);
+			this->wienerNoiseToSignalLabel->setVisible(true);
+			this->wienerNoiseToSignalFactorSpinBox->setVisible(true);
 			break;
 		case Deconvolver::RICHARDSON_LUCY_3D:
 			this->paddingModeLabel->setVisible(true);
@@ -303,8 +303,8 @@ QVariantMap DeconvolutionSettingsWidget::getSettings() const
 	settings.insert(KEY_ITERATIONS_LW,         this->iterationsPerAlgorithm.value(Deconvolver::LANDWEBER, DEF_ITERATIONS_LW));
 	settings.insert(KEY_ITERATIONS_RL3D,       this->iterationsPerAlgorithm.value(Deconvolver::RICHARDSON_LUCY_3D, DEF_ITERATIONS_RL3D));
 	settings.insert(KEY_RELAXATION_FACTOR,     this->relaxationFactorSpinBox->value());
-	settings.insert(KEY_REGULARIZATION_FACTOR, this->regularizationFactorSpinBox->value());
-	settings.insert(KEY_NOISE_TO_SIGNAL,       this->noiseToSignalFactorSpinBox->value());
+	settings.insert(KEY_REGULARIZATION_FACTOR, this->tikhonovRegularizationFactorSpinBox->value());
+	settings.insert(KEY_NOISE_TO_SIGNAL,       this->wienerNoiseToSignalFactorSpinBox->value());
 	settings.insert(KEY_PADDING_MODE,          this->paddingModeComboBox->currentIndex());
 	settings.insert(KEY_ACCELERATION,          this->accelerationModeComboBox->currentIndex());
 	settings.insert(KEY_REGULARIZER_3D,        this->regularizerComboBox->currentIndex());
@@ -324,13 +324,19 @@ void DeconvolutionSettingsWidget::setSettings(const QVariantMap& settings)
 	this->previousAlgorithm = currentAlgo;
 	this->iterationsSpinBox->setValue(this->iterationsPerAlgorithm.value(currentAlgo, fallback));
 	this->relaxationFactorSpinBox->setValue(       settings.value(KEY_RELAXATION_FACTOR,     DEF_RELAXATION_FACTOR).toDouble());
-	this->regularizationFactorSpinBox->setValue(   settings.value(KEY_REGULARIZATION_FACTOR, DEF_REGULARIZATION_FACTOR).toDouble());
-	this->noiseToSignalFactorSpinBox->setValue(    settings.value(KEY_NOISE_TO_SIGNAL,        DEF_NOISE_TO_SIGNAL).toDouble());
+	this->tikhonovRegularizationFactorSpinBox->setValue(settings.value(KEY_REGULARIZATION_FACTOR, DEF_REGULARIZATION_FACTOR).toDouble());
+	this->wienerNoiseToSignalFactorSpinBox->setValue(settings.value(KEY_NOISE_TO_SIGNAL, DEF_NOISE_TO_SIGNAL).toDouble());
 	this->paddingModeComboBox->setCurrentIndex(   settings.value(KEY_PADDING_MODE,           DEF_PADDING_MODE).toInt());
 	this->accelerationModeComboBox->setCurrentIndex(settings.value(KEY_ACCELERATION,          DEF_ACCELERATION).toInt());
 	this->regularizerComboBox->setCurrentIndex(    settings.value(KEY_REGULARIZER_3D,        DEF_REGULARIZER_3D).toInt());
 	this->regularizationWeightSpinBox->setValue(   settings.value(KEY_REGULARIZATION_WEIGHT_3D, DEF_REGULARIZATION_WEIGHT_3D).toDouble());
 	this->liveModeCheckBox->setChecked(            settings.value(KEY_LIVE_MODE,              DEF_LIVE_MODE).toBool());
+}
+
+void DeconvolutionSettingsWidget::setDeconvolutionRunning(bool running)
+{
+	this->deconvolutionRunning = running;
+	this->deconvolveButton->setEnabled(!running && !this->liveModeCheckBox->isChecked());
 }
 
 void DeconvolutionSettingsWidget::installScrollGuard(QWidget* widget)

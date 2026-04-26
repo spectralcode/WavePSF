@@ -2,11 +2,11 @@
 #define BATCHPROCESSOR_H
 
 #include <QObject>
+#include "deconvolutiontypes.h"
 
-class ImageSession;
-class PSFModule;
-class WavefrontParameterTable;
-class QWidget;
+class IPSFGenerator;
+class Deconvolver;
+struct PatchLayout;
 
 class BatchProcessor : public QObject
 {
@@ -14,23 +14,32 @@ class BatchProcessor : public QObject
 public:
 	explicit BatchProcessor(QObject* parent = nullptr);
 
-	// Deconvolves all patches across all frames using stored coefficients
-	// or file-based PSFs (via FilePSFGenerator).
-	// For 3D algorithms, processes per-patch subvolumes instead of per-frame patches.
-	// Shows a modal progress dialog (parented to parentWidget).
-	// Returns true if completed (not cancelled).
-	bool executeBatchDeconvolution(
-		ImageSession* imageSession,
-		PSFModule* psfModule,
-		WavefrontParameterTable* parameterTable,
-		QWidget* parentWidget = nullptr);
+	// GUI-free executor used by worker-side batch and single-patch 3D processing.
+	DeconvolutionRunResult executeBatchDeconvolution(
+		const DeconvolutionRequest& request,
+		IPSFGenerator* generator,
+		Deconvolver* deconvolver,
+		const DeconvolutionCancelToken* cancelToken = nullptr);
+
+signals:
+	void progressUpdated(DeconvolutionProgress progress);
+	void patchOutputReady(DeconvolutionPatchOutput output);
+	void volumeOutputReady(DeconvolutionVolumeOutput output);
 
 private:
-	bool executeBatchVolumetricDeconvolution(
-		ImageSession* imageSession,
-		PSFModule* psfModule,
-		WavefrontParameterTable* parameterTable,
-		QWidget* parentWidget);
+	DeconvolutionRunResult executeBatch2D(
+		const DeconvolutionRequest& request,
+		const PatchLayout& patchLayout,
+		IPSFGenerator* generator,
+		Deconvolver* deconvolver,
+		const DeconvolutionCancelToken* cancelToken);
+
+	DeconvolutionRunResult executeVolumeJobs(
+		const DeconvolutionRequest& request,
+		const PatchLayout& patchLayout,
+		IPSFGenerator* generator,
+		Deconvolver* deconvolver,
+		const DeconvolutionCancelToken* cancelToken);
 };
 
 #endif // BATCHPROCESSOR_H

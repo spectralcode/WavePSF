@@ -23,12 +23,15 @@ public:
 	QVariantMap getSettings() const;
 	void setSettings(const QVariantMap& settings);
 
+public slots:
+	void setDeconvolutionRunning(bool running);
+
 signals:
 	void algorithmChanged(int algorithm);
 	void iterationsChanged(int iterations);
 	void relaxationFactorChanged(float factor);
-	void regularizationFactorChanged(float factor);
-	void noiseToSignalFactorChanged(float factor);
+	void tikhonovRegularizationFactorChanged(float factor);
+	void wienerNoiseToSignalFactorChanged(float factor);
 	void paddingModeChanged(int mode);
 	void accelerationModeChanged(int mode);
 	void regularizer3DChanged(int mode);
@@ -50,16 +53,17 @@ private:
 	QMap<int, int> iterationsPerAlgorithm;
 	int previousAlgorithm;
 	QDoubleSpinBox* relaxationFactorSpinBox;
-	QDoubleSpinBox* regularizationFactorSpinBox;
-	QDoubleSpinBox* noiseToSignalFactorSpinBox;
+	QDoubleSpinBox* tikhonovRegularizationFactorSpinBox;
+	QDoubleSpinBox* wienerNoiseToSignalFactorSpinBox;
 	QCheckBox* liveModeCheckBox;
 	QPushButton* deconvolveButton;
+	bool deconvolutionRunning = false;
 
 	// Labels for parameter rows (for show/hide)
 	QLabel* iterationsLabel;
 	QLabel* relaxationLabel;
-	QLabel* regularizationLabel;
-	QLabel* noiseToSignalLabel;
+	QLabel* tikhonovRegularizationLabel;
+	QLabel* wienerNoiseToSignalLabel;
 	QLabel* paddingModeLabel;
 	QComboBox* paddingModeComboBox;
 	QLabel* accelerationModeLabel;

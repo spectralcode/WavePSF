@@ -1,5 +1,6 @@
 #include "imagedataaccessor.h"
 #include "patchlayout.h"
+#include "patchextractor.h"
 #include "utils/logging.h"
 #include <QDebug>
 #include <QRect>
@@ -59,93 +60,28 @@ af::array ImageDataAccessor::getFrame(int frameNr)
 
 ImagePatch ImageDataAccessor::getExtendedPatch(int patchX, int patchY, int frameNr)
 {
-	ImagePatch result;
-
 	if (!this->isValidPatchCoordinate(patchX, patchY)) {
 		LOG_WARNING() << ": Invalid patch coordinates:" << patchX << "," << patchY;
-		return result;
+		return ImagePatch();
 	}
 
-	// Get the frame
 	af::array frame = this->getFrame(frameNr);
 	if (frame.isempty()) {
-		return result;
+		return ImagePatch();
 	}
 
-	long long imageWidth = static_cast<long long>(frame.dims(0));
-	long long imageHeight = static_cast<long long>(frame.dims(1));
-
-	// Calculate core patch bounds (without borders)
-	QRect coreBounds = this->calculateCorePatchBounds(patchX, patchY);
-
-	// Your existing border extension logic:
-	long long xPos = coreBounds.x();
-	long long yPos = coreBounds.y();
-	long long width = coreBounds.width();
-	long long height = coreBounds.height();
-
-	int expansion = this->patchBorderExtension;
-
-	long long newXPos = xPos;
-	long long newYPos = yPos;
-	long long newWidth = width;
-	long long newHeight = height;
-
-	// Track which borders were extended
-	result.borders.extensionSize = expansion;
-
-	// Extend left
-	if (xPos - expansion >= 0) {
-		newXPos = xPos - expansion;
-		newWidth += expansion;
-		result.borders.leftExtended = true;
-	}
-
-	// Extend right
-	if (xPos + width + expansion <= imageWidth) {
-		newWidth += expansion;
-		result.borders.rightExtended = true;
-	}
-
-	// Extend top
-	if (yPos - expansion >= 0) {
-		newYPos = yPos - expansion;
-		newHeight += expansion;
-		result.borders.topExtended = true;
-	}
-
-	// Extend bottom
-	if (yPos + height + expansion <= imageHeight) {
-		newHeight += expansion;
-		result.borders.bottomExtended = true;
-	}
-
-	try {
-		// Extract extended patch
-		result.data = frame(af::seq(newXPos, newXPos + newWidth - 1),
-							af::seq(newYPos, newYPos + newHeight - 1));
-
-		// Calculate core area within extended patch (relative coordinates)
-		long long coreStartX = result.borders.leftExtended ? expansion : 0;
-		long long coreStartY = result.borders.topExtended ? expansion : 0;
-		result.coreArea = QRect(coreStartX, coreStartY, width, height);
-
-		// Original image position (absolute coordinates)
-		result.imagePosition = QRect(xPos, yPos, width, height);
-
-		LOG_DEBUG() << ": Extracted patch (" << patchX << "," << patchY << ")"
-					<< " extended size:" << newWidth << "x" << newHeight
-					<< " borders: L=" << result.borders.leftExtended
-					<< " R=" << result.borders.rightExtended
-					<< " T=" << result.borders.topExtended
-					<< " B=" << result.borders.bottomExtended;
-
-	} catch (const af::exception& e) {
-		LOG_WARNING() << ": ArrayFire exception during extended patch extraction:" << e.what();
-		result = ImagePatch();  // Reset to invalid state
-	}
-
-	return result;
+	const PatchLayout layout{
+		this->imageData->getWidth(),
+		this->imageData->getHeight(),
+		this->patchGridCols,
+		this->patchGridRows
+	};
+	return PatchExtractor::extractExtendedPatch(
+		frame,
+		layout,
+		patchX,
+		patchY,
+		this->patchBorderExtension);
 }
 
 void ImageDataAccessor::writeFrame(int frameNr, const af::array& frameData)
@@ -196,30 +132,16 @@ void ImageDataAccessor::writePatchResult(const ImagePatch& originalPatch, const 
 		return;
 	}
 
-	// Extract core area from processed data using the same logic as your existing code
-	const BorderExtension& borders = originalPatch.borders;
-	int expansion = borders.extensionSize;
-
-	long long startX = borders.leftExtended ? expansion : 0;
-	long long startY = borders.topExtended ? expansion : 0;
-	long long endX = processedData.dims(0) - (borders.rightExtended ? expansion : 0);
-	long long endY = processedData.dims(1) - (borders.bottomExtended ? expansion : 0);
-
-	try {
-		// Extract core area from processed data
-		af::array coreResult = processedData(af::seq(startX, endX - 1),
-											 af::seq(startY, endY - 1));
-
-		// Write core result back to image using absolute coordinates
-		this->writePatchAtPosition(originalPatch.imagePosition, coreResult);
-
-		LOG_DEBUG() << ": Wrote patch result - core area" << originalPatch.imagePosition
-					<< " from processed size:" << processedData.dims(0) << "x" << processedData.dims(1)
-					<< " extracted:" << startX << "," << startY << " to " << endX-1 << "," << endY-1;
-
-	} catch (const af::exception& e) {
-		LOG_WARNING() << ": ArrayFire exception during patch result write:" << e.what();
+	if (this->cachedFrameNumber < 0) {
+		LOG_WARNING() << ": No cached frame available for patch result write";
+		return;
 	}
+
+	if (!this->writePatchResultToCache(originalPatch, processedData)) {
+		return;
+	}
+
+	this->writeFrameFromCache();
 }
 
 void ImageDataAccessor::writeMultiplePatches(int frameNr, const QList<QPoint>& patchCoords, const QList<af::array>& patchData)
@@ -268,6 +190,38 @@ void ImageDataAccessor::writeMultiplePatches(int frameNr, const QList<QPoint>& p
 	} catch (const af::exception& e) {
 		LOG_WARNING() << ": ArrayFire exception during multi-patch write:" << e.what();
 	}
+}
+
+void ImageDataAccessor::writeMultiplePatchResults(
+	int frameNr,
+	const QList<ImagePatch>& originalPatches,
+	const QList<af::array>& processedData)
+{
+	if (this->readOnly) {
+		LOG_WARNING() << ": Cannot write patch results - accessor is read-only";
+		return;
+	}
+
+	if (originalPatches.size() != processedData.size()) {
+		LOG_WARNING() << ": Patch templates and processed data count mismatch";
+		return;
+	}
+
+	af::array frame = this->getFrame(frameNr);
+	if (frame.isempty()) {
+		return;
+	}
+
+	for (int i = 0; i < originalPatches.size(); ++i) {
+		if (!this->writePatchResultToCache(originalPatches[i], processedData[i])) {
+			continue;
+		}
+
+		const QRect& patchBounds = originalPatches[i].imagePosition;
+		emit patchWritten(patchBounds.x(), patchBounds.y(), frameNr);
+	}
+
+	this->writeFrameFromCache();
 }
 
 void ImageDataAccessor::flushFrame(int frameNr)
@@ -421,10 +375,46 @@ void ImageDataAccessor::writePatchAtPosition(const QRect& imagePos, const af::ar
 						  af::seq(imagePos.y(), imagePos.y() + imagePos.height() - 1)) = patchData;
 
 		this->frameModified = true;
-		this->writeFrameFromCache();
 
 	} catch (const af::exception& e) {
 		LOG_WARNING() << ": ArrayFire exception during position-based patch write:" << e.what();
+	}
+}
+
+bool ImageDataAccessor::writePatchResultToCache(
+	const ImagePatch& originalPatch,
+	const af::array& processedData)
+{
+	if (!originalPatch.isValid() || processedData.isempty()) {
+		return false;
+	}
+
+	const BorderExtension& borders = originalPatch.borders;
+	const int expansion = borders.extensionSize;
+
+	const long long startX = borders.leftExtended ? expansion : 0;
+	const long long startY = borders.topExtended ? expansion : 0;
+	const long long endX = processedData.dims(0) - (borders.rightExtended ? expansion : 0);
+	const long long endY = processedData.dims(1) - (borders.bottomExtended ? expansion : 0);
+
+	if (startX >= endX || startY >= endY) {
+		LOG_WARNING() << ": Invalid processed patch bounds for write:" << originalPatch.imagePosition;
+		return false;
+	}
+
+	try {
+		af::array coreResult = processedData(
+			af::seq(startX, endX - 1),
+			af::seq(startY, endY - 1));
+		this->writePatchAtPosition(originalPatch.imagePosition, coreResult);
+
+		LOG_DEBUG() << ": Wrote patch result - core area" << originalPatch.imagePosition
+					<< " from processed size:" << processedData.dims(0) << "x" << processedData.dims(1)
+					<< " extracted:" << startX << "," << startY << " to " << endX - 1 << "," << endY - 1;
+		return true;
+	} catch (const af::exception& e) {
+		LOG_WARNING() << ": ArrayFire exception during patch result write:" << e.what();
+		return false;
 	}
 }
 

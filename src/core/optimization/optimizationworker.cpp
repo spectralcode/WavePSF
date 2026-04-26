@@ -76,8 +76,8 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 	Deconvolver deconvolver(config.deconvIterations);
 	deconvolver.setAlgorithm(static_cast<Deconvolver::Algorithm>(config.deconvAlgorithm));
 	deconvolver.setRelaxationFactor(config.deconvRelaxationFactor);
-	deconvolver.setRegularizationFactor(config.deconvRegularizationFactor);
-	deconvolver.setNoiseToSignalFactor(config.deconvNoiseToSignalFactor);
+	deconvolver.setTikhonovRegularizationFactor(config.deconvTikhonovRegularizationFactor);
+	deconvolver.setWienerNoiseToSignalFactor(config.deconvWienerNoiseToSignalFactor);
 
 	// Helper: evaluate metric for given coefficients and input/reference
 	int currentJobFrame = 0;

@@ -89,10 +89,10 @@ ProcessingControlWidget::ProcessingControlWidget(QWidget* parent)
 			this, &ProcessingControlWidget::deconvIterationsChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::relaxationFactorChanged,
 			this, &ProcessingControlWidget::deconvRelaxationFactorChanged);
-	connect(this->deconvSettings, &DeconvolutionSettingsWidget::regularizationFactorChanged,
-			this, &ProcessingControlWidget::deconvRegularizationFactorChanged);
-	connect(this->deconvSettings, &DeconvolutionSettingsWidget::noiseToSignalFactorChanged,
-			this, &ProcessingControlWidget::deconvNoiseToSignalFactorChanged);
+	connect(this->deconvSettings, &DeconvolutionSettingsWidget::tikhonovRegularizationFactorChanged,
+			this, &ProcessingControlWidget::deconvTikhonovRegularizationFactorChanged);
+	connect(this->deconvSettings, &DeconvolutionSettingsWidget::wienerNoiseToSignalFactorChanged,
+			this, &ProcessingControlWidget::deconvWienerNoiseToSignalFactorChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::paddingModeChanged,
 			this, &ProcessingControlWidget::deconvPaddingModeChanged);
 	connect(this->deconvSettings, &DeconvolutionSettingsWidget::accelerationModeChanged,
@@ -184,6 +184,11 @@ void ProcessingControlWidget::onOptimizationFinished(const OptimizationResult& r
 void ProcessingControlWidget::onOptimizationStarted()
 {
 	this->optimizationWidget->onOptimizationStarted();
+}
+
+void ProcessingControlWidget::setDeconvolutionRunning(bool running)
+{
+	this->deconvSettings->setDeconvolutionRunning(running);
 }
 
 void ProcessingControlWidget::updateInterpolationResult(const InterpolationResult& result)

@@ -6,17 +6,15 @@
 
 Deconvolver::Deconvolver(int iterations, QObject* parent)
 	: QObject(parent)
-	, algorithm(RICHARDSON_LUCY)
-	, iterations(iterations)
-	, landweberRelaxationFactor(0.65f)
-	, tikhonovRegularizationFactor(0.005f)
-	, wienerNoiseToSignalFactor(0.01f)
 	, volumetricDeconvolver(new VolumetricDeconvolver(this))
 {
 	connect(this->volumetricDeconvolver, &VolumetricDeconvolver::iterationCompleted,
 			this, &Deconvolver::iterationCompleted);
 	connect(this->volumetricDeconvolver, &VolumetricDeconvolver::error,
 			this, &Deconvolver::error);
+
+	this->settings.iterations = iterations;
+	this->applySettings(this->settings);
 }
 
 Deconvolver::~Deconvolver()
@@ -42,23 +40,23 @@ af::array Deconvolver::deconvolve(const af::array& blurredInput, const af::array
 	// No manual zero-padding needed.
 	af::array result;
 	try {
-		switch (this->algorithm) {
+		switch (static_cast<Algorithm>(this->settings.algorithm)) {
 			case RICHARDSON_LUCY:
-				result = af::iterativeDeconv(input, kernel, this->iterations, 1.0f, AF_ITERATIVE_DECONV_RICHARDSONLUCY);
+				result = af::iterativeDeconv(input, kernel, this->settings.iterations, 1.0f, AF_ITERATIVE_DECONV_RICHARDSONLUCY);
 				break;
 
 			case LANDWEBER:
-				result = af::iterativeDeconv(input, kernel, this->iterations, this->landweberRelaxationFactor, AF_ITERATIVE_DECONV_LANDWEBER);
+				result = af::iterativeDeconv(input, kernel, this->settings.iterations, this->settings.relaxationFactor, AF_ITERATIVE_DECONV_LANDWEBER);
 				this->conserveTotalIntensity(input, result);
 				break;
 
 			case TIKHONOV:
-				result = af::inverseDeconv(input, kernel, this->tikhonovRegularizationFactor, AF_INVERSE_DECONV_TIKHONOV);
+				result = af::inverseDeconv(input, kernel, this->settings.tikhonovRegularizationFactor, AF_INVERSE_DECONV_TIKHONOV);
 				this->conserveTotalIntensity(input, result);
 				break;
 
 			case WIENER:
-				result = this->wienerDeconvolution(input, kernel, this->wienerNoiseToSignalFactor);
+				result = this->wienerDeconvolution(input, kernel, this->settings.wienerNoiseToSignalFactor);
 				this->conserveTotalIntensity(input, result);
 				break;
 
@@ -67,7 +65,7 @@ af::array Deconvolver::deconvolve(const af::array& blurredInput, const af::array
 				break;
 
 			case RICHARDSON_LUCY_3D:
-				result = this->volumetricDeconvolver->deconvolve(input, kernel, this->iterations);
+				result = this->volumetricDeconvolver->deconvolve(input, kernel, this->settings.iterations);
 				break;
 
 			default:
@@ -84,16 +82,16 @@ af::array Deconvolver::deconvolve(const af::array& blurredInput, const af::array
 
 void Deconvolver::setAlgorithm(Algorithm algo)
 {
-	this->algorithm = algo;
+	this->settings.algorithm = static_cast<int>(algo);
 }
 
 void Deconvolver::setIterations(int iterations)
 {
 	if (iterations < 1) {
 		LOG_WARNING() << "Deconvolution iterations must be >= 1, clamping to 1";
-		this->iterations = 1;
+		this->settings.iterations = 1;
 	} else {
-		this->iterations = iterations;
+		this->settings.iterations = iterations;
 	}
 }
 
@@ -101,58 +99,84 @@ void Deconvolver::setRelaxationFactor(float factor)
 {
 	if (factor <= 0.0f) {
 		LOG_WARNING() << "Relaxation factor must be > 0, clamping to 0.001";
-		this->landweberRelaxationFactor = 0.001f;
+		this->settings.relaxationFactor = 0.001f;
 	} else {
-		this->landweberRelaxationFactor = factor;
+		this->settings.relaxationFactor = factor;
 	}
 }
 
-void Deconvolver::setRegularizationFactor(float factor)
+void Deconvolver::setTikhonovRegularizationFactor(float factor)
 {
 	if (factor <= 0.0f) {
 		LOG_WARNING() << "Regularization factor must be > 0, clamping to 0.0001";
-		this->tikhonovRegularizationFactor = 0.0001f;
+		this->settings.tikhonovRegularizationFactor = 0.0001f;
 	} else {
-		this->tikhonovRegularizationFactor = factor;
+		this->settings.tikhonovRegularizationFactor = factor;
 	}
 }
 
-void Deconvolver::setNoiseToSignalFactor(float factor)
+void Deconvolver::setWienerNoiseToSignalFactor(float factor)
 {
 	if (factor <= 0.0f) {
 		LOG_WARNING() << "NSR factor must be > 0, clamping to 0.001";
-		this->wienerNoiseToSignalFactor = 0.001f;
+		this->settings.wienerNoiseToSignalFactor = 0.001f;
 	} else {
-		this->wienerNoiseToSignalFactor = factor;
+		this->settings.wienerNoiseToSignalFactor = factor;
 	}
 }
 
 void Deconvolver::setVolumePaddingMode(int mode)
 {
+	this->settings.volumePaddingMode = mode;
 	this->volumetricDeconvolver->setPaddingMode(
 		static_cast<VolumetricDeconvolver::PaddingMode>(mode));
 }
 
 void Deconvolver::setAccelerationMode(int mode)
 {
+	this->settings.accelerationMode = mode;
 	this->volumetricDeconvolver->setAccelerationMode(
 		static_cast<VolumetricDeconvolver::AccelerationMode>(mode));
 }
 
 void Deconvolver::setRegularizer3D(int mode)
 {
+	this->settings.regularizer3D = mode;
 	this->volumetricDeconvolver->setRegularizer(
 		static_cast<VolumetricDeconvolver::RegularizerMode>(mode));
 }
 
 void Deconvolver::setRegularizationWeight(float weight)
 {
+	this->settings.regularizationWeight = weight;
 	this->volumetricDeconvolver->setRegularizationWeight(weight);
 }
 
 void Deconvolver::setVoxelSize(float sizeY, float sizeX, float sizeZ)
 {
+	this->settings.voxelSizeY = sizeY;
+	this->settings.voxelSizeX = sizeX;
+	this->settings.voxelSizeZ = sizeZ;
 	this->volumetricDeconvolver->setVoxelSize(sizeY, sizeX, sizeZ);
+}
+
+DeconvolutionSettings Deconvolver::getSettings() const
+{
+	return this->settings;
+}
+
+void Deconvolver::applySettings(const DeconvolutionSettings& settings)
+{
+	this->setAlgorithm(static_cast<Algorithm>(settings.algorithm));
+	this->setIterations(settings.iterations);
+	this->setRelaxationFactor(settings.relaxationFactor);
+	this->setTikhonovRegularizationFactor(settings.tikhonovRegularizationFactor);
+	this->setWienerNoiseToSignalFactor(settings.wienerNoiseToSignalFactor);
+	this->setVolumePaddingMode(settings.volumePaddingMode);
+	this->setAccelerationMode(settings.accelerationMode);
+	this->setRegularizer3D(settings.regularizer3D);
+	this->setRegularizationWeight(settings.regularizationWeight);
+	this->setVoxelSize(settings.voxelSizeY, settings.voxelSizeX, settings.voxelSizeZ);
 }
 
 void Deconvolver::requestDeconvolutionCancel()
@@ -172,7 +196,7 @@ bool Deconvolver::wasDeconvolutionCancelled() const
 
 bool Deconvolver::is3DAlgorithm() const
 {
-	return this->algorithm == RICHARDSON_LUCY_3D;
+	return this->settings.algorithm == RICHARDSON_LUCY_3D;
 }
 
 QStringList Deconvolver::getAlgorithmNames()

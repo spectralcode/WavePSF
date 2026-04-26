@@ -2,40 +2,65 @@
 #define DECONVOLUTIONCONTROLLER_H
 
 #include <QObject>
-#include <QThread>
-#include "core/processing/deconvolutionworker.h"
+#include "core/processing/deconvolutionjobbuilder.h"
+#include "core/processing/deconvolutiontypes.h"
+
+class AFDeviceManager;
+class PSFModule;
+class ImageSession;
+class CoefficientWorkspace;
+class DeconvolutionWorkerController;
 
 class DeconvolutionController : public QObject
 {
 	Q_OBJECT
 
 public:
-	explicit DeconvolutionController(QObject* parent = nullptr);
-	~DeconvolutionController() override;
+	explicit DeconvolutionController(
+		AFDeviceManager* afDeviceManager,
+		PSFModule* psfModule,
+		ImageSession* imageSession,
+		CoefficientWorkspace* coefficientWorkspace,
+		QObject* parent = nullptr);
 
 public slots:
-	void start(const DeconvolutionRequest& request);
-	void cancel();
+	void requestCurrentDeconvolution();
+	bool requestBatchDeconvolution();
+	void cancelDeconvolution();
 
 signals:
-	void started();
-	void progressUpdated(DeconvolutionProgress progress);
-	void patchOutputReady(DeconvolutionPatchOutput output);
-	void volumeOutputReady(DeconvolutionVolumeOutput output);
-	void finished(DeconvolutionRunResult result);
-
-	// Internal: queued dispatch to worker thread.
-	void runOnWorker(DeconvolutionRequest request);
+	void deconvolutionRunStarted();
+	void deconvolutionRunProgressUpdated(DeconvolutionProgress progress);
+	void deconvolutionRunCancellationRequested();
+	void deconvolutionRunFinished(DeconvolutionRunResult result);
+	void deconvolutionOutputUpdated();
 
 private slots:
-	void handleWorkerProgress(const DeconvolutionProgress& progress);
-	void handleWorkerPatchOutput(const DeconvolutionPatchOutput& output);
-	void handleWorkerVolumeOutput(const DeconvolutionVolumeOutput& output);
-	void handleWorkerFinished(const DeconvolutionRunResult& result);
+	void startPendingBatchDeconvolution();
+	void handleDeconvolutionPatchOutput(const DeconvolutionPatchOutput& output);
+	void handleDeconvolutionVolumeOutput(const DeconvolutionVolumeOutput& output);
+	void handleDeconvolutionFinished(const DeconvolutionRunResult& result);
 
 private:
-	QThread* thread;
-	DeconvolutionWorker* worker;
+	void runOnCurrentPatch();
+	void emitBatchPreparationProgress();
+	void flushBufferedVolumeOutputs();
+	void finalizeDeconvolutionRun(const DeconvolutionRunResult& result);
+	void syncVoxelSize();
+
+	AFDeviceManager* afDeviceManager;
+	PSFModule* psfModule;
+	ImageSession* imageSession;
+	CoefficientWorkspace* coefficientWorkspace;
+	DeconvolutionWorkerController* deconvolutionWorkerController;
+	bool asyncDeconvolutionInProgress;
+	bool pendingBatchDeconvolutionStart;
+	bool pendingDeconvolutionCancellation;
+	bool deconvolutionCancellationInProgress;
+	DeconvolutionOperationKind pendingBatchOperationKind;
+	DeconvolutionOperationKind activeAsyncDeconvolutionOperationKind;
+	DeconvolutionJobBuilder::BatchPreparationState batchPreparationState;
+	QList<DeconvolutionVolumeOutput> bufferedVolumeOutputs;
 };
 
 #endif // DECONVOLUTIONCONTROLLER_H

@@ -6,6 +6,7 @@
 #include <QString>
 #include <QVector>
 #include <arrayfire.h>
+#include "core/psf/deconvolutionsettings.h"
 #include "core/psf/psfsettings.h"
 
 enum class DeconvolutionOperationKind {
@@ -53,8 +54,6 @@ struct DeconvolutionPatchJob {
 	int patchX = 0;
 	int patchY = 0;
 	int patchIdx = -1;
-	af::array inputPatch;
-	af::array psf;
 	QVector<double> coefficients;
 };
 
@@ -63,9 +62,7 @@ struct DeconvolutionVolumeJob {
 	int patchY = 0;
 	int patchIdx = -1;
 	int displayFrame = 0;
-	af::array inputVolume;
-	af::array psfVolume;
-	QVector<double> coefficients;
+	QVector<QVector<double>> coefficientsByFrame;
 };
 
 struct DeconvolutionPatchOutput {
@@ -89,20 +86,16 @@ struct DeconvolutionRequest {
 	int afBackend = 0;
 	int afDeviceId = 0;
 
-	// Snapshot of PSF and deconvolution settings for future worker-side execution.
+	// Snapshot of PSF and deconvolution settings for worker-side execution.
 	PSFSettings psfSettings;
-	int deconvAlgorithm = 0;
-	int deconvIterations = 128;
-	float deconvRelaxationFactor = 0.65f;
-	float deconvRegularizationFactor = 0.005f;
-	float deconvNoiseToSignalFactor = 0.01f;
-	int volumePaddingMode = 0;
-	int accelerationMode = 0;
-	int regularizer3D = 0;
-	float regularizationWeight = 0.0f;
-	float voxelSizeY = 1.0f;
-	float voxelSizeX = 1.0f;
-	float voxelSizeZ = 1.0f;
+	DeconvolutionSettings deconvolutionSettings;
+	int patchGridCols = 0;
+	int patchGridRows = 0;
+	int patchBorderExtension = 0;
+
+	// Batch and single-patch 3D requests snapshot full input frames once
+	// and let the worker reconstruct patches or subvolumes on demand.
+	QVector<af::array> inputFrames;
 
 	QVector<DeconvolutionPatchJob> patchJobs;
 	QVector<DeconvolutionVolumeJob> volumeJobs;
@@ -123,6 +116,7 @@ struct DeconvolutionProgress {
 };
 
 struct DeconvolutionRunResult {
+	DeconvolutionOperationKind operationKind = DeconvolutionOperationKind::UNKNOWN;
 	DeconvolutionRunStatus status = DeconvolutionRunStatus::COMPLETED;
 	QString message;
 	int completedUnits = 0;

@@ -5,6 +5,7 @@
 #include <QVector>
 #include <arrayfire.h>
 #include "wavefrontparameter.h"
+#include "deconvolutionsettings.h"
 #include "psfsettings.h"
 
 class IPSFGenerator;
@@ -23,6 +24,7 @@ public:
 	af::array getCurrentWavefront() const;
 	af::array getCurrentPSF() const;
 	PSFSettings getPSFSettings() const;
+	DeconvolutionSettings getDeconvolutionSettings() const;
 	QString getGeneratorTypeName() const;
 	af::array computePSFFromCoefficients(const QVector<double>& coefficients);
 
@@ -59,8 +61,8 @@ public slots:
 	void setDeconvolutionAlgorithm(int algorithm);
 	void setDeconvolutionIterations(int iterations);
 	void setDeconvolutionRelaxationFactor(float factor);
-	void setDeconvolutionRegularizationFactor(float factor);
-	void setDeconvolutionNoiseToSignalFactor(float factor);
+	void setDeconvolutionTikhonovRegularizationFactor(float factor);
+	void setDeconvolutionWienerNoiseToSignalFactor(float factor);
 	void setVolumePaddingMode(int mode);
 	void setAccelerationMode(int mode);
 	void setRegularizer3D(int mode);

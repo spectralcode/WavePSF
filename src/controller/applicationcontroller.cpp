@@ -1,9 +1,8 @@
 #include "applicationcontroller.h"
-#include "deconvolutioncontroller.h"
 #include "optimizationcontroller.h"
 #include "psffilecontroller.h"
 #include "coefficientworkspace.h"
-#include "deconvolutionorchestrator.h"
+#include "deconvolutioncontroller.h"
 #include "imagesession.h"
 #include "data/inputdatareader.h"
 #include "data/imagedata.h"
@@ -21,8 +20,8 @@
 ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, QObject* parent)
 	: QObject(parent), afDeviceManager(afDeviceManager), imageSession(nullptr), inputDataReader(nullptr), psfModule(nullptr)
 	, coefficientWorkspace(nullptr), deconvolutionLiveMode(false)
-	, deconvolutionController(nullptr), optimizationController(nullptr), suppressLiveDeconv(false), psfFileController(nullptr)
-	, interpolationOrchestrator(nullptr), deconvolutionOrchestrator(nullptr), psfGridGenerator(nullptr)
+	, optimizationController(nullptr), suppressLiveDeconv(false), psfFileController(nullptr)
+	, interpolationOrchestrator(nullptr), deconvolutionController(nullptr), psfGridGenerator(nullptr)
 {
 	this->initializeComponents();
 	this->connectSessionSignals();
@@ -46,15 +45,6 @@ ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, Q
 	connect(this->optimizationController, &OptimizationController::finished,
 			this, &ApplicationController::handleOptimizationFinished);
 
-	// Deconvolution controller (worker thread scaffold for future async execution paths)
-	this->deconvolutionController = new DeconvolutionController(this);
-	connect(this->deconvolutionController, &DeconvolutionController::started,
-			this, &ApplicationController::deconvolutionStarted);
-	connect(this->deconvolutionController, &DeconvolutionController::progressUpdated,
-			this, &ApplicationController::deconvolutionProgressUpdated);
-	connect(this->deconvolutionController, &DeconvolutionController::finished,
-			this, &ApplicationController::deconvolutionFinished);
-
 	// PSF file controller (owns PSFFileManager, file-based PSF logic)
 	connect(this->psfFileController, &PSFFileController::filePSFInfoUpdated,
 			this, &ApplicationController::filePSFInfoUpdated);
@@ -64,6 +54,23 @@ ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, Q
 			this, &ApplicationController::coefficientsLoaded);
 	connect(this->coefficientWorkspace, &CoefficientWorkspace::parametersLoaded,
 			this, &ApplicationController::parametersLoaded);
+	connect(this->deconvolutionController, &DeconvolutionController::deconvolutionRunStarted,
+			this, &ApplicationController::deconvolutionRunStarted);
+	connect(this->deconvolutionController, &DeconvolutionController::deconvolutionRunCancellationRequested,
+			this, &ApplicationController::deconvolutionRunCancellationRequested);
+	connect(this->deconvolutionController, &DeconvolutionController::deconvolutionRunProgressUpdated,
+			this, &ApplicationController::deconvolutionRunProgressUpdated);
+	connect(this->deconvolutionController, &DeconvolutionController::deconvolutionRunFinished,
+			this, &ApplicationController::deconvolutionRunFinished);
+	connect(this->deconvolutionController, &DeconvolutionController::deconvolutionOutputUpdated,
+			this, &ApplicationController::deconvolutionOutputUpdated);
+	connect(this->deconvolutionController, &DeconvolutionController::deconvolutionRunFinished,
+			this, [this](const DeconvolutionRunResult& result) {
+				if (result.operationKind == DeconvolutionOperationKind::BATCH_2D
+					|| result.operationKind == DeconvolutionOperationKind::BATCH_3D) {
+					this->suppressLiveDeconv = false;
+				}
+			});
 
 	qRegisterMetaType<InterpolationResult>("InterpolationResult");
 }
@@ -135,8 +142,9 @@ void ApplicationController::setCurrentFrame(int frame)
 
 	// Re-deconvolve: input data changed (different frame).
 	// Skip for 3D algorithms — they process all frames at once.
-	if (this->deconvolutionLiveMode && !suppress3D) {
-		this->deconvolutionOrchestrator->runOnCurrentPatch();
+	if (this->deconvolutionLiveMode && !suppress3D
+		&& this->deconvolutionController != nullptr) {
+		this->deconvolutionController->requestCurrentDeconvolution();
 	}
 }
 
@@ -153,8 +161,9 @@ void ApplicationController::setCurrentPatch(int x, int y)
 
 		this->suppressLiveDeconv = oldSuppress;
 
-		if (this->deconvolutionLiveMode) {
-			this->deconvolutionOrchestrator->runOnCurrentPatch();
+		if (this->deconvolutionLiveMode
+			&& this->deconvolutionController != nullptr) {
+			this->deconvolutionController->requestCurrentDeconvolution();
 		}
 	}
 }
@@ -309,17 +318,17 @@ void ApplicationController::setDeconvolutionRelaxationFactor(float factor)
 	}
 }
 
-void ApplicationController::setDeconvolutionRegularizationFactor(float factor)
+void ApplicationController::setDeconvolutionTikhonovRegularizationFactor(float factor)
 {
 	if (this->psfModule != nullptr) {
-		this->psfModule->setDeconvolutionRegularizationFactor(factor);
+		this->psfModule->setDeconvolutionTikhonovRegularizationFactor(factor);
 	}
 }
 
-void ApplicationController::setDeconvolutionNoiseToSignalFactor(float factor)
+void ApplicationController::setDeconvolutionWienerNoiseToSignalFactor(float factor)
 {
 	if (this->psfModule != nullptr) {
-		this->psfModule->setDeconvolutionNoiseToSignalFactor(factor);
+		this->psfModule->setDeconvolutionWienerNoiseToSignalFactor(factor);
 	}
 }
 
@@ -356,32 +365,36 @@ void ApplicationController::setDeconvolutionLiveMode(bool enabled)
 	this->deconvolutionLiveMode = enabled;
 	if (enabled) {
 		this->suppressLiveDeconv = false;
-		this->deconvolutionOrchestrator->runOnCurrentPatch();
+		if (this->deconvolutionController != nullptr) {
+			this->deconvolutionController->requestCurrentDeconvolution();
+		}
 	}
 }
 
 void ApplicationController::requestDeconvolution()
 {
 	this->suppressLiveDeconv = false;
-	this->deconvolutionOrchestrator->runOnCurrentPatch();
+	if (this->deconvolutionController != nullptr) {
+		this->deconvolutionController->requestCurrentDeconvolution();
+	}
 }
 
 
 void ApplicationController::requestBatchDeconvolution()
 {
-	this->suppressLiveDeconv = true;
-	bool ok = this->deconvolutionOrchestrator->runBatch();
-	this->suppressLiveDeconv = false;
-	if (!ok) return;
-	this->coefficientWorkspace->loadForCurrentPatch();
-	emit batchDeconvolutionCompleted();
+	if (this->deconvolutionController != nullptr
+		&& this->deconvolutionController->requestBatchDeconvolution()) {
+		this->suppressLiveDeconv = true;
+	}
 }
 
 void ApplicationController::handlePSFUpdatedForDeconvolution(af::array psf)
 {
 	Q_UNUSED(psf);
 	if (this->deconvolutionLiveMode && !this->suppressLiveDeconv) {
-		this->deconvolutionOrchestrator->runOnCurrentPatch();
+		if (this->deconvolutionController != nullptr) {
+			this->deconvolutionController->requestCurrentDeconvolution();
+		}
 	}
 
 	// Auto-save PSF if enabled
@@ -395,7 +408,9 @@ void ApplicationController::handlePSFUpdatedForDeconvolution(af::array psf)
 void ApplicationController::handleDeconvolutionSettingsChanged()
 {
 	if (this->deconvolutionLiveMode) {
-		this->deconvolutionOrchestrator->runOnCurrentPatch();
+		if (this->deconvolutionController != nullptr) {
+			this->deconvolutionController->requestCurrentDeconvolution();
+		}
 	}
 }
 
@@ -555,7 +570,8 @@ void ApplicationController::initializeComponents()
 	this->coefficientWorkspace = new CoefficientWorkspace(this->psfModule, this->imageSession, this);
 	this->interpolationOrchestrator = new InterpolationOrchestrator(this);
 	this->psfFileController = new PSFFileController(this->psfModule, this);
-	this->deconvolutionOrchestrator = new DeconvolutionOrchestrator(
+	this->deconvolutionController = new DeconvolutionController(
+		this->afDeviceManager,
 		this->psfModule, this->imageSession, this->coefficientWorkspace, this);
 	this->psfGridGenerator = new PSFGridGenerator(this);
 }
@@ -619,10 +635,6 @@ void ApplicationController::connectDeconvolutionSignals()
 		// Note: deconvolution on patch/frame change is triggered explicitly
 		// from setCurrentFrame()/setCurrentPatch(), not through the
 		// psfUpdated signal chain.
-
-		// Forward outputPatchUpdated to deconvolutionCompleted
-		connect(this->imageSession, &ImageSession::outputPatchUpdated,
-				this, &ApplicationController::deconvolutionCompleted);
 	}
 }
 
@@ -721,10 +733,8 @@ void ApplicationController::startOptimization(const OptimizationConfig& uiConfig
 void ApplicationController::cancelDeconvolution()
 {
 	if (this->deconvolutionController != nullptr) {
-		this->deconvolutionController->cancel();
+		this->deconvolutionController->cancelDeconvolution();
 	}
-	emit deconvolutionCancellationRequested();
-	this->deconvolutionOrchestrator->cancel();
 }
 
 void ApplicationController::cancelOptimization()
@@ -752,7 +762,9 @@ void ApplicationController::handleOptimizationLivePreview(
 	this->imageSession->setCurrentFrame(frame);
 	this->imageSession->setCurrentPatch(patchX, patchY);
 	this->suppressLiveDeconv = oldSuppress;
-	this->deconvolutionOrchestrator->runOnCurrentPatch();
+	if (this->deconvolutionController != nullptr) {
+		this->deconvolutionController->requestCurrentDeconvolution();
+	}
 }
 
 void ApplicationController::handleOptimizationFinished(const OptimizationResult& result)
@@ -772,7 +784,9 @@ void ApplicationController::handleOptimizationFinished(const OptimizationResult&
 		this->imageSession->setCurrentFrame(jobResult.frameNr);
 		this->imageSession->setCurrentPatch(jobResult.patchX, jobResult.patchY);
 		this->suppressLiveDeconv = oldSuppress;
-		this->deconvolutionOrchestrator->runOnCurrentPatch();
+		if (this->deconvolutionController != nullptr) {
+			this->deconvolutionController->requestCurrentDeconvolution();
+		}
 	}
 
 	// Emit the last job's coefficients so the UI reflects the final state

@@ -41,8 +41,8 @@ struct OptimizationConfig {
 	int deconvAlgorithm = 0;
 	int deconvIterations = 128;
 	float deconvRelaxationFactor = 0.65f;
-	float deconvRegularizationFactor = 0.005f;
-	float deconvNoiseToSignalFactor = 0.01f;
+	float deconvTikhonovRegularizationFactor = 0.005f;
+	float deconvWienerNoiseToSignalFactor = 0.01f;
 
 	// Metric selection
 	bool useReferenceMetric = false;

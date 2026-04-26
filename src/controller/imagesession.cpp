@@ -352,6 +352,120 @@ void ImageSession::setOutputPatch(int frameNr, int patchX, int patchY, const af:
 
 	// Write the processed data using input patch's position/border info
 	this->outputAccessor->writePatchResult(inputPatch, processedExtendedData);
+
+	if (frameNr == this->currentFrame) {
+		emit outputPatchUpdated();
+	}
+}
+
+void ImageSession::setOutputPatches(
+	int frameNr,
+	const QList<QPoint>& patchCoords,
+	const QList<af::array>& patchData)
+{
+	if (!this->hasOutputData() || !this->hasInputData()
+		|| this->outputAccessor == nullptr || this->inputAccessor == nullptr) {
+		LOG_WARNING() << "No data available for batch output writing";
+		return;
+	}
+
+	if (!this->isValidFrame(frameNr) || patchCoords.isEmpty() || patchCoords.size() != patchData.size()) {
+		return;
+	}
+
+	this->outputAccessor->writeMultiplePatches(frameNr, patchCoords, patchData);
+
+	if (frameNr == this->currentFrame) {
+		emit outputPatchUpdated();
+	}
+}
+
+void ImageSession::setOutputPatchResults(
+	int frameNr,
+	const QList<QPoint>& patchCoords,
+	const QList<af::array>& processedExtendedData)
+{
+	if (!this->hasOutputData() || !this->hasInputData()
+		|| this->outputAccessor == nullptr || this->inputAccessor == nullptr) {
+		LOG_WARNING() << "No data available for batch output writing";
+		return;
+	}
+
+	if (!this->isValidFrame(frameNr)
+		|| patchCoords.isEmpty()
+		|| patchCoords.size() != processedExtendedData.size()) {
+		return;
+	}
+
+	QList<ImagePatch> patchTemplates;
+	patchTemplates.reserve(patchCoords.size());
+
+	for (const QPoint& coord : patchCoords) {
+		if (!this->isValidPatch(coord.x(), coord.y())) {
+			LOG_WARNING() << "Invalid patch for batch output writing:" << coord.x() << coord.y();
+			return;
+		}
+
+		ImagePatch patchTemplate = this->inputAccessor->getExtendedPatch(
+			coord.x(),
+			coord.y(),
+			frameNr);
+		if (!patchTemplate.isValid()) {
+			LOG_WARNING() << "Could not get input patch for batch output writing";
+			return;
+		}
+
+		patchTemplates.append(patchTemplate);
+	}
+
+	this->outputAccessor->writeMultiplePatchResults(
+		frameNr,
+		patchTemplates,
+		processedExtendedData);
+
+	if (frameNr == this->currentFrame) {
+		emit outputPatchUpdated();
+	}
+}
+
+void ImageSession::setOutputSubvolume(int patchX, int patchY, const af::array& resultVolume)
+{
+	if (!this->hasOutputData() || !this->hasInputData()
+		|| this->outputAccessor == nullptr || this->inputAccessor == nullptr) {
+		LOG_WARNING() << "No data available for volumetric output writing";
+		return;
+	}
+
+	if (!this->isValidPatch(patchX, patchY) || resultVolume.isempty() || resultVolume.numdims() < 3) {
+		LOG_WARNING() << "Invalid patch or volume for volumetric output writing:" << patchX << patchY;
+		return;
+	}
+
+	const int frames = qMin(this->getInputFrames(), static_cast<int>(resultVolume.dims(2)));
+	if (frames <= 0) {
+		return;
+	}
+
+	ImagePatch patchTemplate = this->inputAccessor->getExtendedPatch(patchX, patchY, 0);
+	if (!patchTemplate.isValid()) {
+		LOG_WARNING() << "Could not get patch template for volumetric output writing";
+		return;
+	}
+
+	bool currentFrameUpdated = false;
+	for (int frameNr = 0; frameNr < frames; ++frameNr) {
+		this->outputAccessor->getFrame(frameNr);
+		af::array slice = resultVolume(af::span, af::span, frameNr);
+		this->outputAccessor->writePatchResult(patchTemplate, slice);
+
+		if (frameNr == this->currentFrame) {
+			currentFrameUpdated = true;
+		}
+	}
+
+	if (currentFrameUpdated) {
+		emit outputPatchUpdated();
+	}
 }
 
 void ImageSession::flushOutput()

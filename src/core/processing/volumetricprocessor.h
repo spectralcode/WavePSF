@@ -1,36 +1,41 @@
 #ifndef VOLUMETRICPROCESSOR_H
 #define VOLUMETRICPROCESSOR_H
 
-#include <QString>
+#include <QVector>
 #include <arrayfire.h>
+#include "data/patchlayout.h"
 
-class ImageSession;
-class PSFModule;
-class WavefrontParameterTable;
+class IPSFGenerator;
 
 class VolumetricProcessor
 {
 public:
-	// Assemble subvolume from all frames for one spatial patch
-	static af::array assembleSubvolume(ImageSession* session, int patchX, int patchY);
+	// Assemble a subvolume from frame snapshots.
+	static af::array assembleSubvolume(
+		const QVector<af::array>& inputFrames,
+		const PatchLayout& patchLayout,
+		int patchX,
+		int patchY,
+		int borderExtension);
 
-	// Assemble 3D PSF by stacking per-frame 2D PSFs or using 3D generator
-	static af::array assemble3DPSF(PSFModule* psfModule,
-								   WavefrontParameterTable* paramTable,
-								   int patchIdx, int numFrames);
-
-	// Write 3D result back to output, one frame at a time
-	static void writeSubvolumeToOutput(ImageSession* session,
-									   int patchX, int patchY,
-									   const af::array& result);
+	// Assemble a PSF volume from a generator snapshot.
+	// For 3D generators, only the first coefficient vector is used.
+	static af::array assemble3DPSF(
+		IPSFGenerator* generator,
+		int gridSize,
+		int patchIdx,
+		int numFrames,
+		const QVector<QVector<double>>& coefficientsByFrame = {});
 
 private:
 	VolumetricProcessor() = delete;
 
-	// Resolve single 2D PSF for (frame, patchIdx)
-	static af::array resolve2DPSF(PSFModule* psfModule,
-								  WavefrontParameterTable* paramTable,
-								  int frame, int patchIdx);
+	static af::array generatePSF(
+		IPSFGenerator* generator,
+		int gridSize,
+		int frame,
+		int patchIdx,
+		const QVector<double>& coefficients = {});
 };
 
 #endif // VOLUMETRICPROCESSOR_H

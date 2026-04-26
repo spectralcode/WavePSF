@@ -5,6 +5,7 @@
 #include <QMenuBar>
 #include <QMenu>
 #include <QAction>
+#include <QPointer>
 #include <QVariantMap>
 #include <QSize>
 #include <QPoint>
@@ -13,6 +14,7 @@
 #include "gui/messageconsole/messageconsoledock.h"
 #include "gui/psfgridview/psfgriddock.h"
 #include "gui/viewertoolbar.h"
+#include "core/processing/deconvolutiontypes.h"
 #include "core/psf/psfsettings.h"
 
 QT_BEGIN_NAMESPACE
@@ -29,6 +31,7 @@ class SettingsDialog;
 class AboutDialog;
 class ShortcutsDialog;
 class RecentFilesMenu;
+class QProgressDialog;
 
 class MainWindow : public QMainWindow {
 	Q_OBJECT
@@ -71,6 +74,9 @@ private slots:
 	// ApplicationController response handlers
 	void onInputFileLoaded(const QString& filePath);
 	void onFileLoadError(const QString& filePath, const QString& error);
+	void handleDeconvolutionRunStarted();
+	void handleDeconvolutionRunProgressUpdated(const DeconvolutionProgress& progress);
+	void handleDeconvolutionRunFinished(const DeconvolutionRunResult& result);
 
 private:
 	void setupMenuBar();
@@ -90,6 +96,8 @@ private:
 	void connectPSFGridWidget();
 	void loadSettings();
 	void saveSettings();
+	void applyDeconvolutionProgress(const DeconvolutionProgress& progress);
+	void closeDeconvolutionProgressDialog();
 
 	Ui::MainWindow *ui;
 	SettingsFileManager* guiSettings;
@@ -137,6 +145,12 @@ private:
 
 	// Processing actions
 	QAction* deconvolveAllAction;
+	bool restoreDeconvolveAllAction;
+	QPointer<QProgressDialog> deconvolutionProgressDialog;
+	bool deconvolutionInProgress;
+	bool updatingDeconvolutionProgress;
+	bool pendingDeconvolutionProgressValid;
+	DeconvolutionProgress pendingDeconvolutionProgress;
 
 	// Style actions
 	QList<QAction*> styleActions;

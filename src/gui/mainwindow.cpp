@@ -35,6 +35,7 @@
 #include <QTextEdit>
 #include <QPlainTextEdit>
 #include <QApplication>
+#include <QProgressDialog>
 #include <QMessageBox>
 namespace {
 	const QString SETTINGS_GROUP       = QStringLiteral("main_window");
@@ -56,6 +57,41 @@ namespace {
 	const bool DEF_CONSOLE_VISIBLE  = false;
 	const bool DEF_PSF_GRID_VISIBLE = false;
 	const bool DEF_CROSS_SECTION_VISIBLE = false;
+
+	QString deconvolutionTitle(DeconvolutionOperationKind operationKind)
+	{
+		switch (operationKind) {
+			case DeconvolutionOperationKind::BATCH_2D:
+				return QObject::tr("Batch Deconvolution");
+
+			case DeconvolutionOperationKind::BATCH_3D:
+				return QObject::tr("Batch Deconvolution (3D)");
+
+			case DeconvolutionOperationKind::SINGLE_PATCH_3D:
+				return QObject::tr("3D Deconvolution");
+
+			case DeconvolutionOperationKind::UNKNOWN:
+			default:
+				return QObject::tr("Deconvolution");
+		}
+	}
+
+	QString deconvolutionStatusMessage(const DeconvolutionRunResult& result)
+	{
+		switch (result.status) {
+			case DeconvolutionRunStatus::COMPLETED:
+				return QObject::tr("Deconvolution completed");
+
+			case DeconvolutionRunStatus::CANCELLED:
+				return QObject::tr("Deconvolution cancelled");
+
+			case DeconvolutionRunStatus::FAILED:
+			default:
+				return result.message.isEmpty()
+					? QObject::tr("Deconvolution failed")
+					: result.message;
+		}
+	}
 }
 
 MainWindow::MainWindow(SettingsFileManager* guiSettings,
@@ -69,7 +105,8 @@ MainWindow::MainWindow(SettingsFileManager* guiSettings,
 	  viewMenu(nullptr), extrasMenu(nullptr), styleMenu(nullptr),
 	  openImageDataAction(nullptr), openGroundTruthAction(nullptr),
 	  saveParametersAction(nullptr), loadParametersAction(nullptr), saveOutputAction(nullptr),
-	  deconvolveAllAction(nullptr),
+	  deconvolveAllAction(nullptr), restoreDeconvolveAllAction(false), deconvolutionProgressDialog(nullptr),
+	  deconvolutionInProgress(false), updatingDeconvolutionProgress(false), pendingDeconvolutionProgressValid(false),
 	  toggleCrossSectionAction(nullptr),
 	  viewerToolBar(nullptr),
 	  sessionViewer(nullptr),
@@ -478,6 +515,25 @@ void MainWindow::connectApplicationController() {
 				this, [this]() {
 					this->deconvolveAllAction->setEnabled(false);
 				});
+
+		connect(this->applicationController, &ApplicationController::deconvolutionRunStarted,
+				this, &MainWindow::handleDeconvolutionRunStarted);
+		connect(this->applicationController, &ApplicationController::deconvolutionRunProgressUpdated,
+				this, &MainWindow::handleDeconvolutionRunProgressUpdated);
+		connect(this->applicationController, &ApplicationController::deconvolutionRunFinished,
+				this, &MainWindow::handleDeconvolutionRunFinished);
+		connect(this->applicationController, &ApplicationController::deconvolutionRunStarted,
+				this->processingControlWidget, [this]() {
+					if (this->processingControlWidget != nullptr) {
+						this->processingControlWidget->setDeconvolutionRunning(true);
+					}
+				});
+		connect(this->applicationController, &ApplicationController::deconvolutionRunFinished,
+				this->processingControlWidget, [this](const DeconvolutionRunResult&) {
+					if (this->processingControlWidget != nullptr) {
+						this->processingControlWidget->setDeconvolutionRunning(false);
+					}
+				});
 	}
 }
 
@@ -621,10 +677,10 @@ void MainWindow::connectProcessingControlWidget() {
 			this->applicationController, &ApplicationController::setDeconvolutionIterations);
 	connect(ctrl, &ProcessingControlWidget::deconvRelaxationFactorChanged,
 			this->applicationController, &ApplicationController::setDeconvolutionRelaxationFactor);
-	connect(ctrl, &ProcessingControlWidget::deconvRegularizationFactorChanged,
-			this->applicationController, &ApplicationController::setDeconvolutionRegularizationFactor);
-	connect(ctrl, &ProcessingControlWidget::deconvNoiseToSignalFactorChanged,
-			this->applicationController, &ApplicationController::setDeconvolutionNoiseToSignalFactor);
+	connect(ctrl, &ProcessingControlWidget::deconvTikhonovRegularizationFactorChanged,
+			this->applicationController, &ApplicationController::setDeconvolutionTikhonovRegularizationFactor);
+	connect(ctrl, &ProcessingControlWidget::deconvWienerNoiseToSignalFactorChanged,
+			this->applicationController, &ApplicationController::setDeconvolutionWienerNoiseToSignalFactor);
 	connect(ctrl, &ProcessingControlWidget::deconvPaddingModeChanged,
 			this->applicationController, &ApplicationController::setVolumePaddingMode);
 	connect(ctrl, &ProcessingControlWidget::deconvAccelerationModeChanged,
@@ -638,8 +694,8 @@ void MainWindow::connectProcessingControlWidget() {
 	connect(ctrl, &ProcessingControlWidget::deconvolutionRequested,
 			this->applicationController, &ApplicationController::requestDeconvolution);
 
-	// Deconvolution completed → refresh output viewer
-	connect(this->applicationController, &ApplicationController::deconvolutionCompleted,
+	// Deconvolution output updated -> refresh output viewer
+	connect(this->applicationController, &ApplicationController::deconvolutionOutputUpdated,
 			this->sessionViewer, &ImageSessionViewer::refreshOutputViewer);
 
 	// --- Optimization signals ---
@@ -997,4 +1053,130 @@ MessageConsoleWidget *MainWindow::consoleWidget() const
 {
 	if (!this->messageConsoleDock) return nullptr;
 	return qobject_cast<MessageConsoleWidget*>(this->messageConsoleDock->widget());
+}
+
+void MainWindow::handleDeconvolutionRunStarted()
+{
+	if (this->deconvolutionInProgress) {
+		return;
+	}
+
+	this->deconvolutionInProgress = true;
+	this->restoreDeconvolveAllAction =
+		(this->deconvolveAllAction != nullptr && this->deconvolveAllAction->isEnabled());
+
+	if (this->deconvolveAllAction != nullptr) {
+		this->deconvolveAllAction->setEnabled(false);
+	}
+}
+
+void MainWindow::handleDeconvolutionRunProgressUpdated(const DeconvolutionProgress& progress)
+{
+	if (!this->deconvolutionInProgress) {
+		return;
+	}
+
+	if (progress.operationKind != DeconvolutionOperationKind::BATCH_2D
+		&& progress.operationKind != DeconvolutionOperationKind::BATCH_3D
+		&& progress.operationKind != DeconvolutionOperationKind::SINGLE_PATCH_3D) {
+		return;
+	}
+
+	if (this->updatingDeconvolutionProgress) {
+		this->pendingDeconvolutionProgress = progress;
+		this->pendingDeconvolutionProgressValid = true;
+		return;
+	}
+
+	this->updatingDeconvolutionProgress = true;
+
+	DeconvolutionProgress nextProgress = progress;
+	while (this->deconvolutionInProgress) {
+		this->pendingDeconvolutionProgressValid = false;
+		this->applyDeconvolutionProgress(nextProgress);
+
+		if (!this->deconvolutionInProgress || !this->pendingDeconvolutionProgressValid) {
+			break;
+		}
+
+		nextProgress = this->pendingDeconvolutionProgress;
+	}
+
+	this->updatingDeconvolutionProgress = false;
+}
+
+void MainWindow::applyDeconvolutionProgress(const DeconvolutionProgress& progress)
+{
+	if (this->deconvolutionProgressDialog.isNull()) {
+		this->deconvolutionProgressDialog = new QProgressDialog(this);
+		this->deconvolutionProgressDialog->setCancelButtonText(tr("Cancel"));
+		this->deconvolutionProgressDialog->setWindowModality(Qt::NonModal);
+		this->deconvolutionProgressDialog->setMinimumDuration(0);
+		this->deconvolutionProgressDialog->setAutoClose(false);
+		this->deconvolutionProgressDialog->setAutoReset(false);
+
+		connect(this->deconvolutionProgressDialog.data(), &QProgressDialog::canceled,
+				this->applicationController, &ApplicationController::cancelDeconvolution);
+	}
+
+	const QString message = progress.message.isEmpty()
+		? ((progress.operationKind == DeconvolutionOperationKind::SINGLE_PATCH_3D)
+			? tr("3D deconvolution in progress...")
+			: tr("Batch deconvolution in progress..."))
+		: progress.message;
+	const int maximum = qMax(0, progress.totalUnits);
+	const int value = qBound(0, progress.completedUnits, maximum);
+
+	if (this->deconvolutionProgressDialog->windowTitle()
+		!= deconvolutionTitle(progress.operationKind)) {
+		this->deconvolutionProgressDialog->setWindowTitle(
+			deconvolutionTitle(progress.operationKind));
+	}
+	if (this->deconvolutionProgressDialog->labelText() != message) {
+		this->deconvolutionProgressDialog->setLabelText(message);
+	}
+	if (this->deconvolutionProgressDialog->maximum() != maximum) {
+		this->deconvolutionProgressDialog->setMaximum(maximum);
+	}
+	if (!this->deconvolutionInProgress || this->deconvolutionProgressDialog.isNull()) {
+		return;
+	}
+	if (this->deconvolutionProgressDialog->value() != value) {
+		this->deconvolutionProgressDialog->setValue(value);
+	}
+	if (!this->deconvolutionInProgress || this->deconvolutionProgressDialog.isNull()) {
+		return;
+	}
+	if (!this->deconvolutionProgressDialog->isVisible()) {
+		this->deconvolutionProgressDialog->show();
+	}
+}
+
+void MainWindow::handleDeconvolutionRunFinished(const DeconvolutionRunResult& result)
+{
+	this->deconvolutionInProgress = false;
+	this->closeDeconvolutionProgressDialog();
+
+	if (this->deconvolveAllAction != nullptr) {
+		const bool hasInputData = this->applicationController != nullptr
+			&& this->applicationController->hasInputData();
+		this->deconvolveAllAction->setEnabled(
+			this->restoreDeconvolveAllAction && hasInputData);
+	}
+	this->restoreDeconvolveAllAction = false;
+	this->pendingDeconvolutionProgressValid = false;
+	this->updatingDeconvolutionProgress = false;
+
+	this->statusBar()->showMessage(deconvolutionStatusMessage(result), 5000);
+}
+
+void MainWindow::closeDeconvolutionProgressDialog()
+{
+	if (this->deconvolutionProgressDialog.isNull()) {
+		return;
+	}
+
+	this->deconvolutionProgressDialog->close();
+	this->deconvolutionProgressDialog->deleteLater();
+	this->deconvolutionProgressDialog = nullptr;
 }

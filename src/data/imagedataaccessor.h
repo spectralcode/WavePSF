@@ -6,36 +6,8 @@
 #include <QList>
 #include <QPoint>
 #include <arrayfire.h>
+#include "imagepatch.h"
 #include "imagedata.h"
-
-struct BorderExtension {
-	bool leftExtended;
-	bool rightExtended;
-	bool topExtended;
-	bool bottomExtended;
-	int extensionSize;  // How many pixels were requested for extension
-
-	BorderExtension() : leftExtended(false), rightExtended(false),
-						topExtended(false), bottomExtended(false), extensionSize(0) {}
-};
-
-struct ImagePatch {
-	af::array data;              // Extended patch data (with borders)
-	QRect coreArea;              // Core patch area within the extended data (relative coordinates)
-	QRect imagePosition;         // Where core patch maps to in the full image (absolute coordinates)
-	BorderExtension borders;     // Which borders were actually extended
-
-	// Convenience methods
-	af::array extractCore() const {
-		if (data.isempty()) return af::array();
-		return data(af::seq(coreArea.x(), coreArea.x() + coreArea.width() - 1),
-					af::seq(coreArea.y(), coreArea.y() + coreArea.height() - 1));
-	}
-
-	bool isValid() const {
-		return !data.isempty() && coreArea.isValid() && imagePosition.isValid();
-	}
-};
 
 class ImageDataAccessor : public QObject
 {
@@ -57,6 +29,7 @@ public:
 
 	// Batch operations for performance
 	void writeMultiplePatches(int frameNr, const QList<QPoint>& patchCoords, const QList<af::array>& patchData);
+	void writeMultiplePatchResults(int frameNr, const QList<ImagePatch>& originalPatches, const QList<af::array>& processedData);
 	void flushFrame(int frameNr);  // Force write cached frame back to ImageData
 
 	// Patch grid configuration
@@ -109,6 +82,7 @@ private:
 	// Patch operations
 	QRect calculateCorePatchBounds(int patchX, int patchY) const;
 	void writePatchAtPosition(const QRect& imagePos, const af::array& patchData);
+	bool writePatchResultToCache(const ImagePatch& originalPatch, const af::array& processedData);
 
 	// Validation helpers
 	bool isValidPatchCoordinate(int patchX, int patchY) const;

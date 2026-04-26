@@ -33,6 +33,7 @@ public slots:
 	void updateOptimizationProgress(const OptimizationProgress& progress);
 	void onOptimizationFinished(const OptimizationResult& result);
 	void onOptimizationStarted();
+	void setDeconvolutionRunning(bool running);
 	void updateInterpolationResult(const InterpolationResult& result);
 	void updateCurrentPatch(int x, int y);
 	void setPatchGridConfiguration(int cols, int rows, int borderExtension);
@@ -42,8 +43,8 @@ signals:
 	void deconvAlgorithmChanged(int algorithm);
 	void deconvIterationsChanged(int iterations);
 	void deconvRelaxationFactorChanged(float factor);
-	void deconvRegularizationFactorChanged(float factor);
-	void deconvNoiseToSignalFactorChanged(float factor);
+	void deconvTikhonovRegularizationFactorChanged(float factor);
+	void deconvWienerNoiseToSignalFactorChanged(float factor);
 	void deconvPaddingModeChanged(int mode);
 	void deconvAccelerationModeChanged(int mode);
 	void deconvRegularizer3DChanged(int mode);
