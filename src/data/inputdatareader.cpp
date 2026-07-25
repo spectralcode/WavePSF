@@ -368,7 +368,7 @@ ImageData* InputDataReader::loadTiffWithLibtiff(const QString& imagePath)
 		wavelengths.append(static_cast<qreal>(i));
 	}
 
-	LOG_INFO() << ": Loaded TIFF:" << width << "x" << height
+	LOG_DEBUG() << "Loaded TIFF:" << width << "x" << height
 	           << "frames:" << frameCount << "bits:" << bitsPerSample;
 
 	return new ImageData(data, static_cast<int>(width), static_cast<int>(height),

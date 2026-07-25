@@ -577,7 +577,6 @@ void MainWindow::connectImageSessionViewer() {
 		connect(this->sessionViewer, &ImageSessionViewer::navigatePatch,
 				this->applicationController, &ApplicationController::navigatePatch);
 
-		LOG_DEBUG() << "ImageSessionViewer signal connections established";
 	}
 
 	// Cross-Section Viewer connections (inline panel in ImageSessionViewer)
@@ -664,7 +663,6 @@ void MainWindow::connectPSFGenerationWidget() {
 	connect(this->applicationController, &ApplicationController::frameChanged,
 			genWidget, &PSFGenerationWidget::setCurrentFrame);
 
-	LOG_DEBUG() << "PSFGenerationWidget signal connections established";
 }
 
 void MainWindow::connectProcessingControlWidget() {
@@ -769,7 +767,6 @@ void MainWindow::connectProcessingControlWidget() {
 	connect(this->applicationController, &ApplicationController::patchChanged,
 			ctrl, &ProcessingControlWidget::updateCurrentPatch);
 
-	LOG_DEBUG() << "ProcessingControlWidget signal connections established";
 }
 
 void MainWindow::connectPSFGridWidget() {
@@ -813,7 +810,6 @@ void MainWindow::connectPSFGridWidget() {
 	connect(this->viewerToolBar, &ViewerToolBar::syncViewsToggled,
 	        this->sessionViewer, &ImageSessionViewer::setViewSyncEnabled);
 
-	LOG_DEBUG() << "PSFGridWidget signal connections established";
 }
 
 void MainWindow::openImageData() {
@@ -854,7 +850,8 @@ void MainWindow::openImageFolder() {
 
 void MainWindow::openGroundTruth() {
 	if (!this->applicationController->hasInputData()) {
-		this->statusBar()->showMessage(tr("Please open image data first before loading ground truth."), 5000);
+		QMessageBox::information(this, tr("Ground Truth"),
+			tr("Please open image data first before loading ground truth."));
 		return;
 	}
 
@@ -952,8 +949,6 @@ void MainWindow::onInputFileLoaded(const QString& filePath) {
 		.arg(this->applicationController->getInputFrames());
 
 	this->statusBar()->showMessage(message, 5000);
-
-	LOG_INFO() << "Input file loaded successfully:" << filePath;
 }
 
 void MainWindow::onFileLoadError(const QString& filePath, const QString& error) {

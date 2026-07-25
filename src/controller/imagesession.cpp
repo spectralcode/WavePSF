@@ -709,7 +709,6 @@ void ImageSession::updateAccessorConfigurations()
 		this->groundTruthAccessor->configurePatchGrid(this->patchGridCols, this->patchGridRows, this->patchBorderExtension);
 	}
 
-	LOG_DEBUG() << "Accessor configurations updated";
 }
 
 int ImageSession::getGroundTruthFrameForCurrentFrame() const
