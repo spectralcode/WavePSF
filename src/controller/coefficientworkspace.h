@@ -5,6 +5,7 @@
 #include <QVector>
 #include <QMap>
 #include <QString>
+#include "utils/operationresult.h"
 
 class PSFModule;
 class ImageSession;
@@ -33,8 +34,8 @@ public:
 	void resetAll();
 
 	// File I/O
-	void saveToFile(const QString& filePath);
-	bool loadFromFile(const QString& filePath);
+	OperationResult saveToFile(const QString& filePath);
+	OperationResult loadFromFile(const QString& filePath);
 
 	// Generator-switch cache management
 	void cacheCurrentTable(const QString& typeName);

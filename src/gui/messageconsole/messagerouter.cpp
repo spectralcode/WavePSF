@@ -1,7 +1,6 @@
 #include "messagerouter.h"
 #include <QMetaObject>
 #include <QThread>
-#include <QMessageBox>
 #include <QCoreApplication>
 
 MessageRouter* MessageRouter::self = nullptr;
@@ -18,8 +17,7 @@ MessageRouter::MessageRouter(QObject* parent)
 	: QObject(parent),
 	  head(0),
 	  count(0),
-	  seq(0),
-	  lastCriticalMs(0)
+	  seq(0)
 {
 	this->ring.resize(MAX_MESSAGES);
 }
@@ -110,31 +108,9 @@ void MessageRouter::handle(QtMsgType type, const QMessageLogContext& ctx, const 
 		emit messageArrived(emitted);
 	}, Qt::QueuedConnection);
 
-	// Dialog policy for Critical/Fatal (Error)
-	if (type == QtCriticalMsg || type == QtFatalMsg) {
-		const qint64 ms = now.toMSecsSinceEpoch();
-
-		// 1s de-dup for identical text
-		bool show = true;
-		{
-			QMutexLocker lock(&this->mutex);
-			if (this->lastCriticalText == emitted.text && (ms - this->lastCriticalMs) < 1000) {
-				show = false;
-			} else {
-				this->lastCriticalText = emitted.text;
-				this->lastCriticalMs = ms;
-			}
-		}
-
-		if (show) {
-			// Clean dialog: only the message text (no timestamp/level)
-			QMessageBox::critical(nullptr, QObject::tr("Error"), emitted.text);
-		}
-
-		if (type == QtFatalMsg) {
-			// Unrecoverable path — terminate immediately (debug-time invariants).
-			// Note: If you need a graceful shutdown, DO NOT log Fatal. Log Critical and quit explicitly.
-			abort();
-		}
+	if (type == QtFatalMsg) {
+		// Unrecoverable path — terminate immediately (debug-time invariants).
+		// Note: If you need a graceful shutdown, DO NOT log Fatal. Log Critical and quit explicitly.
+		abort();
 	}
 }

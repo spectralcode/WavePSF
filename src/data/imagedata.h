@@ -6,6 +6,7 @@
 #include <QPair>
 #include <QString>
 #include <QImage>
+#include "utils/operationresult.h"
 
 enum EnviDataType { //todo: rename to PixelDataType
 	UNSIGNED_CHAR_8BIT = 1,
@@ -63,10 +64,10 @@ public:
 	// Utility
 	QPair<double,double> getGlobalRange() const;
 	QPair<double,double> getGlobalRangeCached() const;
-	void saveDataToDisk(const QString& filePath);
-	void saveAsEnvi(const QString& filePath);
-	void saveAsTiff(const QString& filePath);
-	void saveFrameAsImage(const QString& filePath, int frameNr);
+	OperationResult saveDataToDisk(const QString& filePath);
+	OperationResult saveAsEnvi(const QString& filePath);
+	OperationResult saveAsTiff(const QString& filePath);
+	OperationResult saveFrameAsImage(const QString& filePath, int frameNr);
 
 private:
 	int width;

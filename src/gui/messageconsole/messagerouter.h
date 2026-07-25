@@ -12,7 +12,8 @@
 	MessageRouter installs a global Qt message handler and forwards messages to the UI.
 	- Thread-safe ring buffer (MAX_MESSAGES).
 	- Emits a Qt signal for each new message (QueuedConnection).
-	- Pops a dialog for Critical/Fatal messages (Error).
+	- Diagnostic only: never creates UI. Error presentation is the frontend's job,
+	  driven by OperationResult / run-result status values.
 */
 
 struct MessageEntry
@@ -62,10 +63,6 @@ private:
 	int head;
 	int count;
 	quint64 seq;
-
-	// Dialog de-dup (ms since epoch)
-	QString lastCriticalText;
-	qint64 lastCriticalMs;
 };
 
 #endif // MESSAGEROUTER_H

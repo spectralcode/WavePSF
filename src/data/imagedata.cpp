@@ -256,37 +256,34 @@ QPair<double, double> ImageData::getGlobalRangeCached() const
 	return qMakePair(this->globalRangeMin, this->globalRangeMax);
 }
 
-void ImageData::saveDataToDisk(const QString& filePath)
+OperationResult ImageData::saveDataToDisk(const QString& filePath)
 {
 	if (this->data == nullptr) {
-		LOG_WARNING() << "No data to save";
-		return;
+		return {false, QObject::tr("No data to save")};
 	}
 
 	QFile outputFile(filePath);
 	if (!outputFile.open(QIODevice::WriteOnly)) {
-		LOG_WARNING() << "Could not write file to disk:" << outputFile.errorString();
-		return;
+		return {false, QObject::tr("Could not write file to disk: %1").arg(outputFile.errorString())};
 	}
 
 	size_t bytesPerSample = this->calculateBytesPerSample();
 	size_t totalBytes = bytesPerSample * static_cast<size_t>(this->frames) * static_cast<size_t>(this->width) * static_cast<size_t>(this->height);
 	qint64 bytesWritten = outputFile.write(static_cast<char*>(this->data), totalBytes);
+	outputFile.close();
 
-	if (bytesWritten != static_cast<qint64>(totalBytes)) {
-		LOG_WARNING() << "Failed to write all data to disk";
-	} else {
-		LOG_INFO() << "Data written to disk:" << filePath;
+	if (bytesWritten != static_cast<qint64>(totalBytes) || outputFile.error() != QFileDevice::NoError) {
+		return {false, QObject::tr("Could not write all data to disk: %1").arg(filePath)};
 	}
 
-	outputFile.close();
+	LOG_INFO() << "Data written to disk:" << filePath;
+	return {true, QString()};
 }
 
-void ImageData::saveAsEnvi(const QString& filePath)
+OperationResult ImageData::saveAsEnvi(const QString& filePath)
 {
 	if (this->data == nullptr) {
-		LOG_WARNING() << "No data to save";
-		return;
+		return {false, QObject::tr("No data to save")};
 	}
 
 	// Derive base name (strip known extensions)
@@ -305,8 +302,7 @@ void ImageData::saveAsEnvi(const QString& filePath)
 	// Write ENVI header
 	QFile hdrFile(hdrPath);
 	if (!hdrFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-		LOG_WARNING() << "Could not write ENVI header:" << hdrFile.errorString();
-		return;
+		return {false, QObject::tr("Could not write ENVI header: %1").arg(hdrFile.errorString())};
 	}
 
 	QTextStream out(&hdrFile);
@@ -334,18 +330,21 @@ void ImageData::saveAsEnvi(const QString& filePath)
 		out << "}\n";
 	}
 
+	out.flush();
 	hdrFile.close();
+	if (hdrFile.error() != QFileDevice::NoError) {
+		return {false, QObject::tr("Could not completely write ENVI header: %1").arg(hdrPath)};
+	}
 	LOG_INFO() << "ENVI header written:" << hdrPath;
 
 	// Write binary data
-	this->saveDataToDisk(datPath);
+	return this->saveDataToDisk(datPath);
 }
 
-void ImageData::saveAsTiff(const QString& filePath)
+OperationResult ImageData::saveAsTiff(const QString& filePath)
 {
 	if (this->data == nullptr) {
-		LOG_WARNING() << "No data to save as TIFF";
-		return;
+		return {false, QObject::tr("No data to save as TIFF")};
 	}
 
 	// Map EnviDataType to TIFF BitsPerSample and SampleFormat
@@ -362,14 +361,12 @@ void ImageData::saveAsTiff(const QString& filePath)
 		case SIGNED_LONG_INT_64BIT:    bitsPerSample = 64; sampleFormat = 2; break;
 		case UNSIGNED_LONG_INT_64BIT:  bitsPerSample = 64; sampleFormat = 1; break;
 		default:
-			LOG_WARNING() << "Unsupported data type for TIFF export:" << this->dataType;
-			return;
+			return {false, QObject::tr("Unsupported data type for TIFF export: %1").arg(static_cast<int>(this->dataType))};
 	}
 
 	QFile file(filePath);
 	if (!file.open(QIODevice::WriteOnly)) {
-		LOG_WARNING() << "Could not write TIFF file:" << file.errorString();
-		return;
+		return {false, QObject::tr("Could not write TIFF file: %1").arg(file.errorString())};
 	}
 
 	size_t bytesPerSample = this->calculateBytesPerSample();
@@ -423,14 +420,18 @@ void ImageData::saveAsTiff(const QString& filePath)
 	}
 
 	file.close();
+	if (stream.status() != QDataStream::Ok || file.error() != QFileDevice::NoError) {
+		return {false, QObject::tr("Could not completely write TIFF file: %1").arg(filePath)};
+	}
+
 	LOG_INFO() << "Multi-page TIFF written:" << filePath << "(" << this->frames << " frames," << bitsPerSample << "-bit)";
+	return {true, QString()};
 }
 
-void ImageData::saveFrameAsImage(const QString& filePath, int frameNr)
+OperationResult ImageData::saveFrameAsImage(const QString& filePath, int frameNr)
 {
 	if (this->data == nullptr) {
-		LOG_WARNING() << "Invalid parameters for saveFrameAsImage";
-		return;
+		return {false, QObject::tr("No data to save as image")};
 	}
 
 	size_t bytesPerSample = this->calculateBytesPerSample();
@@ -482,16 +483,15 @@ void ImageData::saveFrameAsImage(const QString& filePath, int frameNr)
 			}
 		}
 
-		if (img.save(filePath)) {
-			LOG_INFO() << "RGB image saved:" << filePath;
-		} else {
-			LOG_WARNING() << "Failed to save RGB image:" << filePath;
+		if (!img.save(filePath)) {
+			return {false, QObject::tr("Could not save RGB image: %1").arg(filePath)};
 		}
+		LOG_INFO() << "RGB image saved:" << filePath;
+		return {true, QString()};
 	} else {
 		// Save single frame as grayscale
 		if (frameNr < 0 || frameNr >= this->frames) {
-			LOG_WARNING() << "Invalid frame number for saveFrameAsImage:" << frameNr;
-			return;
+			return {false, QObject::tr("Invalid frame number for image export: %1").arg(frameNr)};
 		}
 
 		const char* frameData = static_cast<const char*>(this->data) + frameNr * samplesPerFrame * bytesPerSample;
@@ -519,11 +519,11 @@ void ImageData::saveFrameAsImage(const QString& filePath, int frameNr)
 			}
 		}
 
-		if (img.save(filePath)) {
-			LOG_INFO() << "Frame" << frameNr << "saved as image:" << filePath;
-		} else {
-			LOG_WARNING() << "Failed to save frame as image:" << filePath;
+		if (!img.save(filePath)) {
+			return {false, QObject::tr("Could not save frame as image: %1").arg(filePath)};
 		}
+		LOG_INFO() << "Frame" << frameNr << "saved as image:" << filePath;
+		return {true, QString()};
 	}
 }
 

@@ -2,6 +2,7 @@
 #define LOGGING_H
 
 #include <QDebug>
+#include <QThread>
 
 // Debug: enabled unless QT_NO_DEBUG_OUTPUT is defined by the build
 #if !defined(QT_NO_DEBUG_OUTPUT)
@@ -15,13 +16,13 @@
 		<< QString::number(reinterpret_cast<quintptr>(QThread::currentThreadId()), 16) \
 		<< ", " << __FILE__ ":" QT_STRINGIFY(__LINE__) << "] "
 #else
-	#define LOG_DEBUG() if (true) {} else qDebug()
-	#define LOG_DEBUG_THIS() if (true) {} else qDebug()
-	#define LOG_DEBUG_DETAILED() if (true) {} else qDebug()
+	#define LOG_DEBUG() while (false) qDebug()
+	#define LOG_DEBUG_THIS() while (false) qDebug()
+	#define LOG_DEBUG_DETAILED() while (false) qDebug()
 #endif
 
-#define LOG_INFO()		qInfo().noquote().nospace()
-#define LOG_WARNING()	qWarning().noquote().nospace()
-#define LOG_ERROR()		qCritical().noquote().nospace()
+#define LOG_INFO()		qInfo().noquote()
+#define LOG_WARNING()	qWarning().noquote()
+#define LOG_ERROR()		qCritical().noquote()
 
 #endif // LOGGING_H

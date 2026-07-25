@@ -121,6 +121,7 @@ HEADERS += \
 	$$SOURCEDIR/data/patchlayout.h \
 	$$SOURCEDIR/data/patchextractor.h \
 	$$SOURCEDIR/utils/logging.h \
+	$$SOURCEDIR/utils/operationresult.h \
 	$$SOURCEDIR/controller/imagesession.h \
 	$$SOURCEDIR/controller/applicationcontroller.h \
 	$$SOURCEDIR/controller/deconvolutioncontroller.h \

@@ -28,43 +28,40 @@ InputDataReader::~InputDataReader()
 {
 }
 
-ImageData* InputDataReader::loadFile(const QString& filePath)
+OperationResult InputDataReader::loadFile(const QString& filePath, ImageData*& data)
 {
+	data = nullptr;
+
 	QFileInfo fileInfo(filePath);
 	if (!fileInfo.exists() || !fileInfo.isReadable()) {
-		LOG_WARNING() << "File does not exist or is not readable:" << filePath;
-		return nullptr;
+		return {false, tr("File does not exist or is not readable: %1").arg(filePath)};
 	}
 
-	ImageData* result = nullptr;
-
 	if (SupportedFileChecker::isEnviFile(filePath)) {
-		LOG_INFO() << tr("Loading ENVI file: ") << filePath;
+		LOG_INFO() << tr("Loading ENVI file:") << filePath;
 		// For ENVI data files, we need to load via the .hdr file
 		QString hdrFilePath = filePath;
 		if (!filePath.endsWith(".hdr", Qt::CaseInsensitive)) {
 			// Convert data file path to .hdr file path
 			hdrFilePath = QDir(fileInfo.absolutePath()).filePath(fileInfo.baseName()) + ".hdr";
 		}
-		result = this->loadEnviFiles(hdrFilePath);
+		data = this->loadEnviFiles(hdrFilePath);
 	}
 	else if (SupportedFileChecker::isStandardImageFile(filePath)) {
-		LOG_INFO() << tr("Loading standard image: ") << filePath;
-		result = this->loadStandardImage(filePath);
+		LOG_INFO() << tr("Loading standard image:") << filePath;
+		data = this->loadStandardImage(filePath);
 	}
 	else {
-		LOG_ERROR() << tr("Unsupported file format: ") << fileInfo.suffix();
-		return nullptr;
+		return {false, tr("Unsupported file format: %1").arg(fileInfo.suffix())};
 	}
 
-	if (result != nullptr) {
-		emit fileLoaded(filePath);
-		LOG_INFO() << tr("Successfully loaded file: ") << filePath;
-	} else {
-		LOG_ERROR() << tr("Failed to load file: ") << filePath;
+	if (data == nullptr) {
+		return {false, tr("Could not read the file (see message console for details): %1").arg(filePath)};
 	}
 
-	return result;
+	emit fileLoaded(filePath);
+	LOG_INFO() << tr("Successfully loaded file:") << filePath;
+	return {true, QString()};
 }
 
 ImageData* InputDataReader::loadEnviFiles(const QString& hdrFilePath)
@@ -635,7 +632,12 @@ ImageData* InputDataReader::loadFolder(const QString& folderPath)
 
 	// Single file → delegate to loadFile()
 	if (fileInfoList.size() == 1) {
-		return this->loadFile(fileInfoList.first().absoluteFilePath());
+		ImageData* singleImage = nullptr;
+		OperationResult result = this->loadFile(fileInfoList.first().absoluteFilePath(), singleImage);
+		if (!result.ok) {
+			LOG_WARNING() << result.message;
+		}
+		return singleImage;
 	}
 
 	// Load first file to get reference dimensions

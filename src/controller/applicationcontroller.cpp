@@ -79,40 +79,36 @@ ApplicationController::~ApplicationController()
 {
 }
 
-bool ApplicationController::openInputFile(const QString& filePath)
+OperationResult ApplicationController::openInputFile(const QString& filePath)
 {
 	return this->loadFileToSession(filePath, false);
 }
 
-bool ApplicationController::openInputFolder(const QString& folderPath)
+OperationResult ApplicationController::openInputFolder(const QString& folderPath)
 {
 	if (this->inputDataReader == nullptr || this->imageSession == nullptr) {
-		LOG_ERROR() << "Components not initialized";
-		return false;
+		return {false, tr("Components not initialized")};
 	}
 
 	try {
-		LOG_INFO() << tr("Attempting to load folder: ") << folderPath;
+		LOG_INFO() << tr("Attempting to load folder:") << folderPath;
 		ImageData* imageData = this->inputDataReader->loadFolder(folderPath);
 		if (imageData == nullptr) {
-			LOG_WARNING() << "Failed to load image data from folder:" << folderPath;
-			return false;
+			return {false, tr("Could not load image data from folder (see message console for details): %1").arg(folderPath)};
 		}
 
 		this->imageSession->setInputData(imageData);
 		LOG_INFO() << "Input folder loaded successfully:" << folderPath;
-		return true;
+		return {true, QString()};
 
 	} catch (const QString& error) {
-		LOG_WARNING() << "Exception during folder loading:" << error << "folder:" << folderPath;
-		return false;
+		return {false, tr("Error during folder loading: %1").arg(error)};
 	} catch (...) {
-		LOG_WARNING() << "Unknown exception during folder loading:" << folderPath;
-		return false;
+		return {false, tr("Unknown error during folder loading: %1").arg(folderPath)};
 	}
 }
 
-bool ApplicationController::openGroundTruthFile(const QString& filePath)
+OperationResult ApplicationController::openGroundTruthFile(const QString& filePath)
 {
 	return this->loadFileToSession(filePath, true);
 }
@@ -226,14 +222,22 @@ void ApplicationController::resetAllCoefficients()
 	this->coefficientWorkspace->resetAll();
 }
 
-void ApplicationController::saveParametersToFile(const QString& filePath)
+OperationResult ApplicationController::saveParametersToFile(const QString& filePath)
 {
-	this->coefficientWorkspace->saveToFile(filePath);
+	OperationResult result = this->coefficientWorkspace->saveToFile(filePath);
+	if (!result.ok) {
+		LOG_WARNING() << result.message;
+	}
+	return result;
 }
 
-void ApplicationController::loadParametersFromFile(const QString& filePath)
+OperationResult ApplicationController::loadParametersFromFile(const QString& filePath)
 {
-	this->coefficientWorkspace->loadFromFile(filePath);
+	OperationResult result = this->coefficientWorkspace->loadFromFile(filePath);
+	if (!result.ok) {
+		LOG_WARNING() << result.message;
+	}
+	return result;
 }
 
 void ApplicationController::applyPSFSettings(const PSFSettings& settings)
@@ -505,28 +509,34 @@ void ApplicationController::requestOpenInputFile(const QString& filePath)
 		return;
 	}
 
-	if (this->openInputFile(filePath)) {
+	OperationResult result = this->openInputFile(filePath);
+	if (result.ok) {
 		emit inputFileLoaded(filePath);
 	} else {
-		emit fileLoadError(filePath, "Failed to load input file");
+		LOG_WARNING() << result.message;
+		emit fileLoadError(filePath, result.message);
 	}
 }
 
 void ApplicationController::requestOpenInputFolder(const QString& folderPath)
 {
-	if (this->openInputFolder(folderPath)) {
+	OperationResult result = this->openInputFolder(folderPath);
+	if (result.ok) {
 		emit inputFileLoaded(folderPath);
 	} else {
-		emit fileLoadError(folderPath, "Failed to load image folder");
+		LOG_WARNING() << result.message;
+		emit fileLoadError(folderPath, result.message);
 	}
 }
 
 void ApplicationController::requestOpenGroundTruthFile(const QString& filePath)
 {
-	if (this->openGroundTruthFile(filePath)) {
+	OperationResult result = this->openGroundTruthFile(filePath);
+	if (result.ok) {
 		emit groundTruthFileLoaded(filePath);
 	} else {
-		emit fileLoadError(filePath, "Failed to load ground truth file");
+		LOG_WARNING() << result.message;
+		emit fileLoadError(filePath, result.message);
 	}
 }
 
@@ -652,38 +662,39 @@ void ApplicationController::syncNumZPlanesWithInput()
 }
 
 
-bool ApplicationController::loadFileToSession(const QString& filePath, bool isGroundTruth)
+OperationResult ApplicationController::loadFileToSession(const QString& filePath, bool isGroundTruth)
 {
 	if (this->inputDataReader == nullptr || this->imageSession == nullptr) {
-		LOG_ERROR() << "Components not initialized";
-		return false;
+		return {false, tr("Components not initialized")};
 	}
 
 	try {
 		// Load the file
-		LOG_INFO() << tr("Attempting to load file: ") << filePath;
-		ImageData* imageData = this->inputDataReader->loadFile(filePath);
-		if (imageData == nullptr) {
-			LOG_WARNING() << "Failed to load image data from file:" << filePath;
-			return false;
+		LOG_INFO() << tr("Attempting to load file:") << filePath;
+		ImageData* imageData = nullptr;
+		OperationResult loadResult = this->inputDataReader->loadFile(filePath, imageData);
+		if (!loadResult.ok) {
+			return loadResult;
 		}
 
 		// Set data in session
 		if (isGroundTruth) {
-			this->imageSession->setGroundTruthData(imageData);
+			OperationResult setResult = this->imageSession->setGroundTruthData(imageData);
+			if (!setResult.ok) {
+				delete imageData;
+				return setResult;
+			}
 		} else {
 			this->imageSession->setInputData(imageData);
 			LOG_INFO() << "Input file loaded successfully:" << filePath;
 		}
 
-		return true;
+		return {true, QString()};
 
 	} catch (const QString& error) {
-		LOG_WARNING() << "Exception during file loading:" << error << "file:" << filePath;
-		return false;
+		return {false, tr("Error during file loading: %1").arg(error)};
 	} catch (...) {
-		LOG_WARNING() << "Unknown exception during file loading:" << filePath;
-		return false;
+		return {false, tr("Unknown error while loading file: %1").arg(filePath)};
 	}
 }
 
@@ -800,18 +811,27 @@ void ApplicationController::handleOptimizationFinished(const OptimizationResult&
 
 // --- File Output ---
 
-void ApplicationController::saveOutputToFile(const QString& filePath)
+OperationResult ApplicationController::saveOutputToFile(const QString& filePath)
 {
-	if (this->imageSession != nullptr) {
-		this->imageSession->saveOutputToFile(filePath, this->getCurrentFrame());
+	if (this->imageSession == nullptr) {
+		return {false, tr("No session available")};
 	}
+	OperationResult result = this->imageSession->saveOutputToFile(filePath, this->getCurrentFrame());
+	if (!result.ok) {
+		LOG_WARNING() << result.message;
+	}
+	return result;
 }
 
 // --- PSF file I/O ---
 
-void ApplicationController::savePSFToFile(const QString& filePath)
+OperationResult ApplicationController::savePSFToFile(const QString& filePath)
 {
-	this->psfFileController->savePSFToFile(filePath);
+	OperationResult result = this->psfFileController->savePSFToFile(filePath);
+	if (!result.ok) {
+		LOG_WARNING() << result.message;
+	}
+	return result;
 }
 
 void ApplicationController::setAutoSavePSF(bool enabled)

@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <arrayfire.h>
+#include "utils/operationresult.h"
 
 class PSFModule;
 
@@ -14,7 +15,7 @@ public:
 	explicit PSFFileManager(QObject* parent = nullptr);
 
 	// PSF file I/O
-	void savePSFToFile(const QString& filePath, PSFModule* psfModule);
+	OperationResult savePSFToFile(const QString& filePath, PSFModule* psfModule);
 	static af::array loadPSFFromFile(const QString& filePath, int* outBitDepth = nullptr);
 
 	// Auto-save PSF if enabled

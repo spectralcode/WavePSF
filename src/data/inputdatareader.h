@@ -7,6 +7,7 @@
 #include <memory>
 #include <arrayfire.h>
 #include "imagedata.h"
+#include "utils/operationresult.h"
 
 // ENVI field names
 //todo: make a envi class to read write and store all these properties
@@ -68,8 +69,9 @@ public:
 	explicit InputDataReader(QObject* parent = nullptr);
 	~InputDataReader();
 
-	// Main interface
-	ImageData* loadFile(const QString& filePath);
+	// Main interface. Out-param contract: data is set to nullptr on entry and
+	// is only non-null when the returned result is ok.
+	OperationResult loadFile(const QString& filePath, ImageData*& data);
 	ImageData* loadFolder(const QString& folderPath);
 
 private:

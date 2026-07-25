@@ -5,6 +5,7 @@
 #include <QPoint>
 #include "data/imagedata.h"
 #include "data/imagedataaccessor.h"
+#include "utils/operationresult.h"
 
 // Forward declarations
 class AFDeviceManager;
@@ -19,7 +20,8 @@ public:
 
 	// Data management
 	void setInputData(ImageData* inputData);
-	void setGroundTruthData(ImageData* groundTruthData);
+	// On failure the caller retains ownership of groundTruthData.
+	OperationResult setGroundTruthData(ImageData* groundTruthData);
 	void clearAllData();
 
 	// State management
@@ -82,7 +84,7 @@ public:
 	int getGroundTruthFrames() const;
 
 	// File output
-	void saveOutputToFile(const QString& filePath, int currentFrame);
+	OperationResult saveOutputToFile(const QString& filePath, int currentFrame);
 
 	// Cache management
 	void clearAFCaches();

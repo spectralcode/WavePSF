@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include "core/psf/psffileinfo.h"
+#include "utils/operationresult.h"
 
 class PSFModule;
 class PSFFileManager;
@@ -16,7 +17,7 @@ public:
 	explicit PSFFileController(PSFModule* psfModule, QObject* parent = nullptr);
 
 public slots:
-	void savePSFToFile(const QString& filePath);
+	OperationResult savePSFToFile(const QString& filePath);
 	void setAutoSavePSF(bool enabled);
 	void setPSFSaveFolder(const QString& folder);
 	void autoSaveIfEnabled(int frame, int patchIdx);

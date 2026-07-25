@@ -12,6 +12,7 @@
 #include "core/interpolation/tableinterpolator.h"
 #include "core/psf/psfgridgenerator.h"
 #include "core/psf/psffileinfo.h"
+#include "utils/operationresult.h"
 
 // Forward declarations
 class ImageSession;
@@ -67,9 +68,9 @@ public slots:
 	void setPSFCoefficient(int id, double value);
 	void resetPSFCoefficients();
 
-	// Parameter file I/O
-	void saveParametersToFile(const QString& filePath);
-	void loadParametersFromFile(const QString& filePath);
+	// Parameter file I/O (return value used by direct callers; ignored when signal-invoked)
+	OperationResult saveParametersToFile(const QString& filePath);
+	OperationResult loadParametersFromFile(const QString& filePath);
 
 	// PSF settings
 	void applyPSFSettings(const PSFSettings& settings);
@@ -109,11 +110,11 @@ public slots:
 	// Reset / clear
 	void resetAllCoefficients();
 
-	// File output
-	void saveOutputToFile(const QString& filePath);
+	// File output (return value used by direct callers; ignored when signal-invoked)
+	OperationResult saveOutputToFile(const QString& filePath);
 
-	// PSF file I/O
-	void savePSFToFile(const QString& filePath);
+	// PSF file I/O (return value used by direct callers; ignored when signal-invoked)
+	OperationResult savePSFToFile(const QString& filePath);
 	void setAutoSavePSF(bool enabled);
 	void setPSFSaveFolder(const QString& folder);
 
@@ -149,15 +150,15 @@ private slots:
 
 private:
 	// File operations
-	bool openInputFile(const QString& filePath);
-	bool openInputFolder(const QString& folderPath);
-	bool openGroundTruthFile(const QString& filePath);
+	OperationResult openInputFile(const QString& filePath);
+	OperationResult openInputFolder(const QString& folderPath);
+	OperationResult openGroundTruthFile(const QString& filePath);
 
 	void initializeComponents();
 	void connectSessionSignals();
 	void connectPSFModuleSignals();
 	void connectDeconvolutionSignals();
-	bool loadFileToSession(const QString& filePath, bool isGroundTruth);
+	OperationResult loadFileToSession(const QString& filePath, bool isGroundTruth);
 
 	void syncNumZPlanesWithInput();
 

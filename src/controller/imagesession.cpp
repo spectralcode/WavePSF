@@ -88,11 +88,10 @@ void ImageSession::setInputData(ImageData* inputData)
 	LOG_INFO() << "Input data set successfully, current frame:" << this->currentFrame;
 }
 
-void ImageSession::setGroundTruthData(ImageData* groundTruthData)
+OperationResult ImageSession::setGroundTruthData(ImageData* groundTruthData)
 {
 	if (groundTruthData == nullptr) {
-		LOG_ERROR() << "Attempted to set null ground truth data";
-		return;
+		return {false, tr("Attempted to set null ground truth data")};
 	}
 
 	LOG_INFO() << "Setting ground truth data" << groundTruthData->getWidth() << "x" << groundTruthData->getHeight() << "x" << groundTruthData->getFrames();
@@ -110,8 +109,7 @@ void ImageSession::setGroundTruthData(ImageData* groundTruthData)
 								.arg(groundTruthData->getWidth())
 								.arg(groundTruthData->getHeight())
 								.arg(groundTruthData->getFrames());
-			LOG_ERROR() << message;
-			return;
+			return {false, message};
 		}
 	}
 
@@ -139,6 +137,7 @@ void ImageSession::setGroundTruthData(ImageData* groundTruthData)
 
 	emit groundTruthDataChanged();
 	LOG_INFO() << "Ground truth data set successfully";
+	return {true, QString()};
 }
 
 void ImageSession::clearAllData()
@@ -580,11 +579,10 @@ int ImageSession::getGroundTruthWidth() const { return this->hasGroundTruthData(
 int ImageSession::getGroundTruthHeight() const { return this->hasGroundTruthData() ? this->groundTruthData->getHeight() : 0; }
 int ImageSession::getGroundTruthFrames() const { return this->hasGroundTruthData() ? this->groundTruthData->getFrames() : 0; }
 
-void ImageSession::saveOutputToFile(const QString& filePath, int currentFrame)
+OperationResult ImageSession::saveOutputToFile(const QString& filePath, int currentFrame)
 {
 	if (this->outputData == nullptr) {
-		LOG_WARNING() << "No output data to save";
-		return;
+		return {false, tr("No output data to save")};
 	}
 
 	// Detect format from extension
@@ -592,12 +590,12 @@ void ImageSession::saveOutputToFile(const QString& filePath, int currentFrame)
 	QString suffix = fileInfo.suffix().toLower();
 
 	if (suffix == "dat" || suffix == "raw" || suffix == "img" || suffix == "bin" || suffix == "hdr") {
-		this->outputData->saveAsEnvi(filePath);
+		return this->outputData->saveAsEnvi(filePath);
 	} else if (suffix == "tif" || suffix == "tiff") {
-		this->outputData->saveAsTiff(filePath);
+		return this->outputData->saveAsTiff(filePath);
 	} else {
 		// Standard image format (png, bmp, jpg, etc.) single frame, 8-bit
-		this->outputData->saveFrameAsImage(filePath, currentFrame);
+		return this->outputData->saveFrameAsImage(filePath, currentFrame);
 	}
 }
 

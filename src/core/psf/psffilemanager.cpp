@@ -13,34 +13,39 @@ PSFFileManager::PSFFileManager(QObject* parent)
 {
 }
 
-void PSFFileManager::savePSFToFile(const QString& filePath, PSFModule* psfModule)
+OperationResult PSFFileManager::savePSFToFile(const QString& filePath, PSFModule* psfModule)
 {
 	if (psfModule == nullptr) {
-		return;
+		return {false, tr("No PSF module available")};
 	}
 
-	af::array psf = psfModule->getCurrentPSF();
-	if (psf.isempty()) {
-		LOG_WARNING() << "No PSF to save";
-		return;
+	int height = 0;
+	int width = 0;
+	QVector<float> hostData;
+
+	try {
+		af::array psf = psfModule->getCurrentPSF();
+		if (psf.isempty()) {
+			return {false, tr("No PSF to save")};
+		}
+
+		// Extract current frame's slice if PSF is 3D
+		psf = PSFModule::extractFrame(psf, psfModule->getCurrentFrame());
+
+		height = static_cast<int>(psf.dims(0));  // rows
+		width = static_cast<int>(psf.dims(1));   // cols
+
+		// Copy PSF to host as float
+		hostData.resize(width * height);
+		psf.as(af::dtype::f32).host(hostData.data());
+	} catch (const af::exception& e) {
+		return {false, tr("ArrayFire error while saving PSF: %1").arg(QString::fromUtf8(e.what()))};
 	}
-
-	// Extract current frame's slice if PSF is 3D
-	psf = PSFModule::extractFrame(psf, psfModule->getCurrentFrame());
-
-	int height = static_cast<int>(psf.dims(0));  // rows
-	int width = static_cast<int>(psf.dims(1));   // cols
-
-	// Copy PSF to host as float
-	af::array floatPSF = psf.as(af::dtype::f32);
-	float* hostData = floatPSF.host<float>();
 
 	// Write single-page 32-bit float TIFF
 	QFile file(filePath);
 	if (!file.open(QIODevice::WriteOnly)) {
-		LOG_WARNING() << "Could not write PSF file:" << file.errorString();
-		af::freeHost(hostData);
-		return;
+		return {false, tr("Could not write PSF file: %1").arg(file.errorString())};
 	}
 
 	QDataStream stream(&file);
@@ -84,9 +89,13 @@ void PSFFileManager::savePSFToFile(const QString& filePath, PSFModule* psfModule
 		}
 	}
 
-	af::freeHost(hostData);
 	file.close();
+	if (stream.status() != QDataStream::Ok || file.error() != QFileDevice::NoError) {
+		return {false, tr("Could not completely write PSF file: %1").arg(filePath)};
+	}
+
 	LOG_INFO() << "PSF saved:" << filePath << "(" << width << "x" << height << ", 32-bit float)";
+	return {true, QString()};
 }
 
 af::array PSFFileManager::loadPSFFromFile(const QString& filePath, int* outBitDepth)
@@ -148,7 +157,10 @@ void PSFFileManager::autoSaveIfEnabled(int frame, int patchIdx, PSFModule* psfMo
 		return;
 	}
 	QString name = QString("%1_%2.tif").arg(frame).arg(patchIdx);
-	this->savePSFToFile(this->psfSaveFolder + "/" + name, psfModule);
+	OperationResult result = this->savePSFToFile(this->psfSaveFolder + "/" + name, psfModule);
+	if (!result.ok) {
+		LOG_WARNING() << "PSF auto-save failed:" << result.message;
+	}
 }
 
 void PSFFileManager::setAutoSavePSF(bool enabled)

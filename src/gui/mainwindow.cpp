@@ -308,8 +308,8 @@ void MainWindow::savePSF() {
 		this, "Save PSF", QString(),
 		"TIFF Image (*.tif)");
 	if (!filePath.isEmpty()) {
-		this->applicationController->savePSFToFile(filePath);
-		this->statusBar()->showMessage("PSF saved", 3000);
+		OperationResult result = this->applicationController->savePSFToFile(filePath);
+		this->reportFileOperationResult(result, tr("PSF saved"), tr("PSF Save Failed"));
 	}
 }
 
@@ -833,8 +833,7 @@ void MainWindow::openImageFolder() {
 
 void MainWindow::openGroundTruth() {
 	if (!this->applicationController->hasInputData()) {
-		//NOTIFY_NOTICE("Please open image data first before loading ground truth.");
-		LOG_ERROR() << "Please open image data first before loading ground truth.";
+		this->statusBar()->showMessage(tr("Please open image data first before loading ground truth."), 5000);
 		return;
 	}
 
@@ -875,8 +874,8 @@ void MainWindow::saveParameters() {
 		busyMsg.show();
 		QApplication::processEvents();
 
-		this->applicationController->saveParametersToFile(filePath);
-		this->statusBar()->showMessage(tr("Wavefront coefficients saved"), 3000);
+		OperationResult result = this->applicationController->saveParametersToFile(filePath);
+		this->reportFileOperationResult(result, tr("Wavefront coefficients saved"), tr("Coefficients Save Failed"));
 	}
 }
 
@@ -897,8 +896,8 @@ void MainWindow::loadParameters() {
 		busyMsg.show();
 		QApplication::processEvents();
 
-		this->applicationController->loadParametersFromFile(filePath);
-		this->statusBar()->showMessage(tr("Wavefront coefficients loaded"), 3000);
+		OperationResult result = this->applicationController->loadParametersFromFile(filePath);
+		this->reportFileOperationResult(result, tr("Wavefront coefficients loaded"), tr("Coefficients Load Failed"));
 	}
 }
 
@@ -918,8 +917,8 @@ void MainWindow::saveOutputData() {
 	);
 	if (!filePath.isEmpty()) {
 		this->lastOpenDirOutput = QFileInfo(filePath).absolutePath();
-		this->applicationController->saveOutputToFile(filePath);
-		this->statusBar()->showMessage("Output data saved", 3000);
+		OperationResult result = this->applicationController->saveOutputToFile(filePath);
+		this->reportFileOperationResult(result, tr("Output data saved"), tr("Output Save Failed"));
 	}
 }
 
@@ -944,8 +943,15 @@ void MainWindow::onFileLoadError(const QString& filePath, const QString& error) 
 
 	QMessageBox::warning(this, "File Load Error",
 		QString("Failed to load file:\n%1\n\nError: %2").arg(filePath, error));
+}
 
-	LOG_WARNING() << "File load error:" << filePath << "Error:" << error;
+void MainWindow::reportFileOperationResult(const OperationResult& result, const QString& successMessage, const QString& failureTitle) {
+	if (result.ok) {
+		this->statusBar()->showMessage(successMessage, 3000);
+	} else {
+		this->statusBar()->showMessage(failureTitle, 5000);
+		QMessageBox::warning(this, failureTitle, result.message);
+	}
 }
 
 void MainWindow::selectStyle(QAction* action) {

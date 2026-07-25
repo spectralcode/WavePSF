@@ -146,23 +146,29 @@ void CoefficientWorkspace::resetAll()
 	this->loadForCurrentPatch();
 }
 
-void CoefficientWorkspace::saveToFile(const QString& filePath)
+OperationResult CoefficientWorkspace::saveToFile(const QString& filePath)
 {
 	this->store();
-	if (this->currentTable != nullptr) {
-		this->currentTable->saveToFile(filePath);
+	if (this->currentTable == nullptr) {
+		return {false, tr("No coefficient table available")};
 	}
+	if (!this->currentTable->saveToFile(filePath)) {
+		return {false, tr("Could not write coefficients file: %1").arg(filePath)};
+	}
+	return {true, QString()};
 }
 
-bool CoefficientWorkspace::loadFromFile(const QString& filePath)
+OperationResult CoefficientWorkspace::loadFromFile(const QString& filePath)
 {
-	if (this->currentTable == nullptr) return false;
-	if (this->currentTable->loadFromFile(filePath)) {
-		this->loadForCurrentPatch();
-		emit parametersLoaded();
-		return true;
+	if (this->currentTable == nullptr) {
+		return {false, tr("No coefficient table available")};
 	}
-	return false;
+	if (!this->currentTable->loadFromFile(filePath)) {
+		return {false, tr("Could not read coefficients file: %1").arg(filePath)};
+	}
+	this->loadForCurrentPatch();
+	emit parametersLoaded();
+	return {true, QString()};
 }
 
 void CoefficientWorkspace::cacheCurrentTable(const QString& typeName)

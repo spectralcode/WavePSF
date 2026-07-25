@@ -16,6 +16,7 @@
 #include "gui/viewertoolbar.h"
 #include "core/processing/deconvolutiontypes.h"
 #include "core/psf/psfsettings.h"
+#include "utils/operationresult.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -96,6 +97,7 @@ private:
 	void connectPSFGridWidget();
 	void loadSettings();
 	void saveSettings();
+	void reportFileOperationResult(const OperationResult& result, const QString& successMessage, const QString& failureTitle);
 	void applyDeconvolutionProgress(const DeconvolutionProgress& progress);
 	void closeDeconvolutionProgressDialog();
 

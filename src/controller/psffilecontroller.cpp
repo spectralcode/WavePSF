@@ -11,10 +11,12 @@ PSFFileController::PSFFileController(PSFModule* psfModule, QObject* parent)
 	this->psfFileManager = new PSFFileManager(this);
 }
 
-void PSFFileController::savePSFToFile(const QString& filePath)
+OperationResult PSFFileController::savePSFToFile(const QString& filePath)
 {
-	if (this->psfModule == nullptr) return;
-	this->psfFileManager->savePSFToFile(filePath, this->psfModule);
+	if (this->psfModule == nullptr) {
+		return {false, tr("No PSF module available")};
+	}
+	return this->psfFileManager->savePSFToFile(filePath, this->psfModule);
 }
 
 void PSFFileController::setAutoSavePSF(bool enabled)
