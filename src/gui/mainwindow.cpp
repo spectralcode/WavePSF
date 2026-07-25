@@ -510,7 +510,6 @@ void MainWindow::connectApplicationController() {
 		connect(this->applicationController, &ApplicationController::fileLoadError,
 				this, &MainWindow::onFileLoadError);
 
-		// Background/pipeline errors: status bar + console entry, never modal
 		connect(this->applicationController, &ApplicationController::errorOccurred,
 				this, [this](const QString& source, const QString& message) {
 					this->statusBar()->showMessage(tr("%1 error: %2").arg(source, message), 8000);
@@ -711,7 +710,6 @@ void MainWindow::connectProcessingControlWidget() {
 			this->sessionViewer, &ImageSessionViewer::refreshOutputViewer);
 
 	// --- Optimization signals ---
-	// Consume the acceptance result directly (same API a future CLI uses)
 	connect(ctrl, &ProcessingControlWidget::optimizationRequested,
 			this, [this](const OptimizationConfig& config) {
 				OperationResult result = this->applicationController->startOptimization(config);
@@ -732,7 +730,6 @@ void MainWindow::connectProcessingControlWidget() {
 			ctrl, &ProcessingControlWidget::updateOptimizationProgress);
 	connect(this->applicationController, &ApplicationController::optimizationFinished,
 			ctrl, &ProcessingControlWidget::onOptimizationFinished);
-	// Present non-successful run outcomes in the status bar (never modal)
 	connect(this->applicationController, &ApplicationController::optimizationFinished,
 			this, [this](const OptimizationResult& result) {
 				if (result.status != RunStatus::COMPLETED && !result.message.isEmpty()) {

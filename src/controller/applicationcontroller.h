@@ -68,7 +68,7 @@ public slots:
 	void setPSFCoefficient(int id, double value);
 	void resetPSFCoefficients();
 
-	// Parameter file I/O (return value used by direct callers; ignored when signal-invoked)
+	// Parameter file I/O
 	OperationResult saveParametersToFile(const QString& filePath);
 	OperationResult loadParametersFromFile(const QString& filePath);
 
@@ -96,8 +96,7 @@ public slots:
 
 	void cancelDeconvolution();
 
-	// Optimization (return value reports run acceptance; the eventual
-	// OptimizationResult reports how the accepted run finished)
+	// Optimization (returns whether the run was accepted)
 	OperationResult startOptimization(const OptimizationConfig& uiConfig);
 	void cancelOptimization();
 	void updateOptimizationLivePreview(bool enabled, int interval);
@@ -111,10 +110,10 @@ public slots:
 	// Reset / clear
 	void resetAllCoefficients();
 
-	// File output (return value used by direct callers; ignored when signal-invoked)
+	// File output
 	OperationResult saveOutputToFile(const QString& filePath);
 
-	// PSF file I/O (return value used by direct callers; ignored when signal-invoked)
+	// PSF file I/O
 	OperationResult savePSFToFile(const QString& filePath);
 	void setAutoSavePSF(bool enabled);
 	void setPSFSaveFolder(const QString& folder);
@@ -122,8 +121,7 @@ public slots:
 	// File-based PSF generator
 	void setFilePSFSource(const QString& path);
 
-	// Batch processing (return value reports run acceptance; the eventual
-	// DeconvolutionRunResult reports how the accepted run finished)
+	// Batch processing (returns whether the run was accepted)
 	OperationResult requestBatchDeconvolution();
 
 	// PSF grid
@@ -161,8 +159,7 @@ private:
 	void connectPSFModuleSignals();
 	void connectDeconvolutionSignals();
 
-	// Single boundary for reactive pipeline errors that have no result
-	// object: writes the one console entry, then notifies the frontend.
+	// Logs once, then notifies the frontend (for errors without a result object)
 	void reportError(const QString& source, const QString& message);
 	OperationResult loadFileToSession(const QString& filePath, bool isGroundTruth);
 
@@ -200,8 +197,7 @@ signals:
 	void groundTruthFileLoaded(const QString& filePath);
 	void fileLoadError(const QString& filePath, const QString& error);
 
-	// Background/pipeline errors that have no result object to carry them
-	// (presented non-modally by the GUI; mapped to stderr/exit codes by a CLI)
+	// Pipeline errors that have no result object to carry them
 	void errorOccurred(const QString& source, const QString& message);
 
 	// Session state changes - emitted for GUI widgets

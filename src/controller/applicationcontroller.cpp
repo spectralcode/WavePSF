@@ -110,9 +110,8 @@ OperationResult ApplicationController::openInputFolder(const QString& folderPath
 
 OperationResult ApplicationController::openGroundTruthFile(const QString& filePath)
 {
-	// Ground truth needs input data first: without it, dimension
-	// compatibility cannot be validated. Guarded here so every entry path
-	// (file dialog, recent-files menu, headless callers) is covered.
+	// Ground truth requires input data (for dimension validation);
+	// guarded here so every entry path is covered.
 	if (!this->hasInputData()) {
 		return {false, tr("Please open image data first before loading ground truth.")};
 	}
@@ -632,8 +631,7 @@ void ApplicationController::connectSessionSignals()
 void ApplicationController::connectPSFModuleSignals()
 {
 	if (this->psfModule != nullptr) {
-		// Live PSF pipeline errors (synchronous generation / 2D deconvolution
-		// return arrays, not results) -> error funnel
+		// Live PSF pipeline errors -> error funnel
 		connect(this->psfModule, &PSFModule::error,
 				this, [this](const QString& message) {
 					this->reportError(tr("PSF pipeline"), message);
@@ -813,7 +811,7 @@ void ApplicationController::handleOptimizationFinished(const OptimizationResult&
 			   << "jobs," << result.totalOuterIterations << "iterations"
 			   << (result.status == RunStatus::CANCELLED ? "(cancelled)" : "");
 
-	// Single-boundary log of the run summary (presentation happens in the GUI)
+	// Log the run summary once
 	if (result.status == RunStatus::FAILED || result.status == RunStatus::PARTIAL) {
 		LOG_WARNING() << result.message;
 	}
