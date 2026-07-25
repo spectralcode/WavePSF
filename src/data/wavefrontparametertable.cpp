@@ -146,6 +146,10 @@ bool WavefrontParameterTable::saveToFile(const QString& filePath) const
 
 	stream.flush();
 	file.close();
+	if (stream.status() != QTextStream::Ok || file.error() != QFileDevice::NoError) {
+		LOG_WARNING() << "Failed to completely write file:" << filePath;
+		return false;
+	}
 	LOG_INFO() << "Parameters saved to:" << filePath;
 	return true;
 }
