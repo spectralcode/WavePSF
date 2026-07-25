@@ -72,7 +72,7 @@ private:
 
 	// Core conversion methods (optimized for different data types)
 	af::array convertToArrayFire(void* data, int width, int height) const;
-	void convertFromArrayFire(const af::array& afData, void* data, int width, int height) const;
+	bool convertFromArrayFire(const af::array& afData, void* data, int width, int height) const;
 
 	// Cache management
 	void loadFrameToCache(int frameNr);

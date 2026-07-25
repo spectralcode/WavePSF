@@ -48,13 +48,11 @@ af::array ImageDataAccessor::getFrame(int frameNr)
 		return this->cachedFrame;
 	}
 
-	// Write back previous frame if modified
+	// Write back previous frame if modified. On failure (already reported by
+	// writeFrameFromCache) the cache must still move on to the requested
+	// frame; the unsaved modifications cannot be preserved.
 	if (this->frameModified && !this->readOnly) {
 		if (!this->writeFrameFromCache()) {
-			// The cache has to move on to the requested frame; unsaved
-			// modifications cannot survive a failed write-back.
-			emit error(QString("Discarded unsaved changes to frame %1 after a failed write-back.")
-				.arg(this->cachedFrameNumber));
 			this->frameModified = false;
 		}
 	}
@@ -260,14 +258,11 @@ void ImageDataAccessor::configurePatchGrid(int cols, int rows, int borderExtensi
 
 void ImageDataAccessor::clearCache()
 {
-	// Write back changes if any
+	// Write back changes if any. On failure (already reported by
+	// writeFrameFromCache) the cache must be dropped regardless
+	// (e.g. device switch); the unsaved modifications are lost.
 	if (this->frameModified && !this->readOnly) {
-		if (!this->writeFrameFromCache()) {
-			// The cache must be dropped regardless (e.g. device switch);
-			// unsaved modifications cannot survive a failed write-back.
-			emit error(QString("Discarded unsaved changes to frame %1 after a failed write-back.")
-				.arg(this->cachedFrameNumber));
-		}
+		this->writeFrameFromCache();
 	}
 
 	this->cachedFrame = af::array();
@@ -311,15 +306,21 @@ bool ImageDataAccessor::writeFrameFromCache()
 	int height = this->imageData->getHeight();
 	size_t frameSize = static_cast<size_t>(width) * static_cast<size_t>(height) * this->imageData->getBytesPerSample();
 
-	// Ensure temp buffer is large enough; on allocation failure nothing can
-	// be written - keep the frame marked dirty and bail out.
+	// One error notification per failed write-back, emitted here where both
+	// the frame number and the cause are known; callers do not emit again.
 	if (!this->ensureTempBuffer(frameSize)) {
+		emit error(QString("Could not write frame %1 back to image data: out of memory.")
+			.arg(this->cachedFrameNumber));
 		return false;
 	}
 
 	try {
 		// Convert from ArrayFire to native format
-		this->convertFromArrayFire(this->cachedFrame, this->tempBuffer, width, height);
+		if (!this->convertFromArrayFire(this->cachedFrame, this->tempBuffer, width, height)) {
+			emit error(QString("Could not write frame %1 back to image data: conversion failed.")
+				.arg(this->cachedFrameNumber));
+			return false;
+		}
 
 		// Write to ImageData
 		this->imageData->writeSingleFrame(this->cachedFrameNumber, this->tempBuffer);
@@ -328,7 +329,6 @@ bool ImageDataAccessor::writeFrameFromCache()
 		LOG_DEBUG() << ": Flushed frame" << this->cachedFrameNumber << "to ImageData";
 		return true;
 	} catch (const af::exception& e) {
-		// Leaf emits only; the ApplicationController error funnel logs once.
 		emit error(QString("Could not write frame %1 back to image data: %2")
 			.arg(this->cachedFrameNumber).arg(QString::fromUtf8(e.what())));
 		return false;
@@ -345,8 +345,7 @@ bool ImageDataAccessor::ensureTempBuffer(size_t requiredSize)
 		this->tempBuffer = malloc(requiredSize);
 		if (this->tempBuffer == nullptr) {
 			this->tempBufferSize = 0;
-			// Leaf emits only; the ApplicationController error funnel logs once.
-			emit error(QString("Out of memory: could not allocate a %1-byte frame buffer.").arg(requiredSize));
+			LOG_WARNING() << ": Failed to allocate temporary buffer, size:" << requiredSize;
 			return false;
 		}
 		this->tempBufferSize = requiredSize;
@@ -487,11 +486,11 @@ af::array ImageDataAccessor::convertToArrayFire(void* data, int width, int heigh
 	}
 }
 
-void ImageDataAccessor::convertFromArrayFire(const af::array& afData, void* data, int width, int height) const
+bool ImageDataAccessor::convertFromArrayFire(const af::array& afData, void* data, int width, int height) const
 {
 	if (data == nullptr || width <= 0 || height <= 0 || !this->isValid()) {
 		LOG_WARNING() << ": Invalid parameters for ArrayFire back-conversion";
-		return;
+		return false;
 	}
 
 	try {
@@ -574,10 +573,12 @@ void ImageDataAccessor::convertFromArrayFire(const af::array& afData, void* data
 
 			default:
 				LOG_WARNING() << ": Unsupported ENVI data type for back-conversion:" << dataType;
-				break;
+				return false;
 		}
+		return true;
 	} catch (const af::exception& e) {
 		LOG_WARNING() << ": ArrayFire exception during back-conversion:" << e.what();
+		return false;
 	}
 }
 
