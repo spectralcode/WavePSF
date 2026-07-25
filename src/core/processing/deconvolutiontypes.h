@@ -8,6 +8,7 @@
 #include <arrayfire.h>
 #include "core/psf/deconvolutionsettings.h"
 #include "core/psf/psfsettings.h"
+#include "utils/operationresult.h"
 
 enum class DeconvolutionOperationKind {
 	UNKNOWN = 0,
@@ -16,11 +17,8 @@ enum class DeconvolutionOperationKind {
 	BATCH_3D
 };
 
-enum class DeconvolutionRunStatus {
-	COMPLETED = 0,
-	CANCELLED,
-	FAILED
-};
+// Authoritative run status shared with optimization (utils/operationresult.h).
+using DeconvolutionRunStatus = RunStatus;
 
 class DeconvolutionCancelToken
 {
@@ -121,6 +119,8 @@ struct DeconvolutionRunResult {
 	QString message;
 	int completedUnits = 0;
 	int totalUnits = 0;
+	int failedUnits = 0;
+	QString firstFailureMessage;
 	QVector<DeconvolutionPatchOutput> patchOutputs;
 	QVector<DeconvolutionVolumeOutput> volumeOutputs;
 };

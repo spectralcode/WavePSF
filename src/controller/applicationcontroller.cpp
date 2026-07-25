@@ -384,12 +384,16 @@ void ApplicationController::requestDeconvolution()
 }
 
 
-void ApplicationController::requestBatchDeconvolution()
+OperationResult ApplicationController::requestBatchDeconvolution()
 {
-	if (this->deconvolutionController != nullptr
-		&& this->deconvolutionController->requestBatchDeconvolution()) {
-		this->suppressLiveDeconv = true;
+	if (this->deconvolutionController == nullptr) {
+		return {false, tr("Deconvolution is not available.")};
 	}
+	if (!this->deconvolutionController->requestBatchDeconvolution()) {
+		return {false, tr("Could not start batch deconvolution: no input data, empty patch grid, or a run is already in progress.")};
+	}
+	this->suppressLiveDeconv = true;
+	return {true, QString()};
 }
 
 void ApplicationController::handlePSFUpdatedForDeconvolution(af::array psf)
@@ -700,11 +704,11 @@ OperationResult ApplicationController::loadFileToSession(const QString& filePath
 
 // --- Optimization ---
 
-void ApplicationController::startOptimization(const OptimizationConfig& uiConfig)
+OperationResult ApplicationController::startOptimization(const OptimizationConfig& uiConfig)
 {
 	if (!this->hasInputData() || this->psfModule == nullptr) {
 		LOG_WARNING() << "Cannot start optimization: no input data or PSF module";
-		return;
+		return {false, tr("Cannot start optimization: no input data loaded.")};
 	}
 
 	// Store current coefficients before starting
@@ -733,12 +737,13 @@ void ApplicationController::startOptimization(const OptimizationConfig& uiConfig
 	if (!OptimizationJobBuilder::buildJobs(config, this->imageSession, this->psfModule,
 			this->coefficientWorkspace->table(), this->getCurrentFrame(), this->getCurrentPatchX(), this->getCurrentPatchY())) {
 		LOG_WARNING() << "Failed to build optimization jobs";
-		return;
+		return {false, tr("Could not build optimization jobs (check the patch/frame specification).")};
 	}
 
 	LOG_INFO() << "Starting optimization with" << config.jobs.size() << "jobs";
 
 	this->optimizationController->start(config);
+	return {true, QString()};
 }
 
 void ApplicationController::cancelDeconvolution()
@@ -782,10 +787,19 @@ void ApplicationController::handleOptimizationFinished(const OptimizationResult&
 {
 	LOG_INFO() << "Optimization finished:" << result.jobResults.size()
 			   << "jobs," << result.totalOuterIterations << "iterations"
-			   << (result.wasCancelled ? "(cancelled)" : "");
+			   << (result.status == RunStatus::CANCELLED ? "(cancelled)" : "");
 
-	// Store coefficients and write deconvolved output for every job
+	// Single-boundary log of the run summary (presentation happens in the GUI)
+	if (result.status == RunStatus::FAILED || result.status == RunStatus::PARTIAL) {
+		LOG_WARNING() << result.message;
+	}
+
+	// Store coefficients and write deconvolved output for every successful job
 	for (const OptimizationJobResult& jobResult : result.jobResults) {
+		if (!jobResult.succeeded) {
+			// No evaluation ever produced a valid metric — don't pollute the table
+			continue;
+		}
 		int patchIdx = this->coefficientWorkspace->table()->patchIndex(jobResult.patchX, jobResult.patchY);
 		this->coefficientWorkspace->table()->setCoefficients(jobResult.frameNr, patchIdx, jobResult.bestCoefficients);
 
@@ -800,10 +814,12 @@ void ApplicationController::handleOptimizationFinished(const OptimizationResult&
 		}
 	}
 
-	// Emit the last job's coefficients so the UI reflects the final state
-	if (!result.jobResults.isEmpty()) {
-		const OptimizationJobResult& lastJob = result.jobResults.last();
-		emit coefficientsLoaded(lastJob.bestCoefficients);
+	// Emit the last successful job's coefficients so the UI reflects the final state
+	for (int i = result.jobResults.size() - 1; i >= 0; --i) {
+		if (result.jobResults[i].succeeded) {
+			emit coefficientsLoaded(result.jobResults[i].bestCoefficients);
+			break;
+		}
 	}
 
 	emit optimizationFinished(result);

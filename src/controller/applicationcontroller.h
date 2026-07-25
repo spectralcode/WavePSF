@@ -96,8 +96,9 @@ public slots:
 
 	void cancelDeconvolution();
 
-	// Optimization
-	void startOptimization(const OptimizationConfig& uiConfig);
+	// Optimization (return value reports run acceptance; the eventual
+	// OptimizationResult reports how the accepted run finished)
+	OperationResult startOptimization(const OptimizationConfig& uiConfig);
 	void cancelOptimization();
 	void updateOptimizationLivePreview(bool enabled, int interval);
 	void updateOptimizationAlgorithmParameters(const QVariantMap& params);
@@ -121,8 +122,9 @@ public slots:
 	// File-based PSF generator
 	void setFilePSFSource(const QString& path);
 
-	// Batch processing
-	void requestBatchDeconvolution();
+	// Batch processing (return value reports run acceptance; the eventual
+	// DeconvolutionRunResult reports how the accepted run finished)
+	OperationResult requestBatchDeconvolution();
 
 	// PSF grid
 	void generatePSFGrid(int frame, int cropSize);

@@ -9,6 +9,7 @@
 #include <QMetaType>
 #include <arrayfire.h>
 #include "core/psf/psfsettings.h"
+#include "utils/operationresult.h"
 
 class IOptimizer;
 
@@ -89,12 +90,15 @@ struct OptimizationJobResult {
 	int patchY = 0;
 	QVector<double> bestCoefficients;
 	double bestMetric = 0.0;
+	bool succeeded = true;	// false if the optimizer never found a valid (finite) metric
 };
 
 struct OptimizationResult {
 	QVector<OptimizationJobResult> jobResults;
 	int totalOuterIterations = 0;
-	bool wasCancelled = false;
+	RunStatus status = RunStatus::COMPLETED;	// authoritative final status
+	QString message;							// user-presentable summary on non-COMPLETED
+	int failedJobs = 0;
 };
 
 Q_DECLARE_METATYPE(OptimizationConfig)

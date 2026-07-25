@@ -82,6 +82,11 @@ namespace {
 			case DeconvolutionRunStatus::COMPLETED:
 				return QObject::tr("Deconvolution completed");
 
+			case DeconvolutionRunStatus::PARTIAL:
+				return result.message.isEmpty()
+					? QObject::tr("Deconvolution completed with failed patches")
+					: result.message;
+
 			case DeconvolutionRunStatus::CANCELLED:
 				return QObject::tr("Deconvolution cancelled");
 
@@ -300,7 +305,10 @@ void MainWindow::setupProcessingMenu() {
 }
 
 void MainWindow::deconvolveAll() {
-	this->applicationController->requestBatchDeconvolution();
+	OperationResult result = this->applicationController->requestBatchDeconvolution();
+	if (!result.ok) {
+		this->statusBar()->showMessage(result.message, 5000);
+	}
 }
 
 void MainWindow::savePSF() {
@@ -699,8 +707,14 @@ void MainWindow::connectProcessingControlWidget() {
 			this->sessionViewer, &ImageSessionViewer::refreshOutputViewer);
 
 	// --- Optimization signals ---
+	// Consume the acceptance result directly (same API a future CLI uses)
 	connect(ctrl, &ProcessingControlWidget::optimizationRequested,
-			this->applicationController, &ApplicationController::startOptimization);
+			this, [this](const OptimizationConfig& config) {
+				OperationResult result = this->applicationController->startOptimization(config);
+				if (!result.ok) {
+					this->statusBar()->showMessage(result.message, 5000);
+				}
+			});
 	connect(ctrl, &ProcessingControlWidget::optimizationCancelRequested,
 			this->applicationController, &ApplicationController::cancelOptimization);
 	connect(ctrl, &ProcessingControlWidget::optimizationLivePreviewChanged,
@@ -714,6 +728,13 @@ void MainWindow::connectProcessingControlWidget() {
 			ctrl, &ProcessingControlWidget::updateOptimizationProgress);
 	connect(this->applicationController, &ApplicationController::optimizationFinished,
 			ctrl, &ProcessingControlWidget::onOptimizationFinished);
+	// Present non-successful run outcomes in the status bar (never modal)
+	connect(this->applicationController, &ApplicationController::optimizationFinished,
+			this, [this](const OptimizationResult& result) {
+				if (result.status != RunStatus::COMPLETED && !result.message.isEmpty()) {
+					this->statusBar()->showMessage(result.message, 8000);
+				}
+			});
 
 	// Ground truth availability → ProcessingControlWidget
 	connect(this->applicationController, &ApplicationController::groundTruthFileLoaded,

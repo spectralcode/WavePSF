@@ -5,6 +5,8 @@
 #include "core/psf/psfgeneratorfactory.h"
 #include "utils/afdevicemanager.h"
 #include <QtGlobal>
+#include <QScopedPointer>
+#include <exception>
 
 DeconvolutionWorker::DeconvolutionWorker(QObject* parent)
 	: QObject(parent)
@@ -24,31 +26,46 @@ void DeconvolutionWorker::runDeconvolution(const DeconvolutionRequest& request)
 {
 	this->cancelToken.reset();
 
-	AFDeviceManager::setDeviceForCurrentThread(request.afBackend, request.afDeviceId);
-
 	DeconvolutionRunResult result;
-	switch (request.operationKind) {
-		case DeconvolutionOperationKind::SINGLE_PATCH_3D:
-			result = this->runVolumeJobs(request);
-			break;
+	try {
+		AFDeviceManager::setDeviceForCurrentThread(request.afBackend, request.afDeviceId);
 
-		case DeconvolutionOperationKind::BATCH_2D:
-			result = this->runBatch2D(request);
-			break;
+		switch (request.operationKind) {
+			case DeconvolutionOperationKind::SINGLE_PATCH_3D:
+				result = this->runVolumeJobs(request);
+				break;
 
-		case DeconvolutionOperationKind::BATCH_3D:
-			result = this->runVolumeJobs(request);
-			break;
+			case DeconvolutionOperationKind::BATCH_2D:
+				result = this->runBatch2D(request);
+				break;
 
-		default:
-			result.operationKind = request.operationKind;
-			result.totalUnits = request.patchJobs.size() + request.volumeJobs.size();
-			result.status = DeconvolutionRunStatus::FAILED;
-			result.message = QStringLiteral("DeconvolutionWorker execution is not implemented for this operation.");
-			emit this->error(result.message);
-			break;
+			case DeconvolutionOperationKind::BATCH_3D:
+				result = this->runVolumeJobs(request);
+				break;
+
+			default:
+				result.operationKind = request.operationKind;
+				result.totalUnits = request.patchJobs.size() + request.volumeJobs.size();
+				result.status = DeconvolutionRunStatus::FAILED;
+				result.message = QStringLiteral("DeconvolutionWorker execution is not implemented for this operation.");
+				emit this->error(result.message);
+				break;
+		}
+	} catch (const af::exception& e) {
+		result.operationKind = request.operationKind;
+		result.status = DeconvolutionRunStatus::FAILED;
+		result.message = QStringLiteral("Deconvolution failed with an ArrayFire error: %1")
+			.arg(QString::fromUtf8(e.what()));
+		emit this->error(result.message);
+	} catch (const std::exception& e) {
+		result.operationKind = request.operationKind;
+		result.status = DeconvolutionRunStatus::FAILED;
+		result.message = QStringLiteral("Deconvolution failed with an error: %1")
+			.arg(QString::fromUtf8(e.what()));
+		emit this->error(result.message);
 	}
 
+	// Emitted exactly once, also on exceptions, so the GUI never gets stuck.
 	emit this->deconvolutionFinished(result);
 }
 
@@ -65,9 +82,9 @@ DeconvolutionRunResult DeconvolutionWorker::runBatch2D(const DeconvolutionReques
 		return result;
 	}
 
-	IPSFGenerator* generator = PSFGeneratorFactory::create(
-		request.psfSettings.generatorTypeName, nullptr);
-	if (generator == nullptr) {
+	QScopedPointer<IPSFGenerator> generator(PSFGeneratorFactory::create(
+		request.psfSettings.generatorTypeName, nullptr));
+	if (generator.isNull()) {
 		result.status = DeconvolutionRunStatus::FAILED;
 		result.message = QStringLiteral("Unknown generator type: %1")
 			.arg(request.psfSettings.generatorTypeName);
@@ -93,11 +110,10 @@ DeconvolutionRunResult DeconvolutionWorker::runBatch2D(const DeconvolutionReques
 			this, &DeconvolutionWorker::patchOutputReady);
 	result = batchProcessor.executeBatchDeconvolution(
 		request,
-		generator,
+		generator.data(),
 		&deconvolver,
 		&this->cancelToken);
 
-	delete generator;
 	return result;
 }
 
@@ -115,9 +131,9 @@ DeconvolutionRunResult DeconvolutionWorker::runVolumeJobs(
 		return result;
 	}
 
-	IPSFGenerator* generator = PSFGeneratorFactory::create(
-		request.psfSettings.generatorTypeName, nullptr);
-	if (generator == nullptr) {
+	QScopedPointer<IPSFGenerator> generator(PSFGeneratorFactory::create(
+		request.psfSettings.generatorTypeName, nullptr));
+	if (generator.isNull()) {
 		result.status = DeconvolutionRunStatus::FAILED;
 		result.message = QStringLiteral("Unknown generator type: %1")
 			.arg(request.psfSettings.generatorTypeName);
@@ -143,10 +159,9 @@ DeconvolutionRunResult DeconvolutionWorker::runVolumeJobs(
 			this, &DeconvolutionWorker::volumeOutputReady);
 	result = batchProcessor.executeBatchDeconvolution(
 		request,
-		generator,
+		generator.data(),
 		&deconvolver,
 		&this->cancelToken);
 
-	delete generator;
 	return result;
 }

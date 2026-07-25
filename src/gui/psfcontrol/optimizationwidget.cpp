@@ -639,8 +639,16 @@ void OptimizationWidget::onOptimizationFinished(const OptimizationResult& result
 {
 	this->setRunning(false);
 
-	if (result.wasCancelled) {
+	if (result.status == RunStatus::CANCELLED) {
 		this->statusLabel->setText(tr("Cancelled"));
+	} else if (result.status == RunStatus::FAILED) {
+		this->statusLabel->setText(tr("Failed"));
+	} else if (result.failedJobs > 0) {
+		this->statusLabel->setText(
+			QString(tr("Finished (%1 jobs, %2 failed, %3 iterations)"))
+				.arg(result.jobResults.size())
+				.arg(result.failedJobs)
+				.arg(result.totalOuterIterations));
 	} else {
 		this->statusLabel->setText(
 			QString(tr("Finished (%1 jobs, %2 iterations)"))
