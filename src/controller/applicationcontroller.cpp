@@ -632,6 +632,12 @@ void ApplicationController::connectSessionSignals()
 void ApplicationController::connectPSFModuleSignals()
 {
 	if (this->psfModule != nullptr) {
+		// Live PSF pipeline errors (synchronous generation / 2D deconvolution
+		// return arrays, not results) -> error funnel
+		connect(this->psfModule, &PSFModule::error,
+				this, [this](const QString& message) {
+					this->reportError(tr("PSF pipeline"), message);
+				});
 		connect(this->psfModule, &PSFModule::wavefrontUpdated,
 				this, &ApplicationController::psfWavefrontUpdated);
 		connect(this->psfModule, &PSFModule::psfUpdated, this, [this](af::array psf) {
