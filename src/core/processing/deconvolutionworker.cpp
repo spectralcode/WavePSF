@@ -48,7 +48,6 @@ void DeconvolutionWorker::runDeconvolution(const DeconvolutionRequest& request)
 				result.totalUnits = request.patchJobs.size() + request.volumeJobs.size();
 				result.status = DeconvolutionRunStatus::FAILED;
 				result.message = QStringLiteral("DeconvolutionWorker execution is not implemented for this operation.");
-				emit this->error(result.message);
 				break;
 		}
 	} catch (const af::exception& e) {
@@ -56,13 +55,15 @@ void DeconvolutionWorker::runDeconvolution(const DeconvolutionRequest& request)
 		result.status = DeconvolutionRunStatus::FAILED;
 		result.message = QStringLiteral("Deconvolution failed with an ArrayFire error: %1")
 			.arg(QString::fromUtf8(e.what()));
-		emit this->error(result.message);
 	} catch (const std::exception& e) {
 		result.operationKind = request.operationKind;
 		result.status = DeconvolutionRunStatus::FAILED;
 		result.message = QStringLiteral("Deconvolution failed with an error: %1")
 			.arg(QString::fromUtf8(e.what()));
-		emit this->error(result.message);
+	} catch (...) {
+		result.operationKind = request.operationKind;
+		result.status = DeconvolutionRunStatus::FAILED;
+		result.message = QStringLiteral("Deconvolution failed with an unknown error.");
 	}
 
 	// Emitted exactly once, also on exceptions, so the GUI never gets stuck.
@@ -78,7 +79,6 @@ DeconvolutionRunResult DeconvolutionWorker::runBatch2D(const DeconvolutionReques
 	if (request.patchJobs.isEmpty()) {
 		result.status = DeconvolutionRunStatus::FAILED;
 		result.message = QStringLiteral("No batch 2D deconvolution jobs specified.");
-		emit this->error(result.message);
 		return result;
 	}
 
@@ -88,7 +88,6 @@ DeconvolutionRunResult DeconvolutionWorker::runBatch2D(const DeconvolutionReques
 		result.status = DeconvolutionRunStatus::FAILED;
 		result.message = QStringLiteral("Unknown generator type: %1")
 			.arg(request.psfSettings.generatorTypeName);
-		emit this->error(result.message);
 		return result;
 	}
 
@@ -100,8 +99,6 @@ DeconvolutionRunResult DeconvolutionWorker::runBatch2D(const DeconvolutionReques
 
 	Deconvolver deconvolver(request.deconvolutionSettings.iterations);
 	deconvolver.applySettings(request.deconvolutionSettings);
-	connect(&deconvolver, &Deconvolver::error,
-			this, &DeconvolutionWorker::error);
 
 	BatchProcessor batchProcessor;
 	connect(&batchProcessor, &BatchProcessor::progressUpdated,
@@ -127,7 +124,6 @@ DeconvolutionRunResult DeconvolutionWorker::runVolumeJobs(
 	if (request.volumeJobs.isEmpty()) {
 		result.status = DeconvolutionRunStatus::FAILED;
 		result.message = QStringLiteral("No 3D deconvolution jobs specified.");
-		emit this->error(result.message);
 		return result;
 	}
 
@@ -137,7 +133,6 @@ DeconvolutionRunResult DeconvolutionWorker::runVolumeJobs(
 		result.status = DeconvolutionRunStatus::FAILED;
 		result.message = QStringLiteral("Unknown generator type: %1")
 			.arg(request.psfSettings.generatorTypeName);
-		emit this->error(result.message);
 		return result;
 	}
 
@@ -149,8 +144,6 @@ DeconvolutionRunResult DeconvolutionWorker::runVolumeJobs(
 
 	Deconvolver deconvolver(request.deconvolutionSettings.iterations);
 	deconvolver.applySettings(request.deconvolutionSettings);
-	connect(&deconvolver, &Deconvolver::error,
-			this, &DeconvolutionWorker::error);
 
 	BatchProcessor batchProcessor;
 	connect(&batchProcessor, &BatchProcessor::progressUpdated,

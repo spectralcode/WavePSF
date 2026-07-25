@@ -24,7 +24,6 @@ signals:
 	void patchOutputReady(DeconvolutionPatchOutput output);
 	void volumeOutputReady(DeconvolutionVolumeOutput output);
 	void deconvolutionFinished(DeconvolutionRunResult result);
-	void error(QString message);
 
 private:
 	DeconvolutionRunResult runBatch2D(const DeconvolutionRequest& request);

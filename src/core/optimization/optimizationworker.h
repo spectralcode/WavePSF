@@ -125,12 +125,10 @@ public slots:
 signals:
 	void progressUpdated(OptimizationProgress progress);
 	void optimizationFinished(OptimizationResult result);
-	void error(QString message);
 
 private:
-	// Full setup + execution path; throws propagate to runOptimization's
-	// exception boundary. Fills result in place so job results completed
-	// before an exception are preserved in the emitted result.
+	// Fills finalResult in place so jobs completed before an exception
+	// are preserved; throws propagate to runOptimization's boundary.
 	void executeOptimization(const OptimizationConfig& config, OptimizationResult& finalResult);
 
 	QAtomicInt cancelRequested;

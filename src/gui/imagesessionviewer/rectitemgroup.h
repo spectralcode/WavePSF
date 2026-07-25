@@ -36,7 +36,6 @@ public slots:
 	void highlightMultipleRects(const QVector<int>& rectIds);
 
 signals:
-	void error(QString);
 	void info(QString);
 	void selectionChanged(int id);
 	void gridGenerated(QVector<RectItem*>);

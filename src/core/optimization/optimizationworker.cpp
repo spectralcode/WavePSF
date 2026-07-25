@@ -41,10 +41,8 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 {
 	this->cancelRequested.storeRelease(0);
 
-	// The entire setup + execution path runs under this exception boundary,
-	// and optimizationFinished is emitted exactly once - also on exceptions -
-	// so the GUI never gets stuck in a running state. finalResult is filled
-	// in place, so jobs completed before an exception remain in the result.
+	// optimizationFinished is emitted exactly once - also on exceptions -
+	// so the GUI never gets stuck in a running state.
 	OptimizationResult finalResult;
 	try {
 		this->executeOptimization(config, finalResult);
@@ -52,16 +50,13 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 		finalResult.status = RunStatus::FAILED;
 		finalResult.message = QStringLiteral("Optimization failed with an ArrayFire error: %1")
 			.arg(QString::fromUtf8(e.what()));
-		emit error(finalResult.message);
 	} catch (const std::exception& e) {
 		finalResult.status = RunStatus::FAILED;
 		finalResult.message = QStringLiteral("Optimization failed with an error: %1")
 			.arg(QString::fromUtf8(e.what()));
-		emit error(finalResult.message);
 	} catch (...) {
 		finalResult.status = RunStatus::FAILED;
 		finalResult.message = QStringLiteral("Optimization failed with an unknown error.");
-		emit error(finalResult.message);
 	}
 
 	emit optimizationFinished(finalResult);
@@ -75,14 +70,12 @@ void OptimizationWorker::executeOptimization(const OptimizationConfig& config, O
 	if (config.jobs.isEmpty()) {
 		finalResult.status = RunStatus::FAILED;
 		finalResult.message = QStringLiteral("No optimization jobs specified.");
-		emit error(finalResult.message);
 		return;
 	}
 
 	if (config.selectedCoefficientIndices.isEmpty()) {
 		finalResult.status = RunStatus::FAILED;
 		finalResult.message = QStringLiteral("No coefficients selected for optimization.");
-		emit error(finalResult.message);
 		return;
 	}
 
@@ -92,7 +85,6 @@ void OptimizationWorker::executeOptimization(const OptimizationConfig& config, O
 	if (generator.isNull()) {
 		finalResult.status = RunStatus::FAILED;
 		finalResult.message = QStringLiteral("Unknown generator type: %1").arg(config.psfSettings.generatorTypeName);
-		emit error(finalResult.message);
 		return;
 	}
 	QVariantMap cachedSettings = config.psfSettings.allGeneratorSettings.value(
@@ -153,7 +145,6 @@ void OptimizationWorker::executeOptimization(const OptimizationConfig& config, O
 	if (optimizer.isNull()) {
 		finalResult.status = RunStatus::FAILED;
 		finalResult.message = QStringLiteral("Unknown optimization algorithm: %1").arg(config.algorithmName);
-		emit error(finalResult.message);
 		return;
 	}
 	optimizer->deserializeSettings(config.algorithmSettings);

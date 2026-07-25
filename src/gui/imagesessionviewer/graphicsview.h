@@ -79,7 +79,6 @@ public slots:
 
 signals:
 	void info(QString);
-	void error(QString);
 	void mouseMiddleButtonPressed(int x, int y);
 	void mouseMoved(int x, int y);
 	void rectangleSelectionChanged(int id);
