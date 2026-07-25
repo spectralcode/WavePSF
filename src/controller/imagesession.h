@@ -120,6 +120,7 @@ private:
 signals:
 	void frameChanged(int frame);
 	void patchChanged(int x, int y);
+	void errorOccurred(QString message);
 	void inputDataChanged();
 	void outputDataChanged();
 	void outputPatchUpdated();

@@ -110,6 +110,12 @@ OperationResult ApplicationController::openInputFolder(const QString& folderPath
 
 OperationResult ApplicationController::openGroundTruthFile(const QString& filePath)
 {
+	// Ground truth needs input data first: without it, dimension
+	// compatibility cannot be validated. Guarded here so every entry path
+	// (file dialog, recent-files menu, headless callers) is covered.
+	if (!this->hasInputData()) {
+		return {false, tr("Please open image data first before loading ground truth.")};
+	}
 	return this->loadFileToSession(filePath, true);
 }
 
@@ -590,6 +596,12 @@ void ApplicationController::initializeComponents()
 	this->psfGridGenerator = new PSFGridGenerator(this);
 }
 
+void ApplicationController::reportError(const QString& source, const QString& message)
+{
+	LOG_ERROR() << source << "error:" << message;
+	emit errorOccurred(source, message);
+}
+
 void ApplicationController::connectSessionSignals()
 {
 	if (this->imageSession != nullptr) {
@@ -600,6 +612,12 @@ void ApplicationController::connectSessionSignals()
 				this, &ApplicationController::patchChanged);
 		connect(this->imageSession, &ImageSession::patchGridConfigured,
 				this, &ApplicationController::patchGridConfigured);
+
+		// Pipeline errors from accessors (e.g. out-of-memory) -> error funnel
+		connect(this->imageSession, &ImageSession::errorOccurred,
+				this, [this](const QString& message) {
+					this->reportError(tr("Image data"), message);
+				});
 
 		// Data change signals need transformation to imageSessionChanged
 		connect(this->imageSession, &ImageSession::inputDataChanged,

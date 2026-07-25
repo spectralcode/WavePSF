@@ -326,8 +326,9 @@ void ImageDataAccessor::ensureTempBuffer(size_t requiredSize)
 
 		this->tempBuffer = malloc(requiredSize);
 		if (this->tempBuffer == nullptr) {
-			LOG_ERROR() << ": Failed to allocate temporary buffer, size:" << requiredSize;
 			this->tempBufferSize = 0;
+			// Leaf emits only; the ApplicationController error funnel logs once.
+			emit error(QString("Out of memory: could not allocate a %1-byte frame buffer.").arg(requiredSize));
 		} else {
 			this->tempBufferSize = requiredSize;
 		}

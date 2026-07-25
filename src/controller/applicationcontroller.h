@@ -160,6 +160,10 @@ private:
 	void connectSessionSignals();
 	void connectPSFModuleSignals();
 	void connectDeconvolutionSignals();
+
+	// Single boundary for reactive pipeline errors that have no result
+	// object: writes the one console entry, then notifies the frontend.
+	void reportError(const QString& source, const QString& message);
 	OperationResult loadFileToSession(const QString& filePath, bool isGroundTruth);
 
 	void syncNumZPlanesWithInput();
@@ -195,6 +199,10 @@ signals:
 	void inputFileLoaded(const QString& filePath);
 	void groundTruthFileLoaded(const QString& filePath);
 	void fileLoadError(const QString& filePath, const QString& error);
+
+	// Background/pipeline errors that have no result object to carry them
+	// (presented non-modally by the GUI; mapped to stderr/exit codes by a CLI)
+	void errorOccurred(const QString& source, const QString& message);
 
 	// Session state changes - emitted for GUI widgets
 	void frameChanged(int frame);

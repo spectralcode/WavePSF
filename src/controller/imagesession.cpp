@@ -62,6 +62,8 @@ void ImageSession::setInputData(ImageData* inputData)
 	// Create new accessors
 	this->inputAccessor = new ImageDataAccessor(this->inputData, true, this);  // read-only
 	this->outputAccessor = new ImageDataAccessor(this->outputData, false, this);  // writable
+	connect(this->inputAccessor, &ImageDataAccessor::error, this, &ImageSession::errorOccurred);
+	connect(this->outputAccessor, &ImageDataAccessor::error, this, &ImageSession::errorOccurred);
 
 	// Apply current patch grid configuration
 	this->updateAccessorConfigurations();
@@ -129,6 +131,7 @@ OperationResult ImageSession::setGroundTruthData(ImageData* groundTruthData)
 
 	// Create ground truth accessor (read-only)
 	this->groundTruthAccessor = new ImageDataAccessor(this->groundTruthData, true, this);
+	connect(this->groundTruthAccessor, &ImageDataAccessor::error, this, &ImageSession::errorOccurred);
 
 	// Apply current patch grid configuration
 	if (this->inputData != nullptr) {

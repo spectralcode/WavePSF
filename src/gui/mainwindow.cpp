@@ -510,6 +510,12 @@ void MainWindow::connectApplicationController() {
 		connect(this->applicationController, &ApplicationController::fileLoadError,
 				this, &MainWindow::onFileLoadError);
 
+		// Background/pipeline errors: status bar + console entry, never modal
+		connect(this->applicationController, &ApplicationController::errorOccurred,
+				this, [this](const QString& source, const QString& message) {
+					this->statusBar()->showMessage(tr("%1 error: %2").arg(source, message), 8000);
+				});
+
 		// Keep local copy of PSF settings in sync for the settings dialog
 		connect(this->applicationController, &ApplicationController::psfSettingsUpdated,
 				this, [this](const PSFSettings& s) { this->currentPSFSettings = s; });
