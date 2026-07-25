@@ -76,8 +76,8 @@ private:
 
 	// Cache management
 	void loadFrameToCache(int frameNr);
-	void writeFrameFromCache();
-	void ensureTempBuffer(size_t requiredSize);
+	bool writeFrameFromCache();
+	bool ensureTempBuffer(size_t requiredSize);
 
 	// Patch operations
 	QRect calculateCorePatchBounds(int patchX, int patchY) const;

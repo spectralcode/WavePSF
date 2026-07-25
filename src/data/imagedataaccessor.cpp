@@ -50,7 +50,13 @@ af::array ImageDataAccessor::getFrame(int frameNr)
 
 	// Write back previous frame if modified
 	if (this->frameModified && !this->readOnly) {
-		this->writeFrameFromCache();
+		if (!this->writeFrameFromCache()) {
+			// The cache has to move on to the requested frame; unsaved
+			// modifications cannot survive a failed write-back.
+			emit error(QString("Discarded unsaved changes to frame %1 after a failed write-back.")
+				.arg(this->cachedFrameNumber));
+			this->frameModified = false;
+		}
 	}
 
 	// Load new frame to cache
@@ -112,9 +118,9 @@ void ImageDataAccessor::writeFrame(int frameNr, const af::array& frameData)
 		this->cachedFrame = frameData.copy();
 		this->cachedFrameNumber = frameNr;
 		this->frameModified = true;
-		this->writeFrameFromCache();
-
-		emit dataWritten(frameNr);
+		if (this->writeFrameFromCache()) {
+			emit dataWritten(frameNr);
+		}
 	} catch (const af::exception& e) {
 		LOG_WARNING() << ": ArrayFire exception during frame write:" << e.what();
 	}
@@ -256,7 +262,12 @@ void ImageDataAccessor::clearCache()
 {
 	// Write back changes if any
 	if (this->frameModified && !this->readOnly) {
-		this->writeFrameFromCache();
+		if (!this->writeFrameFromCache()) {
+			// The cache must be dropped regardless (e.g. device switch);
+			// unsaved modifications cannot survive a failed write-back.
+			emit error(QString("Discarded unsaved changes to frame %1 after a failed write-back.")
+				.arg(this->cachedFrameNumber));
+		}
 	}
 
 	this->cachedFrame = af::array();
@@ -290,18 +301,21 @@ void ImageDataAccessor::loadFrameToCache(int frameNr)
 	}
 }
 
-void ImageDataAccessor::writeFrameFromCache()
+bool ImageDataAccessor::writeFrameFromCache()
 {
 	if (this->cachedFrame.isempty() || this->cachedFrameNumber < 0 || !this->frameModified) {
-		return;
+		return true;
 	}
 
 	int width = this->imageData->getWidth();
 	int height = this->imageData->getHeight();
 	size_t frameSize = static_cast<size_t>(width) * static_cast<size_t>(height) * this->imageData->getBytesPerSample();
 
-	// Ensure temp buffer is large enough
-	this->ensureTempBuffer(frameSize);
+	// Ensure temp buffer is large enough; on allocation failure nothing can
+	// be written - keep the frame marked dirty and bail out.
+	if (!this->ensureTempBuffer(frameSize)) {
+		return false;
+	}
 
 	try {
 		// Convert from ArrayFire to native format
@@ -312,12 +326,16 @@ void ImageDataAccessor::writeFrameFromCache()
 		this->frameModified = false;
 
 		LOG_DEBUG() << ": Flushed frame" << this->cachedFrameNumber << "to ImageData";
+		return true;
 	} catch (const af::exception& e) {
-		LOG_WARNING() << ": ArrayFire exception during frame flush:" << e.what();
+		// Leaf emits only; the ApplicationController error funnel logs once.
+		emit error(QString("Could not write frame %1 back to image data: %2")
+			.arg(this->cachedFrameNumber).arg(QString::fromUtf8(e.what())));
+		return false;
 	}
 }
 
-void ImageDataAccessor::ensureTempBuffer(size_t requiredSize)
+bool ImageDataAccessor::ensureTempBuffer(size_t requiredSize)
 {
 	if (this->tempBufferSize < requiredSize) {
 		if (this->tempBuffer != nullptr) {
@@ -329,10 +347,11 @@ void ImageDataAccessor::ensureTempBuffer(size_t requiredSize)
 			this->tempBufferSize = 0;
 			// Leaf emits only; the ApplicationController error funnel logs once.
 			emit error(QString("Out of memory: could not allocate a %1-byte frame buffer.").arg(requiredSize));
-		} else {
-			this->tempBufferSize = requiredSize;
+			return false;
 		}
+		this->tempBufferSize = requiredSize;
 	}
+	return true;
 }
 
 QRect ImageDataAccessor::calculateCorePatchBounds(int patchX, int patchY) const
