@@ -41,24 +41,48 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 {
 	this->cancelRequested.storeRelease(0);
 
+	// The entire setup + execution path runs under this exception boundary,
+	// and optimizationFinished is emitted exactly once - also on exceptions -
+	// so the GUI never gets stuck in a running state. finalResult is filled
+	// in place, so jobs completed before an exception remain in the result.
+	OptimizationResult finalResult;
+	try {
+		this->executeOptimization(config, finalResult);
+	} catch (const af::exception& e) {
+		finalResult.status = RunStatus::FAILED;
+		finalResult.message = QStringLiteral("Optimization failed with an ArrayFire error: %1")
+			.arg(QString::fromUtf8(e.what()));
+		emit error(finalResult.message);
+	} catch (const std::exception& e) {
+		finalResult.status = RunStatus::FAILED;
+		finalResult.message = QStringLiteral("Optimization failed with an error: %1")
+			.arg(QString::fromUtf8(e.what()));
+		emit error(finalResult.message);
+	} catch (...) {
+		finalResult.status = RunStatus::FAILED;
+		finalResult.message = QStringLiteral("Optimization failed with an unknown error.");
+		emit error(finalResult.message);
+	}
+
+	emit optimizationFinished(finalResult);
+}
+
+void OptimizationWorker::executeOptimization(const OptimizationConfig& config, OptimizationResult& finalResult)
+{
 	// Set ArrayFire backend + device for this worker thread (both are per-thread)
 	AFDeviceManager::setDeviceForCurrentThread(config.afBackend, config.afDeviceId);
 
 	if (config.jobs.isEmpty()) {
-		OptimizationResult result;
-		result.status = RunStatus::FAILED;
-		result.message = QStringLiteral("No optimization jobs specified.");
-		emit error(result.message);
-		emit optimizationFinished(result);
+		finalResult.status = RunStatus::FAILED;
+		finalResult.message = QStringLiteral("No optimization jobs specified.");
+		emit error(finalResult.message);
 		return;
 	}
 
 	if (config.selectedCoefficientIndices.isEmpty()) {
-		OptimizationResult result;
-		result.status = RunStatus::FAILED;
-		result.message = QStringLiteral("No coefficients selected for optimization.");
-		emit error(result.message);
-		emit optimizationFinished(result);
+		finalResult.status = RunStatus::FAILED;
+		finalResult.message = QStringLiteral("No coefficients selected for optimization.");
+		emit error(finalResult.message);
 		return;
 	}
 
@@ -66,11 +90,9 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 	QScopedPointer<IPSFGenerator> generator(PSFGeneratorFactory::create(
 		config.psfSettings.generatorTypeName, nullptr));
 	if (generator.isNull()) {
-		OptimizationResult result;
-		result.status = RunStatus::FAILED;
-		result.message = QStringLiteral("Unknown generator type: %1").arg(config.psfSettings.generatorTypeName);
-		emit error(result.message);
-		emit optimizationFinished(result);
+		finalResult.status = RunStatus::FAILED;
+		finalResult.message = QStringLiteral("Unknown generator type: %1").arg(config.psfSettings.generatorTypeName);
+		emit error(finalResult.message);
 		return;
 	}
 	QVariantMap cachedSettings = config.psfSettings.allGeneratorSettings.value(
@@ -129,11 +151,9 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 	// Create optimizer
 	QScopedPointer<IOptimizer> optimizer(OptimizerFactory::create(config.algorithmName));
 	if (optimizer.isNull()) {
-		OptimizationResult result;
-		result.status = RunStatus::FAILED;
-		result.message = QStringLiteral("Unknown optimization algorithm: %1").arg(config.algorithmName);
-		emit error(result.message);
-		emit optimizationFinished(result);
+		finalResult.status = RunStatus::FAILED;
+		finalResult.message = QStringLiteral("Unknown optimization algorithm: %1").arg(config.algorithmName);
+		emit error(finalResult.message);
 		return;
 	}
 	optimizer->deserializeSettings(config.algorithmSettings);
@@ -142,10 +162,22 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 		this->currentOptimizer = optimizer.data();
 	}
 
-	OptimizationResult finalResult;
+	// Clears the live-parameter target under the mutex before the scoped
+	// optimizer is destroyed - including during exception unwinding
+	// (declared after the optimizer, so it is destroyed first) - so
+	// updateLiveAlgorithmParameters can never touch a dead object.
+	struct OptimizerRegistrationGuard {
+		OptimizationWorker* worker;
+		~OptimizerRegistrationGuard()
+		{
+			QMutexLocker locker(&this->worker->optimizerMutex);
+			this->worker->currentOptimizer = nullptr;
+		}
+	} registrationGuard{this};
+	Q_UNUSED(registrationGuard);
+
 	finalResult.totalOuterIterations = 0;
 
-	try {
 	// Process each job
 	for (int jobIdx = 0; jobIdx < config.jobs.size(); ++jobIdx) {
 		if (this->cancelRequested.loadAcquire()) {
@@ -226,44 +258,20 @@ void OptimizationWorker::runOptimization(const OptimizationConfig& config)
 		}
 		finalResult.jobResults.append(jobResult);
 	}
-	} catch (const af::exception& e) {
+
+	const int totalJobs = finalResult.jobResults.size();
+	if (this->cancelRequested.loadAcquire() != 0) {
+		finalResult.status = RunStatus::CANCELLED;
+		finalResult.message = QStringLiteral("Optimization cancelled.");
+	} else if (totalJobs > 0 && finalResult.failedJobs >= totalJobs) {
 		finalResult.status = RunStatus::FAILED;
-		finalResult.message = QStringLiteral("Optimization failed with an ArrayFire error: %1")
-			.arg(QString::fromUtf8(e.what()));
-		emit error(finalResult.message);
-	} catch (const std::exception& e) {
-		finalResult.status = RunStatus::FAILED;
-		finalResult.message = QStringLiteral("Optimization failed with an error: %1")
-			.arg(QString::fromUtf8(e.what()));
-		emit error(finalResult.message);
+		finalResult.message = QStringLiteral("Optimization failed: none of the %1 jobs found a valid result.")
+			.arg(totalJobs);
+	} else if (finalResult.failedJobs > 0) {
+		finalResult.status = RunStatus::PARTIAL;
+		finalResult.message = QStringLiteral("Optimization completed, but %1 of %2 jobs found no valid result.")
+			.arg(finalResult.failedJobs).arg(totalJobs);
+	} else {
+		finalResult.status = RunStatus::COMPLETED;
 	}
-
-	// Clear the live-parameter target under the mutex BEFORE the scoped
-	// optimizer is destroyed, so updateLiveAlgorithmParameters can never
-	// touch a dead object.
-	{
-		QMutexLocker locker(&this->optimizerMutex);
-		this->currentOptimizer = nullptr;
-	}
-
-	if (finalResult.status != RunStatus::FAILED) {
-		const int totalJobs = finalResult.jobResults.size();
-		if (this->cancelRequested.loadAcquire() != 0) {
-			finalResult.status = RunStatus::CANCELLED;
-			finalResult.message = QStringLiteral("Optimization cancelled.");
-		} else if (totalJobs > 0 && finalResult.failedJobs >= totalJobs) {
-			finalResult.status = RunStatus::FAILED;
-			finalResult.message = QStringLiteral("Optimization failed: none of the %1 jobs found a valid result.")
-				.arg(totalJobs);
-		} else if (finalResult.failedJobs > 0) {
-			finalResult.status = RunStatus::PARTIAL;
-			finalResult.message = QStringLiteral("Optimization completed, but %1 of %2 jobs found no valid result.")
-				.arg(finalResult.failedJobs).arg(totalJobs);
-		} else {
-			finalResult.status = RunStatus::COMPLETED;
-		}
-	}
-
-	// Emitted exactly once, also on exceptions, so the GUI never gets stuck.
-	emit optimizationFinished(finalResult);
 }

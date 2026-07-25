@@ -128,6 +128,11 @@ signals:
 	void error(QString message);
 
 private:
+	// Full setup + execution path; throws propagate to runOptimization's
+	// exception boundary. Fills result in place so job results completed
+	// before an exception are preserved in the emitted result.
+	void executeOptimization(const OptimizationConfig& config, OptimizationResult& finalResult);
+
 	QAtomicInt cancelRequested;
 	IOptimizer* currentOptimizer;
 	QMutex optimizerMutex;
