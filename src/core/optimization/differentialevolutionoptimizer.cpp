@@ -1,4 +1,5 @@
 #include "differentialevolutionoptimizer.h"
+#include "utils/logging.h"
 #include <QRandomGenerator>
 #include <QtMath>
 #include <limits>
@@ -34,7 +35,7 @@ QVector<OptimizerParameter> DifferentialEvolutionOptimizer::getParameterDescript
 		  "Probability of taking each dimension from the mutant.\nHigher = more dimensions changed per trial.\nTypical: 0.1-1.0.",
 		  0.0, 1.0, 0.01, 0.9, 2 },
 		{ KEY_POPULATION_SIZE, "Population Size (0=auto)",
-		  "Number of individuals in the population.\n0 = automatic (N+2, min 6).",
+		  "Number of individuals in the population.\n0 = automatic (N+2, min 6).\nExplicit values 1-2 are raised to 3.",
 		  0, 1000, 1, 0, 0 },
 		{ KEY_MAX_GENERATIONS, "Max Generations",
 		  "Maximum number of generations before stopping.",
@@ -83,8 +84,17 @@ OptimizerResult DifferentialEvolutionOptimizer::run(
 	// Population size: keep small for expensive objectives.
 	// N+2 gives enough vectors for mutation while keeping eval count
 	// comparable to SA (~1500-2500 total for 300 generations).
-	const int NP = (this->populationSize > 0) ? this->populationSize
-											   : qMax(6, N + 2);
+	// Mutation needs two indices distinct from each other and from the
+	// current individual, so at least 3 individuals are required; smaller
+	// values would make the index-selection loops below spin forever.
+	const int minPopulationSize = 3;
+	const int NP = (this->populationSize > 0)
+					   ? qMax(minPopulationSize, this->populationSize)
+					   : qMax(6, N + 2);
+	if (this->populationSize > 0 && this->populationSize < minPopulationSize) {
+		LOG_WARNING() << "DE population size" << this->populationSize
+					  << "raised to" << minPopulationSize;
+	}
 	const double F = this->mutationFactor;
 	const double CR = this->crossoverRate;
 
@@ -148,7 +158,7 @@ OptimizerResult DifferentialEvolutionOptimizer::run(
 		for (int k = 0; k < NP; ++k) {
 			if (cancelFlag.loadAcquire()) break;
 
-			// Pick 2 distinct random indices, different from k and bestIdx
+			// Pick 2 random indices, distinct from each other and from k
 			int r1, r2;
 			do { r1 = randomInt(0, NP - 1); } while (r1 == k);
 			do { r2 = randomInt(0, NP - 1); } while (r2 == k || r2 == r1);

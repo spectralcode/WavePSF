@@ -26,7 +26,7 @@ public:
 private:
 	double mutationFactor;   // F
 	double crossoverRate;    // CR
-	int populationSize;      // 0 = auto (10*N)
+	int populationSize;      // 0 = auto (N+2, min 6); explicit 1-2 raised to 3
 	int maxGenerations;
 
 	static double randomDouble(double low, double high);
