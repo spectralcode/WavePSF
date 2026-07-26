@@ -52,7 +52,20 @@ todo
 - Keep main.cpp in src/ root
 
 ## Error Handling
-todo
+Three rules govern all error handling:
+
+1. **Logs never create UI.** Logging is diagnostic only; presentation belongs to the frontend.
+2. **Synchronous commands return `OperationResult`** (`src/utils/operationresult.h`): `ok` plus a user-presentable `message`. Functions that return data use an out-parameter that is nulled on entry.
+3. **Fallible asynchronous runs (deconvolution, optimization) always finish with an authoritative `RunStatus`** (COMPLETED, PARTIAL, CANCELLED, FAILED) carried in their result; their workers emit the finished signal exactly once, also on exceptions.
+
+| Failure type | Mechanism | Presented by |
+|---|---|---|
+| Diagnostic information | `LOG_DEBUG/INFO/WARNING/ERROR` | Message console (GUI) or terminal (headless); logging never creates UI |
+| Synchronous operation | `OperationResult` return value | Calling frontend presents the result once (status bar / dialog) |
+| Asynchronous run | Result carrying `RunStatus` | Finished-signal handler |
+| Pipeline error without a result object | `error` signal → `ApplicationController::errorOccurred` | `ApplicationController::reportError()` logs once; frontend presents |
+
+Modal dialogs are reserved for foreground user-initiated operations (file open/save); background and worker failures are presented non-modally.
 
 ## Git commit messages
 todo

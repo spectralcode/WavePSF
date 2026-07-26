@@ -106,6 +106,14 @@ Important current behavior:
 - `MainWindow` owns the `QProgressDialog` for long-running deconvolution. Compute-side code no longer creates progress dialogs or calls `QApplication::processEvents()`.
 - ArrayFire state is thread-local, so both optimization and deconvolution workers explicitly restore backend/device selection before running.
 
+## Error and Logging Flow
+
+- Logging (`utils/logging.h`) is diagnostic only and never creates UI. The GUI installs `MessageRouter` as its console sink; a future headless frontend can use Qt's default message handler to print logs to the terminal.
+- Synchronous operations return `OperationResult`; asynchronous runs finish with a result carrying `RunStatus`; pipeline errors without a result object reach the GUI via `ApplicationController::errorOccurred`.
+- Presentation is owned by the frontend: `MainWindow` decides between status bar and dialogs (modal only for foreground file operations). A future CLI maps the same results to stderr and exit codes without changes to the compute code.
+
+The normative contract table is in [Error Handling](coding_conventions.md#error-handling).
+
 ## Settings and Ownership Notes
 
 - `SettingsFileManager` is used by `MainWindow`, but it is also passed to `AFDeviceManager` and `StyleManager` during application startup.

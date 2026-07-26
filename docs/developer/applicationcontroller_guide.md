@@ -104,6 +104,14 @@ The deconvolution workflow is split across three layers:
 
 `MainWindow` remains responsible for the progress dialog. The compute/controller layers only emit typed progress and cancellation signals.
 
+## Error Reporting
+
+- Synchronous file operations (`saveOutputToFile`, `savePSFToFile`, `saveParametersToFile`, `loadParametersFromFile`) and run-start requests (`startOptimization`, `requestBatchDeconvolution`) return an `OperationResult`; the calling frontend presents it. Qt signal-slot dispatch discards return values, so operations that need failure feedback must be called directly or through a lambda that handles the result.
+- Asynchronous runs report their outcome in the finished signal's result (`DeconvolutionRunResult`, `OptimizationResult`); its `RunStatus` (COMPLETED, PARTIAL, CANCELLED, FAILED) is authoritative.
+- Pipeline errors without a result object (live PSF generation, accessor write-back failures) surface through `errorOccurred(source, message)`; `reportError()` writes the one console entry.
+
+The full contract is in [Error Handling](coding_conventions.md#error-handling).
+
 ## Adding a New Component
 
 ### Add a new workflow helper

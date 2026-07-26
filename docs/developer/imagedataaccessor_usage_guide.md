@@ -59,3 +59,6 @@ The accessor provides safe defaults:
 - Out-of-bounds patches are clamped safely  
 - Border extension respects image boundaries
 - All operations are validated before execution
+- Failed frame write-backs (out of memory, conversion errors) emit `error(QString)` — one message per failure — which reaches the GUI through the `ApplicationController` error funnel
+
+**Warning:** if a dirty cached frame cannot be flushed, switching the cache to another frame (`getFrame`) or clearing it (`clearCache`) discards the unsaved GPU-side modifications. The failure is reported via the `error` signal, but the lost changes are not recoverable.
