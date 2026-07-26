@@ -259,7 +259,10 @@ void OptimizationWidget::setupCoefficientSection(QVBoxLayout* layout)
 	coeffLayout->addLayout(coeffForm);
 
 	connect(this->optimizeAllCheck, &QCheckBox::toggled,
-			this, [this](bool checked) { this->coefficientSpecLineEdit->setEnabled(!checked); });
+			this, [this](bool checked) {
+				this->coefficientSpecLineEdit->setEnabled(
+					!checked && !this->parameterDescriptors.isEmpty());
+			});
 
 	layout->addWidget(coeffGroup);
 }
@@ -575,11 +578,19 @@ void OptimizationWidget::setParameterDescriptors(const QVector<WavefrontParamete
 {
 	this->parameterDescriptors = descriptors;
 
-	// Update placeholder with valid ID range
-	if (!descriptors.isEmpty()) {
-		this->coefficientSpecLineEdit->setPlaceholderText(
-			QString("e.g. %1-%2").arg(descriptors.first().id).arg(descriptors.last().id));
+	const bool hasParameters = !descriptors.isEmpty();
+	this->optimizeAllCheck->setEnabled(hasParameters);
+	this->coefficientSpecLineEdit->setEnabled(
+		hasParameters && !this->optimizeAllCheck->isChecked());
+	this->startButton->setEnabled(hasParameters && !this->isRunning);
+
+	if (!hasParameters) {
+		this->coefficientSpecLineEdit->setPlaceholderText(tr("No adjustable parameters"));
+		return;
 	}
+
+	this->coefficientSpecLineEdit->setPlaceholderText(
+		QString("e.g. %1-%2").arg(descriptors.first().id).arg(descriptors.last().id));
 
 	// If the line edit is empty, default to all coefficients (by ID)
 	if (this->coefficientSpecLineEdit->text().isEmpty()) {
@@ -724,7 +735,7 @@ OptimizationConfig OptimizationWidget::buildConfig() const
 void OptimizationWidget::setRunning(bool running)
 {
 	this->isRunning = running;
-	this->startButton->setEnabled(!running);
+	this->startButton->setEnabled(!running && !this->parameterDescriptors.isEmpty());
 	this->cancelButton->setEnabled(running);
 	this->modeComboBox->setEnabled(!running);
 	this->batchGroup->setEnabled(!running);
@@ -820,7 +831,8 @@ void OptimizationWidget::setSettings(const QVariantMap& settings)
 	this->startCoeffSourceComboBox->setCurrentIndex(settings.value(KEY_START_COEFF_SOURCE, DEF_START_COEFF_SOURCE).toInt());
 	this->sourceParamSpinBox->setValue(        settings.value(KEY_SOURCE_PARAM,          DEF_SOURCE_PARAM).toInt());
 	this->optimizeAllCheck->setChecked(        settings.value(KEY_OPTIMIZE_ALL,          DEF_OPTIMIZE_ALL).toBool());
-	this->coefficientSpecLineEdit->setEnabled(!this->optimizeAllCheck->isChecked());
+	this->coefficientSpecLineEdit->setEnabled(
+		!this->parameterDescriptors.isEmpty() && !this->optimizeAllCheck->isChecked());
 	this->coefficientSpecLineEdit->setText(    settings.value(KEY_COEFFICIENT_SPEC,      DEF_COEFFICIENT_SPEC).toString());
 	this->livePreviewCheckBox->setChecked(     settings.value(KEY_LIVE_PREVIEW,          DEF_LIVE_PREVIEW).toBool());
 	this->livePreviewIntervalSpinBox->setValue(settings.value(KEY_LIVE_PREVIEW_INTERVAL, DEF_LIVE_PREVIEW_INTERVAL).toInt());
