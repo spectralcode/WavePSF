@@ -316,10 +316,10 @@ QVariantMap DeconvolutionSettingsWidget::getSettings() const
 void DeconvolutionSettingsWidget::setSettings(const QVariantMap& settings)
 {
 	int fallback = settings.value(KEY_ITERATIONS, DEF_ITERATIONS).toInt();
+	this->algorithmComboBox->setCurrentIndex(      settings.value(KEY_ALGORITHM,             DEF_ALGORITHM).toInt()); // // Load the algorithm first so it cannot overwrite the saved iteration counts.
 	this->iterationsPerAlgorithm[Deconvolver::RICHARDSON_LUCY]    = settings.value(KEY_ITERATIONS_RL,   fallback).toInt();
 	this->iterationsPerAlgorithm[Deconvolver::LANDWEBER]          = settings.value(KEY_ITERATIONS_LW,   fallback).toInt();
 	this->iterationsPerAlgorithm[Deconvolver::RICHARDSON_LUCY_3D] = settings.value(KEY_ITERATIONS_RL3D, fallback).toInt();
-	this->algorithmComboBox->setCurrentIndex(      settings.value(KEY_ALGORITHM,             DEF_ALGORITHM).toInt());
 	int currentAlgo = this->algorithmComboBox->currentIndex();
 	this->previousAlgorithm = currentAlgo;
 	this->iterationsSpinBox->setValue(this->iterationsPerAlgorithm.value(currentAlgo, fallback));
