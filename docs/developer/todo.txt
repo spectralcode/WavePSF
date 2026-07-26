@@ -12,7 +12,7 @@
 
 [done] remember path where last hsi data was openend
 
-- inputdatareader: avoid unnecessary size_t use
+[resolved: size_t is now required for large-file-safe byte arithmetic] inputdatareader: avoid unnecessary size_t use
 
 [done] imagedataviewer: rotation
 
@@ -112,7 +112,7 @@
 
 [done] add some kind of "loading" indicator when loading/saving wavefront coeff csv files
 
-- change the mouse interaction (zoom, translation, etc) for input/output viewer or for psf grid viewer such that all viewers use same control (i think the control of psf grid viewer is more intuitive and this should be used)
+- choose and apply one consistent pan/zoom interaction scheme across all viewers, including which mouse button performs panning (all viewers should support dragging via middle mouse to imitate input/oputut viewers)
 
 [done] add optional 3d deconvolution functionality (maybe ui in deconvolution tab). maybe richardson-lucy only? see:
 	- https://svi.nl/Huygens-Deconvolution
@@ -141,8 +141,6 @@
 
 [done] fix bug: 3d psf is clipped on edges for grid dimensions smaller 768. fast as well as exact mode
 
-- all viewers should support dragging via middle mouse to imitate input/oputut viewers
-
 [done] add optional log scaling to input/output viewer
 
 [done] add LUTs to PSF and input/output viewers
@@ -162,3 +160,9 @@
 - in sync mode pixel value output should also be synced. this makes it easier to compare specific pixel values between input and output images
 
 - move computeAvgXY() / computeAvgXZ() off the GUI thread into seperate worker thread and maybe use use qtimer to defer updates/to avoid to many updates in short period
+
+[done] refactor deconvolution and batch deconvolution to run in seperate threads and decouply full from GUI (QProgressDialog should not be used in there, should only be used in GUI code).
+
+- improve performance of "deconvolve all"
+
+[done] refactor BatchProcessor. no UI responsibilities: remove QWidget* parentWidget, QProgressDialog, QApplication::processEvents()
