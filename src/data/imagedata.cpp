@@ -581,17 +581,11 @@ void ImageData::convertGrayscaleToFrame(const QImage& grayscaleImage)
 	}
 
 	auto* outputData = static_cast<unsigned char*>(this->data);
-	const unsigned char* pixels = convertedImage.constBits();
-
-	// Validate Qt image data size matches our expectations
-	qint64 qtImageBytes = convertedImage.sizeInBytes();
-	if (static_cast<size_t>(qtImageBytes) != totalBytes) {
-		LOG_WARNING() << "Qt image size mismatch - expected:" << totalBytes << "got:" << qtImageBytes;
-		return;
+	const size_t rowBytes = static_cast<size_t>(this->width);
+	for (int y = 0; y < this->height; ++y) {
+		std::memcpy(outputData + static_cast<size_t>(y) * rowBytes,
+					convertedImage.constScanLine(y), rowBytes);
 	}
-
-	// Copy grayscale data directly
-	std::memcpy(outputData, pixels, totalBytes);
 }
 
 void ImageData::initializeRGBMetadata()

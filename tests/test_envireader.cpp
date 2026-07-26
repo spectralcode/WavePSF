@@ -1,4 +1,6 @@
-// Regression test for large-file and short-read safety of the ENVI loader:
+// Regression tests for image conversion and ENVI loading:
+// Grayscale QImages may pad each row, so their data is not always contiguous.
+// The ENVI loader also needs large-file and short-read safety:
 // byte offsets and total sizes were computed in 32-bit int, so realistic
 // hyperspectral cubes (e.g. 2048x2048x600 @ 2 bytes = 4.8 GiB) overflowed
 // into heap corruption (BIP) or a silently truncated read reported as
@@ -10,6 +12,7 @@
 //   (compatibility protection for the loader rewrite; passes before it).
 // - Truncated files must be rejected (red before the fix: short reads
 //   were reported as success).
+// - Padded grayscale rows must be copied without their alignment bytes.
 #include "data/envilayout.h"
 #include "data/inputdatareader.h"
 #include "data/imagedata.h"
@@ -199,6 +202,31 @@ bool testTruncatedRejected(InputDataReader& reader, const QString& dirPath, cons
 	return true;
 }
 
+bool testGrayscaleRowPadding()
+{
+	constexpr int width = 5;
+	constexpr int height = 2;
+	QImage image(width, height, QImage::Format_Grayscale8);
+	for (int y = 0; y < height; ++y) {
+		uchar* row = image.scanLine(y);
+		for (int x = 0; x < width; ++x) {
+			row[x] = static_cast<uchar>(y * width + x + 1);
+		}
+	}
+
+	ImageData data(image);
+	const auto* pixels = static_cast<const uchar*>(data.getData());
+	for (int i = 0; i < width * height; ++i) {
+		if (pixels == nullptr || pixels[i] != i + 1) {
+			std::fprintf(stderr, "FAIL [grayscale padding]: pixel %d is %d, expected %d\n",
+				i, pixels == nullptr ? -1 : pixels[i], i + 1);
+			return false;
+		}
+	}
+	std::printf("grayscale row padding ok\n");
+	return true;
+}
+
 } // namespace
 
 int main()
@@ -219,6 +247,7 @@ int main()
 	for (const QString& interleave : interleaves) {
 		ok = testTruncatedRejected(reader, tempDir.path(), interleave) && ok;
 	}
+	ok = testGrayscaleRowPadding() && ok;
 
 	if (!ok) {
 		return 1;

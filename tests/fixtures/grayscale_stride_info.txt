@@ -1,0 +1,11 @@
+Grayscale row-stride test images
+
+grayscale_stride_101x64.png
+Triggers the old loading bug because its width is not divisible by four.
+
+grayscale_stride_control_100x64.png
+Reference image that loaded correctly because its rows required no padding.
+
+After the fix, both images should show the same three gray bands and diagonal line.
+
+Image files are kept for reference and future manual testing.
