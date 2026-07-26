@@ -116,6 +116,7 @@ HEADERS += \
 	$$SOURCEDIR/gui/stylemanager.h \
 	$$SOURCEDIR/data/imagedata.h \
 	$$SOURCEDIR/data/inputdatareader.h \
+	$$SOURCEDIR/data/envilayout.h \
 	$$SOURCEDIR/data/imagedataaccessor.h \
 	$$SOURCEDIR/data/imagepatch.h \
 	$$SOURCEDIR/data/patchlayout.h \

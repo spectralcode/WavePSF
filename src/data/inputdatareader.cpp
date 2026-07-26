@@ -1,4 +1,5 @@
 #include "inputdatareader.h"
+#include "envilayout.h"
 #include "utils/logging.h"
 #ifdef WAVEPSF_LIBTIFF_BACKEND
 #include "tiffio.h"
@@ -7,7 +8,6 @@
 #include <QTextStream>
 #include <QFileInfo>
 #include <QDir>
-#include <QDataStream>
 #include <QVector>
 #include <QString>
 #include <QStringList>
@@ -134,6 +134,33 @@ QMap<QString, QString> InputDataReader::parseEnviHeader(const QString& hdrFilePa
 	return enviMap;
 }
 
+namespace {
+	// Upper bound for a single file-read request and for the BIP reorder
+	// chunk buffer.
+	constexpr size_t READ_CHUNK_BYTES = 64u * 1024 * 1024;
+
+	// Reads exactly byteCount bytes into destination, in bounded chunks so a
+	// single request stays well below the qint64 API limit. Partial positive
+	// reads are resumed; EOF or an I/O error before all bytes arrived fails.
+	bool readExactly(QFile& file, char* destination, size_t byteCount)
+	{
+		size_t remaining = byteCount;
+		char* cursor = destination;
+		while (remaining > 0) {
+			qint64 request = (remaining > READ_CHUNK_BYTES)
+								 ? static_cast<qint64>(READ_CHUNK_BYTES)
+								 : static_cast<qint64>(remaining);
+			qint64 bytesRead = file.read(cursor, request);
+			if (bytesRead <= 0) {
+				return false;
+			}
+			cursor += bytesRead;
+			remaining -= static_cast<size_t>(bytesRead);
+		}
+		return true;
+	}
+}
+
 ImageData* InputDataReader::loadEnviData(const QString& dataFilePath, const QMap<QString, QString>& enviMap)
 {
 	QFile file(dataFilePath);
@@ -141,8 +168,6 @@ ImageData* InputDataReader::loadEnviData(const QString& dataFilePath, const QMap
 		LOG_WARNING() << ": Could not open ENVI data file:" << dataFilePath;
 		return nullptr;
 	}
-
-	QDataStream in(&file);
 
 	// Parse ENVI parameters
 	QString interleave = enviMap.value(INTERLEAVE, "bsq").toLower().trimmed();
@@ -152,18 +177,30 @@ ImageData* InputDataReader::loadEnviData(const QString& dataFilePath, const QMap
 	int height = enviMap.value(LINES, "0").toInt();
 	int frames = enviMap.value(BANDS, "1").toInt();
 
-	if (width <= 0 || height <= 0 || frames <= 0 || bytesPerSample == 0) {
-		LOG_WARNING() << ": Invalid ENVI parameters - width:" << width << "height:" << height << "frames:" << frames;
+	// Overflow-checked size_t layout arithmetic; also rejects nonsensical
+	// header dimensions before anything gets allocated.
+	EnviLayout layout;
+	if (!EnviLayout::calculate(width, height, frames, bytesPerSample, layout)) {
+		LOG_WARNING() << ": Invalid ENVI parameters - width:" << width << "height:" << height
+					  << "frames:" << frames << "bytes per sample:" << static_cast<qint64>(bytesPerSample);
 		return nullptr;
 	}
 
-	size_t samplesPerFrame = width * height;
-	size_t bytesPerFrame = samplesPerFrame * bytesPerSample;
-	size_t samplesPerSpectralFrame = width * frames;
-	size_t bytesPerSpectralFrame = samplesPerSpectralFrame * bytesPerSample;
-	size_t samples = width * height * frames;
-	size_t dataSizeInBytes = samples * bytesPerSample;
-	size_t bytesPerLine = width * bytesPerSample;
+	if (interleave != "bsq" && interleave != "bil" && interleave != "bip") {
+		LOG_WARNING() << ": Unsupported interleave format:" << interleave;
+		return nullptr;
+	}
+
+	// The whole declared payload must be present: short files previously
+	// passed the read calls and served an uninitialized buffer tail as
+	// data. Extra trailing bytes stay allowed (the unsupported
+	// "header offset" case is a separate concern).
+	if (file.size() < static_cast<qint64>(layout.totalBytes)) {
+		LOG_WARNING() << ": ENVI data file smaller than the declared cube:" << dataFilePath
+					  << "- expected" << static_cast<qint64>(layout.totalBytes)
+					  << "bytes but file has" << file.size();
+		return nullptr;
+	}
 
 	QString wavelengthsString = enviMap.value(WAVELENGTH, "");
 	wavelengthsString = wavelengthsString.remove("{", Qt::CaseInsensitive);
@@ -184,67 +221,86 @@ ImageData* InputDataReader::loadEnviData(const QString& dataFilePath, const QMap
 		wavelengthUnit = "nm";
 	}
 
-	char* data = static_cast<char*>(malloc(dataSizeInBytes));
+	char* data = static_cast<char*>(malloc(layout.totalBytes));
 	if (data == nullptr) {
-		LOG_ERROR() << ": Failed to allocate memory for ENVI data, size:" << dataSizeInBytes;
+		LOG_ERROR() << ": Failed to allocate memory for ENVI data, size:" << static_cast<qint64>(layout.totalBytes);
 		return nullptr;
 	}
 
-	char* tmpFrame = nullptr;
+	char* tmpBuffer = nullptr;
 	bool success = false;
 
 	//reorder/reslice data according to interleave parameter
 	if (interleave == "bip") {
-		tmpFrame = static_cast<char*>(malloc(bytesPerFrame));
-		if (tmpFrame != nullptr) {
+		// Read whole pixels per chunk (each BIP pixel holds all of its bands
+		// contiguously) and de-interleave with size_t offsets from the
+		// validated layout - no per-sample division, no 32-bit indices.
+		size_t pixelsPerChunk = READ_CHUNK_BYTES / layout.bytesPerPixel;
+		if (pixelsPerChunk == 0) {
+			pixelsPerChunk = 1;
+		}
+		if (pixelsPerChunk > layout.samplesPerFrame) {
+			pixelsPerChunk = layout.samplesPerFrame;
+		}
+		tmpBuffer = static_cast<char*>(malloc(pixelsPerChunk * layout.bytesPerPixel));
+		if (tmpBuffer != nullptr) {
 			success = true;
-			for (int i = 0; i < frames && success; i++) {
-				int readResult = in.readRawData(&tmpFrame[0], static_cast<int>(bytesPerFrame));
-				if (readResult == -1) {
+			size_t pixelBase = 0;
+			while (pixelBase < layout.samplesPerFrame && success) {
+				size_t chunkPixels = layout.samplesPerFrame - pixelBase;
+				if (chunkPixels > pixelsPerChunk) {
+					chunkPixels = pixelsPerChunk;
+				}
+				if (!readExactly(file, tmpBuffer, chunkPixels * layout.bytesPerPixel)) {
 					success = false;
 					break;
 				}
+				// MSVC OpenMP requires a signed index; chunkPixels is capped
+				// by the READ_CHUNK_BYTES budget and always fits an int.
+				const int chunkPixelCount = static_cast<int>(chunkPixels);
 #pragma omp parallel for
-				for (int j = 0; j < samplesPerFrame; j++) {
-					int index = i * static_cast<int>(samplesPerFrame) + j;
-					int pos = ((index / frames) + (index % frames) * static_cast<int>(samplesPerFrame)) * static_cast<int>(bytesPerSample);
-					memcpy(&data[pos], &tmpFrame[j * bytesPerSample], bytesPerSample);
+				for (int p = 0; p < chunkPixelCount; p++) {
+					const size_t pixel = pixelBase + static_cast<size_t>(p);
+					const char* source = &tmpBuffer[static_cast<size_t>(p) * layout.bytesPerPixel];
+					for (int band = 0; band < frames; band++) {
+						memcpy(&data[layout.bipDestinationOffset(pixel, static_cast<size_t>(band))],
+							   &source[static_cast<size_t>(band) * layout.bytesPerSample],
+							   layout.bytesPerSample);
+					}
 				}
+				pixelBase += chunkPixels;
 			}
 		}
 	}
 	else if (interleave == "bil") {
-		tmpFrame = static_cast<char*>(malloc(bytesPerSpectralFrame));
-		if (tmpFrame != nullptr) {
+		tmpBuffer = static_cast<char*>(malloc(layout.bytesPerSpectralFrame));
+		if (tmpBuffer != nullptr) {
 			success = true;
-			for (int i = 0; i < height && success; i++) {
-				int readResult = in.readRawData(&tmpFrame[0], static_cast<int>(bytesPerSpectralFrame));
-				if (readResult == -1) {
+			for (int line = 0; line < height && success; line++) {
+				if (!readExactly(file, tmpBuffer, layout.bytesPerSpectralFrame)) {
 					success = false;
 					break;
 				}
 #pragma omp parallel for
-				for (int j = 0; j < frames; j++) {
-					memcpy(&data[i * bytesPerLine + j * bytesPerFrame], &tmpFrame[j * bytesPerLine], bytesPerLine);
+				for (int band = 0; band < frames; band++) {
+					memcpy(&data[static_cast<size_t>(line) * layout.bytesPerLine
+							+ static_cast<size_t>(band) * layout.bytesPerFrame],
+						   &tmpBuffer[static_cast<size_t>(band) * layout.bytesPerLine],
+						   layout.bytesPerLine);
 				}
 			}
 		}
 	}
-	else if (interleave == "bsq") {
-		int readResult = in.readRawData(&data[0], static_cast<int>(dataSizeInBytes));
-		if (readResult == -1) {
+	else { // bsq - the file layout already matches the band-sequential storage
+		success = readExactly(file, data, layout.totalBytes);
+		if (!success) {
 			LOG_WARNING() << ": Could not read input data!";
-		} else {
-			success = true;
 		}
 	}
-	else {
-		LOG_WARNING() << ": Unsupported interleave format:" << interleave;
-	}
 
-	// Clean up temporary frame
-	if (tmpFrame != nullptr) {
-		free(tmpFrame);
+	// Clean up temporary buffer
+	if (tmpBuffer != nullptr) {
+		free(tmpBuffer);
 	}
 
 	file.close();
