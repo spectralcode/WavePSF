@@ -133,6 +133,8 @@ DeconvolutionRunResult BatchProcessor::executeBatch2D(
 		emitProgress(progressMessage, jobIndex, job.frameNr, job.patchX, job.patchY);
 
 		if (job.frameNr < 0 || job.frameNr >= request.inputFrames.size()) {
+			LOG_WARNING() << "Skipping batch 2D job with invalid frame number" << job.frameNr
+						  << "at patch (" << job.patchX << "," << job.patchY << ")";
 			result.failedUnits++;
 			result.completedUnits = jobIndex + 1;
 			emitProgress(progressMessage, result.completedUnits, job.frameNr, job.patchX, job.patchY);
@@ -146,6 +148,8 @@ DeconvolutionRunResult BatchProcessor::executeBatch2D(
 			job.patchY,
 			request.patchBorderExtension);
 		if (!inputPatch.isValid()) {
+			LOG_WARNING() << "Could not extract patch (" << job.patchX << "," << job.patchY
+						  << ") of frame" << job.frameNr;
 			result.failedUnits++;
 			result.completedUnits = jobIndex + 1;
 			emitProgress(progressMessage, result.completedUnits, job.frameNr, job.patchX, job.patchY);
