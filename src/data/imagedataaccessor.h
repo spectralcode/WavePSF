@@ -89,9 +89,6 @@ private:
 	bool isValidFrame(int frameNr) const;
 
 signals:
-	void dataWritten(int frameNr);
-	void patchWritten(int patchX, int patchY, int frameNr);
-	void frameLoaded(int frameNr);
 	void error(QString message);
 };
 

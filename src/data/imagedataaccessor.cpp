@@ -116,9 +116,7 @@ void ImageDataAccessor::writeFrame(int frameNr, const af::array& frameData)
 		this->cachedFrame = frameData.copy();
 		this->cachedFrameNumber = frameNr;
 		this->frameModified = true;
-		if (this->writeFrameFromCache()) {
-			emit dataWritten(frameNr);
-		}
+		this->writeFrameFromCache();
 	} catch (const af::exception& e) {
 		LOG_WARNING() << ": ArrayFire exception during frame write:" << e.what();
 	}
@@ -182,8 +180,6 @@ void ImageDataAccessor::writeMultiplePatches(int frameNr, const QList<QPoint>& p
 			if (patch.dims(0) == coreBounds.width() && patch.dims(1) == coreBounds.height()) {
 				this->cachedFrame(af::seq(coreBounds.x(), coreBounds.x() + coreBounds.width() - 1),
 								  af::seq(coreBounds.y(), coreBounds.y() + coreBounds.height() - 1)) = patch;
-
-				emit patchWritten(coord.x(), coord.y(), frameNr);
 			} else {
 				LOG_WARNING() << ": Skipping patch with incorrect dimensions at:" << coord.x() << "," << coord.y();
 			}
@@ -217,12 +213,7 @@ void ImageDataAccessor::writeMultiplePatchResults(
 	}
 
 	for (int i = 0; i < originalPatches.size(); ++i) {
-		if (!this->writePatchResultToCache(originalPatches[i], processedData[i])) {
-			continue;
-		}
-
-		const QRect& patchBounds = originalPatches[i].imagePosition;
-		emit patchWritten(patchBounds.x(), patchBounds.y(), frameNr);
+		this->writePatchResultToCache(originalPatches[i], processedData[i]);
 	}
 
 	this->writeFrameFromCache();
@@ -287,8 +278,6 @@ void ImageDataAccessor::loadFrameToCache(int frameNr)
 		this->cachedFrame = this->convertToArrayFire(frameData, this->imageData->getWidth(), this->imageData->getHeight());
 		this->cachedFrameNumber = frameNr;
 		this->frameModified = false;
-
-		emit frameLoaded(frameNr);
 	} catch (const af::exception& e) {
 		LOG_WARNING() << ": ArrayFire exception during frame loading:" << e.what();
 		this->cachedFrame = af::array();
@@ -309,8 +298,8 @@ bool ImageDataAccessor::writeFrameFromCache()
 	// One error notification per failed write-back, emitted here where both
 	// the frame number and the cause are known; callers do not emit again.
 	if (!this->ensureTempBuffer(frameSize)) {
-		emit error(QString("Could not write frame %1 back to image data: out of memory.")
-			.arg(this->cachedFrameNumber));
+		emit error(QString("Could not write frame %1 back to image data: out of memory (%2 bytes).")
+			.arg(this->cachedFrameNumber).arg(frameSize));
 		return false;
 	}
 
@@ -345,7 +334,6 @@ bool ImageDataAccessor::ensureTempBuffer(size_t requiredSize)
 		this->tempBuffer = malloc(requiredSize);
 		if (this->tempBuffer == nullptr) {
 			this->tempBufferSize = 0;
-			LOG_WARNING() << ": Failed to allocate temporary buffer, size:" << requiredSize;
 			return false;
 		}
 		this->tempBufferSize = requiredSize;
@@ -489,7 +477,6 @@ af::array ImageDataAccessor::convertToArrayFire(void* data, int width, int heigh
 bool ImageDataAccessor::convertFromArrayFire(const af::array& afData, void* data, int width, int height) const
 {
 	if (data == nullptr || width <= 0 || height <= 0 || !this->isValid()) {
-		LOG_WARNING() << ": Invalid parameters for ArrayFire back-conversion";
 		return false;
 	}
 
@@ -572,12 +559,10 @@ bool ImageDataAccessor::convertFromArrayFire(const af::array& afData, void* data
 			}
 
 			default:
-				LOG_WARNING() << ": Unsupported ENVI data type for back-conversion:" << dataType;
 				return false;
 		}
 		return true;
-	} catch (const af::exception& e) {
-		LOG_WARNING() << ": ArrayFire exception during back-conversion:" << e.what();
+	} catch (const af::exception&) {
 		return false;
 	}
 }
