@@ -213,19 +213,26 @@ QStringList Deconvolver::getAlgorithmNames()
 
 af::array Deconvolver::wienerDeconvolution(const af::array& blurredInput, const af::array& psf, float nsr) const
 {
-	// Standard ifftshift: move PSF center to origin so the linear phase term
-	// from tip/tilt correctly shifts the deconvolved output.
 	int psfRows = psf.dims(0);
 	int psfCols = psf.dims(1);
-	af::array psfCorner = af::shift(psf, -(psfRows / 2), -(psfCols / 2));
+	int inRows = blurredInput.dims(0);
+	int inCols = blurredInput.dims(1);
 
 	// Compute at the larger of image and PSF size to avoid truncating the PSF.
 	// When PSF > image: zero-pad image to PSF size (no PSF truncation).
 	// When PSF <= image: zero-pad PSF to image size (standard behavior).
-	int inRows = blurredInput.dims(0);
-	int inCols = blurredInput.dims(1);
 	int compRows = (std::max)(inRows, psfRows);
 	int compCols = (std::max)(inCols, psfCols);
+
+	// psf2otf: zero-pad the PSF to the computation size BEFORE the circular
+	// shift that moves the PSF center to the origin (so the linear phase term
+	// from tip/tilt correctly shifts the deconvolved output). Shifting first
+	// would strand the wrapped kernel halves in the middle of the padded
+	// array instead of at its far edges whenever PSF and computation size
+	// differ.
+	af::array psfPadded = af::constant(0.0, compRows, compCols, psf.type());
+	psfPadded(af::seq(psfRows), af::seq(psfCols)) = psf;
+	af::array psfCorner = af::shift(psfPadded, -(psfRows / 2), -(psfCols / 2));
 
 	af::array G = af::fft2(blurredInput, compRows, compCols);
 	af::array H = af::fft2(psfCorner, compRows, compCols);
