@@ -272,12 +272,15 @@ void ImageRenderWorker::scaleToU8Typed(const T* src, int count, double minV, dou
 	//if a newer request already exists, bail before doing any work.
 	if (this->latestIdSource && this->latestIdSource->loadAcquire() != curId) return;
 
-	const double scale = 255.0 / (maxV - minV);
-	const double offs = -minV * scale;
+	const double range = maxV - minV;
+	const double scale = (range > 0.0 && qIsFinite(range)) ? 255.0 / range : 0.0;
+	if (!(scale > 0.0) || !qIsFinite(scale)) { std::memset(dst, 0, static_cast<size_t>(count)); return; }
 
 #pragma omp parallel for if(count >= 1048576) schedule(static) //use OpenMP parallelization only if frame is larger than 1024x1024 (=1048576)
 	for (int i = 0; i < count; ++i) {
-		double sv = static_cast<double>(src[i]) * scale + offs;
+		const double value = static_cast<double>(src[i]);
+		if (!qIsFinite(value)) { dst[i] = 0; continue; }
+		double sv = (value - minV) * scale;
 		sv = sv < 0.0 ? 0.0 : (sv > 255.0 ? 255.0 : sv);
 		dst[i] = static_cast<uchar>(sv + 0.5);
 	}
@@ -291,11 +294,14 @@ void ImageRenderWorker::scaleToU8LogTyped(const T* src, int count, double minV, 
 	const double logMin = std::log(1.0 + std::max(0.0, minV));
 	const double logMax = std::log(1.0 + std::max(0.0, maxV));
 	const double logRange = logMax - logMin;
-	const double scale = (logRange > 0.0) ? (255.0 / logRange) : 0.0;
+	const double scale = (logRange > 0.0 && qIsFinite(logRange)) ? 255.0 / logRange : 0.0;
+	if (!(scale > 0.0) || !qIsFinite(scale)) { std::memset(dst, 0, static_cast<size_t>(count)); return; }
 
 #pragma omp parallel for if(count >= 1048576) schedule(static)
 	for (int i = 0; i < count; ++i) {
-		double v = std::log(1.0 + std::max(0.0, static_cast<double>(src[i])));
+		const double value = static_cast<double>(src[i]);
+		if (!qIsFinite(value)) { dst[i] = 0; continue; }
+		double v = std::log(1.0 + std::max(0.0, value));
 		double sv = (v - logMin) * scale;
 		sv = sv < 0.0 ? 0.0 : (sv > 255.0 ? 255.0 : sv);
 		dst[i] = static_cast<uchar>(sv + 0.5);
