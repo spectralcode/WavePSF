@@ -229,20 +229,12 @@ void ApplicationController::resetAllCoefficients()
 
 OperationResult ApplicationController::saveParametersToFile(const QString& filePath)
 {
-	OperationResult result = this->coefficientWorkspace->saveToFile(filePath);
-	if (!result.ok) {
-		LOG_WARNING() << result.message;
-	}
-	return result;
+	return this->coefficientWorkspace->saveToFile(filePath);
 }
 
 OperationResult ApplicationController::loadParametersFromFile(const QString& filePath)
 {
-	OperationResult result = this->coefficientWorkspace->loadFromFile(filePath);
-	if (!result.ok) {
-		LOG_WARNING() << result.message;
-	}
-	return result;
+	return this->coefficientWorkspace->loadFromFile(filePath);
 }
 
 void ApplicationController::applyPSFSettings(const PSFSettings& settings)
@@ -522,7 +514,6 @@ void ApplicationController::requestOpenInputFile(const QString& filePath)
 	if (result.ok) {
 		emit inputFileLoaded(filePath);
 	} else {
-		LOG_WARNING() << result.message;
 		emit fileLoadError(filePath, result.message);
 	}
 }
@@ -533,7 +524,6 @@ void ApplicationController::requestOpenInputFolder(const QString& folderPath)
 	if (result.ok) {
 		emit inputFileLoaded(folderPath);
 	} else {
-		LOG_WARNING() << result.message;
 		emit fileLoadError(folderPath, result.message);
 	}
 }
@@ -544,7 +534,6 @@ void ApplicationController::requestOpenGroundTruthFile(const QString& filePath)
 	if (result.ok) {
 		emit groundTruthFileLoaded(filePath);
 	} else {
-		LOG_WARNING() << result.message;
 		emit fileLoadError(filePath, result.message);
 	}
 }
@@ -854,22 +843,14 @@ OperationResult ApplicationController::saveOutputToFile(const QString& filePath)
 	if (this->imageSession == nullptr) {
 		return {false, tr("No session available")};
 	}
-	OperationResult result = this->imageSession->saveOutputToFile(filePath, this->getCurrentFrame());
-	if (!result.ok) {
-		LOG_WARNING() << result.message;
-	}
-	return result;
+	return this->imageSession->saveOutputToFile(filePath, this->getCurrentFrame());
 }
 
 // --- PSF file I/O ---
 
 OperationResult ApplicationController::savePSFToFile(const QString& filePath)
 {
-	OperationResult result = this->psfFileController->savePSFToFile(filePath);
-	if (!result.ok) {
-		LOG_WARNING() << result.message;
-	}
-	return result;
+	return this->psfFileController->savePSFToFile(filePath);
 }
 
 void ApplicationController::setAutoSavePSF(bool enabled)

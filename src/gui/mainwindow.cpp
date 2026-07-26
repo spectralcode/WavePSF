@@ -955,6 +955,8 @@ void MainWindow::onInputFileLoaded(const QString& filePath) {
 }
 
 void MainWindow::onFileLoadError(const QString& filePath, const QString& error) {
+	LOG_WARNING() << error;
+
 	QFileInfo fileInfo(filePath);
 	QString message = QString("Failed to load: %1").arg(fileInfo.fileName());
 
@@ -968,6 +970,7 @@ void MainWindow::reportFileOperationResult(const OperationResult& result, const 
 	if (result.ok) {
 		this->statusBar()->showMessage(successMessage, 3000);
 	} else {
+		LOG_WARNING() << result.message;
 		this->statusBar()->showMessage(failureTitle, 5000);
 		QMessageBox::warning(this, failureTitle, result.message);
 	}
