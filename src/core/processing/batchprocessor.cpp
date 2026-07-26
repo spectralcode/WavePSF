@@ -111,29 +111,11 @@ DeconvolutionRunResult BatchProcessor::executeBatch2D(
 		emit this->progressUpdated(progress);
 	};
 
-	// Capture the specific reason behind empty results (Deconvolver catches
-	// af::exceptions internally); reset before each job so the message can
-	// never attach to the wrong patch.
-	QString deconvolverError;
-	QMetaObject::Connection errorConnection = QObject::connect(
-		deconvolver, &Deconvolver::error,
-		[&deconvolverError](const QString& message) {
-			deconvolverError = message;
-		});
-
-	auto recordFailure = [&result](const QString& message) {
-		result.failedUnits++;
-		if (result.firstFailureMessage.isEmpty()) {
-			result.firstFailureMessage = message;
-		}
-	};
-
 	LOG_INFO() << "Starting batch 2D deconvolution with" << request.patchJobs.size() << "jobs";
 	emitProgress(QStringLiteral("Initializing batch deconvolution..."), 0, -1, -1, -1);
 
 	for (int jobIndex = 0; jobIndex < request.patchJobs.size(); ++jobIndex) {
 		if (cancelToken != nullptr && cancelToken->isCancellationRequested()) {
-			QObject::disconnect(errorConnection);
 			result.status = DeconvolutionRunStatus::CANCELLED;
 			result.message = QStringLiteral("Batch deconvolution cancelled.");
 			result.completedUnits = jobIndex;
@@ -141,8 +123,6 @@ DeconvolutionRunResult BatchProcessor::executeBatch2D(
 					   << "of" << request.patchJobs.size();
 			return result;
 		}
-
-		deconvolverError.clear();
 
 		const DeconvolutionPatchJob& job = request.patchJobs[jobIndex];
 		const QString progressMessage = QString("Processing frame %1/%2, patch (%3,%4)...")
@@ -153,8 +133,7 @@ DeconvolutionRunResult BatchProcessor::executeBatch2D(
 		emitProgress(progressMessage, jobIndex, job.frameNr, job.patchX, job.patchY);
 
 		if (job.frameNr < 0 || job.frameNr >= request.inputFrames.size()) {
-			recordFailure(QString("Invalid frame number %1 for patch (%2,%3).")
-				.arg(job.frameNr).arg(job.patchX).arg(job.patchY));
+			result.failedUnits++;
 			result.completedUnits = jobIndex + 1;
 			emitProgress(progressMessage, result.completedUnits, job.frameNr, job.patchX, job.patchY);
 			continue;
@@ -167,8 +146,7 @@ DeconvolutionRunResult BatchProcessor::executeBatch2D(
 			job.patchY,
 			request.patchBorderExtension);
 		if (!inputPatch.isValid()) {
-			recordFailure(QString("Could not extract patch (%1,%2) of frame %3.")
-				.arg(job.patchX).arg(job.patchY).arg(job.frameNr));
+			result.failedUnits++;
 			result.completedUnits = jobIndex + 1;
 			emitProgress(progressMessage, result.completedUnits, job.frameNr, job.patchX, job.patchY);
 			continue;
@@ -190,10 +168,7 @@ DeconvolutionRunResult BatchProcessor::executeBatch2D(
 			if (outputPatch.isempty()) {
 				LOG_WARNING() << "Batch 2D deconvolution returned empty result at frame"
 							  << job.frameNr << "patch (" << job.patchX << "," << job.patchY << ")";
-				recordFailure(!deconvolverError.isEmpty()
-					? deconvolverError
-					: QString("Deconvolution returned an empty result at frame %1, patch (%2,%3).")
-						.arg(job.frameNr).arg(job.patchX).arg(job.patchY));
+				result.failedUnits++;
 				result.completedUnits = jobIndex + 1;
 				emitProgress(progressMessage, result.completedUnits, job.frameNr, job.patchX, job.patchY);
 				continue;
@@ -210,23 +185,21 @@ DeconvolutionRunResult BatchProcessor::executeBatch2D(
 			LOG_WARNING() << "Batch 2D deconvolution failed at frame" << job.frameNr
 						  << "patch (" << job.patchX << "," << job.patchY << "):"
 						  << e.what();
-			recordFailure(QString::fromUtf8(e.what()));
+			result.failedUnits++;
 		}
 
 		result.completedUnits = jobIndex + 1;
 		emitProgress(progressMessage, result.completedUnits, job.frameNr, job.patchX, job.patchY);
 	}
 
-	QObject::disconnect(errorConnection);
-
 	if (result.totalUnits > 0 && result.failedUnits >= result.totalUnits) {
 		result.status = DeconvolutionRunStatus::FAILED;
-		result.message = QStringLiteral("Batch deconvolution failed: all %1 patches failed (%2)")
-			.arg(result.totalUnits).arg(result.firstFailureMessage);
+		result.message = QStringLiteral("Batch deconvolution failed: all %1 patches failed (see message console).")
+			.arg(result.totalUnits);
 	} else if (result.failedUnits > 0) {
 		result.status = DeconvolutionRunStatus::PARTIAL;
-		result.message = QStringLiteral("Batch deconvolution completed with %1 of %2 patches failed: %3")
-			.arg(result.failedUnits).arg(result.totalUnits).arg(result.firstFailureMessage);
+		result.message = QStringLiteral("Batch deconvolution completed with %1 of %2 patches failed (see message console).")
+			.arg(result.failedUnits).arg(result.totalUnits);
 	} else {
 		result.status = DeconvolutionRunStatus::COMPLETED;
 		result.message = QStringLiteral("Batch deconvolution completed.");
@@ -293,23 +266,6 @@ DeconvolutionRunResult BatchProcessor::executeVolumeJobs(
 		emit this->progressUpdated(progress);
 	};
 
-	// Capture the specific reason behind empty results (Deconvolver catches
-	// af::exceptions internally); reset before each job so the message can
-	// never attach to the wrong patch.
-	QString deconvolverError;
-	QMetaObject::Connection errorConnection = QObject::connect(
-		deconvolver, &Deconvolver::error,
-		[&deconvolverError](const QString& message) {
-			deconvolverError = message;
-		});
-
-	auto recordFailure = [&result](const QString& message) {
-		result.failedUnits++;
-		if (result.firstFailureMessage.isEmpty()) {
-			result.firstFailureMessage = message;
-		}
-	};
-
 	int currentJobIndex = -1;
 	QMetaObject::Connection iterationConnection = QObject::connect(
 		deconvolver,
@@ -350,13 +306,11 @@ DeconvolutionRunResult BatchProcessor::executeVolumeJobs(
 	for (int jobIndex = 0; jobIndex < request.volumeJobs.size(); ++jobIndex) {
 		if (isCancelled()) {
 			QObject::disconnect(iterationConnection);
-			QObject::disconnect(errorConnection);
 			LOG_INFO() << "Batch 3D deconvolution cancelled at job" << jobIndex
 					   << "of" << request.volumeJobs.size();
 			return finishCancelled(jobIndex);
 		}
 
-		deconvolverError.clear();
 		currentJobIndex = jobIndex;
 		const DeconvolutionVolumeJob& job = request.volumeJobs[jobIndex];
 		const QString patchPrefix = QString("Patch %1/%2")
@@ -380,8 +334,7 @@ DeconvolutionRunResult BatchProcessor::executeVolumeJobs(
 			if (inputVolume.isempty()) {
 				LOG_WARNING() << "Skipping batch 3D patch (" << job.patchX << "," << job.patchY
 							  << "): empty subvolume";
-				recordFailure(QString("Empty subvolume at patch (%1,%2).")
-					.arg(job.patchX).arg(job.patchY));
+				result.failedUnits++;
 				result.completedUnits = jobIndex + 1;
 				emitProgress(
 					patchPrefix + QStringLiteral(": skipped empty subvolume"),
@@ -393,7 +346,6 @@ DeconvolutionRunResult BatchProcessor::executeVolumeJobs(
 			}
 			if (isCancelled()) {
 				QObject::disconnect(iterationConnection);
-				QObject::disconnect(errorConnection);
 				LOG_INFO() << "Batch 3D deconvolution cancelled after subvolume assembly at patch"
 						   << job.patchX << job.patchY;
 				return finishCancelled(jobIndex);
@@ -415,8 +367,7 @@ DeconvolutionRunResult BatchProcessor::executeVolumeJobs(
 			if (psfVolume.isempty()) {
 				LOG_WARNING() << "Skipping batch 3D patch (" << job.patchX << "," << job.patchY
 							  << "): empty PSF volume";
-				recordFailure(QString("Empty PSF volume at patch (%1,%2).")
-					.arg(job.patchX).arg(job.patchY));
+				result.failedUnits++;
 				result.completedUnits = jobIndex + 1;
 				emitProgress(
 					patchPrefix + QStringLiteral(": skipped empty PSF"),
@@ -428,7 +379,6 @@ DeconvolutionRunResult BatchProcessor::executeVolumeJobs(
 			}
 			if (isCancelled()) {
 				QObject::disconnect(iterationConnection);
-				QObject::disconnect(errorConnection);
 				LOG_INFO() << "Batch 3D deconvolution cancelled after PSF assembly at patch"
 						   << job.patchX << job.patchY;
 				return finishCancelled(jobIndex);
@@ -448,7 +398,6 @@ DeconvolutionRunResult BatchProcessor::executeVolumeJobs(
 					|| deconvolver->wasDeconvolutionCancelled();
 				if (wasCancelled) {
 					QObject::disconnect(iterationConnection);
-					QObject::disconnect(errorConnection);
 					LOG_INFO() << "Batch 3D deconvolution cancelled at patch"
 							   << job.patchX << job.patchY;
 					return finishCancelled(jobIndex);
@@ -456,10 +405,7 @@ DeconvolutionRunResult BatchProcessor::executeVolumeJobs(
 
 				LOG_WARNING() << "Batch 3D deconvolution returned empty result at patch ("
 							  << job.patchX << "," << job.patchY << ")";
-				recordFailure(!deconvolverError.isEmpty()
-					? deconvolverError
-					: QString("Deconvolution returned an empty result at patch (%1,%2).")
-						.arg(job.patchX).arg(job.patchY));
+				result.failedUnits++;
 				result.completedUnits = jobIndex + 1;
 				emitProgress(
 					patchPrefix + QStringLiteral(": deconvolution returned empty result"),
@@ -496,7 +442,7 @@ DeconvolutionRunResult BatchProcessor::executeVolumeJobs(
 		} catch (const af::exception& e) {
 			LOG_WARNING() << "Batch 3D deconvolution failed at patch (" << job.patchX
 						  << "," << job.patchY << "):" << e.what();
-			recordFailure(QString::fromUtf8(e.what()));
+			result.failedUnits++;
 			result.completedUnits = jobIndex + 1;
 			emitProgress(
 				patchPrefix + QStringLiteral(": failed"),
@@ -509,19 +455,18 @@ DeconvolutionRunResult BatchProcessor::executeVolumeJobs(
 	}
 
 	QObject::disconnect(iterationConnection);
-	QObject::disconnect(errorConnection);
 
 	const QString operationName = singlePatch3D
 		? QStringLiteral("3D deconvolution")
 		: QStringLiteral("Batch deconvolution");
 	if (result.totalUnits > 0 && result.failedUnits >= result.totalUnits) {
 		result.status = DeconvolutionRunStatus::FAILED;
-		result.message = QStringLiteral("%1 failed: all %2 patches failed (%3)")
-			.arg(operationName).arg(result.totalUnits).arg(result.firstFailureMessage);
+		result.message = QStringLiteral("%1 failed: all %2 patches failed (see message console).")
+			.arg(operationName).arg(result.totalUnits);
 	} else if (result.failedUnits > 0) {
 		result.status = DeconvolutionRunStatus::PARTIAL;
-		result.message = QStringLiteral("%1 completed with %2 of %3 patches failed: %4")
-			.arg(operationName).arg(result.failedUnits).arg(result.totalUnits).arg(result.firstFailureMessage);
+		result.message = QStringLiteral("%1 completed with %2 of %3 patches failed (see message console).")
+			.arg(operationName).arg(result.failedUnits).arg(result.totalUnits);
 	} else {
 		result.status = DeconvolutionRunStatus::COMPLETED;
 		result.message = operationName + QStringLiteral(" completed.");

@@ -120,7 +120,6 @@ struct DeconvolutionRunResult {
 	int completedUnits = 0;
 	int totalUnits = 0;
 	int failedUnits = 0;
-	QString firstFailureMessage;
 	QVector<DeconvolutionPatchOutput> patchOutputs;
 	QVector<DeconvolutionVolumeOutput> volumeOutputs;
 };
