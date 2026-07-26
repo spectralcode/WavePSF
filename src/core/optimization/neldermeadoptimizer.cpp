@@ -1,6 +1,7 @@
 #include "neldermeadoptimizer.h"
 #include <QtMath>
 #include <algorithm>
+#include <limits>
 
 namespace {
 	const QString KEY_MAX_ITERATIONS   = QStringLiteral("max_iterations");
@@ -84,7 +85,9 @@ OptimizerResult NelderMeadOptimizer::run(
 	// Build initial simplex: N+1 vertices
 	const int NV = N + 1;
 	QVector<QVector<double>> simplex(NV, QVector<double>(N));
-	QVector<double> values(NV);
+	// Initialize to the failure sentinel so vertices skipped by a
+	// cancelled initial evaluation can never become the global best.
+	QVector<double> values(NV, (std::numeric_limits<double>::max)());
 
 	// Vertex 0 = initial coefficients (clamped to bounds)
 	for (int i = 0; i < N; ++i) {

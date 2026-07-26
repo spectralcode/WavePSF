@@ -1,6 +1,6 @@
 QT = core
 TEMPLATE = app
-TARGET = test_differentialevolution
+TARGET = test_optimizationcancellation
 CONFIG += console c++11 testcase
 CONFIG -= app_bundle debug_and_release
 
@@ -16,5 +16,6 @@ OBJECTS_DIR = obj/$${TARGET}
 
 INCLUDEPATH += ../src
 
-SOURCES += test_differentialevolution.cpp \
-	../src/core/optimization/differentialevolutionoptimizer.cpp
+SOURCES += test_optimizationcancellation.cpp \
+	../src/core/optimization/differentialevolutionoptimizer.cpp \
+	../src/core/optimization/neldermeadoptimizer.cpp

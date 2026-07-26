@@ -108,7 +108,9 @@ OptimizerResult DifferentialEvolutionOptimizer::run(
 
 	// Initialize population: NP individuals, each with N selected dimensions
 	QVector<QVector<double>> pop(NP, QVector<double>(N));
-	QVector<double> fitness(NP);
+	// Initialize to the failure sentinel so individuals skipped by a
+	// cancelled initial evaluation can never win the best-scan below.
+	QVector<double> fitness(NP, (std::numeric_limits<double>::max)());
 
 	// First individual = initial coefficients (clamped to bounds)
 	for (int i = 0; i < N; ++i) {
