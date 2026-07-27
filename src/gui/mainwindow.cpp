@@ -781,7 +781,15 @@ void MainWindow::connectPSFGridWidget() {
 	// Generate request → ApplicationController
 	connect(gridWidget, &PSFGridWidget::generateRequested,
 	        this->applicationController, &ApplicationController::generatePSFGrid);
-	connect(this->applicationController, &ApplicationController::psfGridGenerated,
+	connect(gridWidget, &PSFGridWidget::cancelGenerationRequested,
+	        this->applicationController, &ApplicationController::cancelPSFGridGeneration);
+	connect(gridWidget, &PSFGridWidget::updatePatchRequested,
+	        this->applicationController, &ApplicationController::refreshPSFGridPatch);
+	connect(this->applicationController, &ApplicationController::psfGridGenerationStarted,
+	        gridWidget, &PSFGridWidget::generationStarted);
+	connect(this->applicationController, &ApplicationController::psfGridGenerationProgressUpdated,
+	        gridWidget, &PSFGridWidget::generationProgressUpdated);
+	connect(this->applicationController, &ApplicationController::psfGridGenerationFinished,
 	        gridWidget, &PSFGridWidget::displayPSFGrid);
 
 	// Bidirectional patch selection
@@ -795,6 +803,10 @@ void MainWindow::connectPSFGridWidget() {
 	        gridWidget, &PSFGridWidget::setPatchGridDimensions);
 	connect(this->applicationController, &ApplicationController::frameChanged,
 	        gridWidget, &PSFGridWidget::setCurrentFrame);
+	connect(this->applicationController, &ApplicationController::psfSettingsUpdated,
+	        gridWidget, &PSFGridWidget::invalidateGrid);
+	connect(this->psfGridDock, &QDockWidget::visibilityChanged,
+	        gridWidget, &PSFGridWidget::handleVisibilityChanged);
 
 	// Live PSF grid view update 
 	connect(this->applicationController, &ApplicationController::psfUpdatedForPatch,

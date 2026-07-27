@@ -1,92 +1,212 @@
 #include "psfgridgenerator.h"
-#include "psfmodule.h"
-#include "data/wavefrontparametertable.h"
+#include "ipsfgenerator.h"
+#include "psfgeneratorfactory.h"
+#include "core/processing/patchdeconvolutionprocessor.h"
+#include "utils/afdevicemanager.h"
 #include "utils/logging.h"
+#include <QtConcurrent>
+#include <QScopedPointer>
+#include <cstring>
+#include <exception>
 
 PSFGridGenerator::PSFGridGenerator(QObject* parent)
 	: QObject(parent)
 {
+	this->cancelRequested.storeRelease(0);
+	connect(&this->watcher, &QFutureWatcher<PSFGridResult>::finished,
+			this, [this]() {
+				emit this->finished(this->watcher.result());
+			});
 }
 
-PSFGridResult PSFGridGenerator::generate(
-	PSFModule* psfModule,
-	WavefrontParameterTable* parameterTable,
-	int frame, int cols, int rows,
-	int cropSize)
+PSFGridGenerator::~PSFGridGenerator()
+{
+	this->cancel();
+	this->watcher.waitForFinished();
+}
+
+void PSFGridGenerator::generate(const PSFGridRequest& request)
+{
+	if (this->watcher.isRunning()) {
+		return;
+	}
+
+	this->cancelRequested.storeRelease(0);
+	emit this->started(request.cols * request.rows);
+	this->watcher.setFuture(QtConcurrent::run([this, request]() {
+		return this->generateGrid(request);
+	}));
+}
+
+void PSFGridGenerator::cancel()
+{
+	this->cancelRequested.storeRelease(1);
+}
+
+PSFGridResult PSFGridGenerator::generateGrid(
+	const PSFGridRequest& request)
+{
+	PSFGridResult result;
+	result.cols = request.cols;
+	result.rows = request.rows;
+	result.cellSize = request.cropSize;
+
+	try {
+		const int totalPatches = request.cols * request.rows;
+		const bool usesLoadedPSFs = !request.loadedPSFs.isEmpty();
+		if (request.cols <= 0 || request.rows <= 0 || request.cropSize <= 0
+			|| (usesLoadedPSFs
+				? request.loadedPSFs.size() != totalPatches
+				: request.coefficients.size() != totalPatches)) {
+			result.status = RunStatus::FAILED;
+			result.message = tr("Invalid PSF grid request.");
+			return result;
+		}
+
+		AFDeviceManager::setDeviceForCurrentThread(
+			request.afBackend, request.afDeviceId);
+
+		QScopedPointer<IPSFGenerator> generator;
+		if (!usesLoadedPSFs) {
+			generator.reset(PSFGeneratorFactory::create(
+				request.psfSettings.generatorTypeName, nullptr));
+			if (generator.isNull()) {
+				result.status = RunStatus::FAILED;
+				result.message = tr("Unknown PSF generator: %1")
+					.arg(request.psfSettings.generatorTypeName);
+				return result;
+			}
+
+			const QVariantMap settings =
+				request.psfSettings.allGeneratorSettings.value(
+					request.psfSettings.generatorTypeName);
+			if (!settings.isEmpty()) {
+				generator->deserializeSettings(settings);
+			}
+		}
+
+		result = createEmptyGrid(
+			request.cols, request.rows, request.cropSize);
+		int missingPatches = 0;
+		for (int patchIdx = 0; patchIdx < totalPatches; ++patchIdx) {
+			if (this->cancelRequested.loadAcquire() != 0) {
+				result.status = RunStatus::CANCELLED;
+				return result;
+			}
+
+			af::array psf;
+			if (usesLoadedPSFs) {
+				psf = request.loadedPSFs.at(patchIdx);
+			} else {
+				generator->setAllCoefficients(
+					request.coefficients.at(patchIdx));
+				PSFRequest psfRequest;
+				psfRequest.gridSize = request.psfSettings.gridSize;
+				psfRequest.frame = request.frame;
+				psfRequest.patchIdx = patchIdx;
+				psf = generator->generatePSF(psfRequest);
+			}
+
+			if (!updatePatch(
+				result, psf, request.frame,
+				patchIdx % request.cols, patchIdx / request.cols)) {
+				++missingPatches;
+			}
+
+			emit this->progressUpdated(patchIdx + 1, totalPatches);
+		}
+
+		if (this->cancelRequested.loadAcquire() != 0) {
+			result.status = RunStatus::CANCELLED;
+			return result;
+		}
+		if (missingPatches > 0) {
+			result.status = RunStatus::FAILED;
+			result.message = tr("No PSF is available for %1 of %2 patches.")
+				.arg(missingPatches)
+				.arg(totalPatches);
+			return result;
+		}
+
+		LOG_INFO() << "PSF grid generated:" << request.cols << "x" << request.rows
+				   << "patches, crop=" << request.cropSize;
+	} catch (const af::exception& e) {
+		result.status = RunStatus::FAILED;
+		result.message = tr("PSF grid generation failed: %1")
+			.arg(QString::fromUtf8(e.what()));
+	} catch (const std::exception& e) {
+		result.status = RunStatus::FAILED;
+		result.message = tr("PSF grid generation failed: %1")
+			.arg(QString::fromUtf8(e.what()));
+	} catch (...) {
+		result.status = RunStatus::FAILED;
+		result.message = tr("PSF grid generation failed with an unknown error.");
+	}
+	return result;
+}
+
+PSFGridResult PSFGridGenerator::createEmptyGrid(
+	int cols, int rows, int cellSize)
 {
 	PSFGridResult result;
 	result.cols = cols;
 	result.rows = rows;
-	result.cellSize = cropSize;
-	result.spacing = 1;
-
-	int totalPatches = cols * rows;
-	result.rawPSFs.resize(totalPatches);
-
-	for (int y = 0; y < rows; y++) {
-		for (int x = 0; x < cols; x++) {
-			int patchIdx = parameterTable->patchIndex(x, y);
-			QVector<double> coeffs = parameterTable->getCoefficients(frame, patchIdx);
-			af::array psf = psfModule->computePSFFromCoefficients(coeffs);
-
-			// Extract frame-specific slice if PSF is 3D
-			psf = PSFModule::extractFrame(psf, frame);
-
-			// Center-crop
-			int psfSize = static_cast<int>(psf.dims(0));
-			if (cropSize < psfSize) {
-				int offset = (psfSize - cropSize) / 2;
-				psf = psf(af::seq(offset, offset + cropSize - 1),
-				          af::seq(offset, offset + cropSize - 1));
-			}
-			psf = af::transpose(psf); //transpose for correct display orientation 
-			result.rawPSFs[patchIdx] = psf;
-		}
+	result.cellSize = cellSize;
+	if (cols <= 0 || rows <= 0 || cellSize <= 0) {
+		return result;
 	}
 
-	result.mosaicImage = composeMosaic(
-		result.rawPSFs, cols, rows, cropSize, result.spacing);
-
-	LOG_INFO() << "PSF grid generated:" << cols << "x" << rows
-			   << "patches, crop=" << cropSize;
+	result.rawPSFs.resize(cols * rows);
+	result.mosaicImage = QImage(
+		cols * cellSize + (cols - 1) * result.spacing,
+		rows * cellSize + (rows - 1) * result.spacing,
+		QImage::Format_Grayscale8);
+	result.mosaicImage.fill(0);
 	return result;
 }
 
-QImage PSFGridGenerator::composeMosaic(
-	const QVector<af::array>& psfs,
-	int cols, int rows, int cellSize, int spacing)
+bool PSFGridGenerator::updatePatch(
+	PSFGridResult& grid, af::array psf,
+	int frame, int patchX, int patchY)
 {
-	int mosaicWidth = cols * cellSize + (cols - 1) * spacing;
-	int mosaicHeight = rows * cellSize + (rows - 1) * spacing;
-
-	QImage mosaic(mosaicWidth, mosaicHeight, QImage::Format_Grayscale8);
-	mosaic.fill(0);
-
-	int stride = cellSize + spacing;
-
-	for (int y = 0; y < rows; y++) {
-		for (int x = 0; x < cols; x++) {
-			int patchIdx = y * cols + x;
-			if (patchIdx >= psfs.size() || psfs[patchIdx].isempty()) {
-				continue;
-			}
-
-			QImage cellImage = afArrayToGrayscaleImage(psfs[patchIdx]);
-
-			int destX = x * stride;
-			int destY = y * stride;
-
-			for (int cy = 0; cy < cellImage.height() && (destY + cy) < mosaicHeight; cy++) {
-				const uchar* srcLine = cellImage.constScanLine(cy);
-				uchar* dstLine = mosaic.scanLine(destY + cy);
-				for (int cx = 0; cx < cellImage.width() && (destX + cx) < mosaicWidth; cx++) {
-					dstLine[destX + cx] = srcLine[cx];
-				}
-			}
-		}
+	if (psf.isempty() || grid.mosaicImage.isNull()
+		|| patchX < 0 || patchX >= grid.cols
+		|| patchY < 0 || patchY >= grid.rows) {
+		return false;
 	}
 
-	return mosaic;
+	psf = PatchDeconvolutionProcessor::extractPSFFrame(psf, frame);
+	if (psf.isempty()) {
+		return false;
+	}
+
+	const int psfSize = static_cast<int>(psf.dims(0));
+	if (grid.cellSize < psfSize) {
+		const int offset = (psfSize - grid.cellSize) / 2;
+		psf = psf(
+			af::seq(offset, offset + grid.cellSize - 1),
+			af::seq(offset, offset + grid.cellSize - 1));
+	}
+	psf = af::transpose(psf);
+
+	const int patchIdx = patchY * grid.cols + patchX;
+	if (patchIdx >= grid.rawPSFs.size()) {
+		return false;
+	}
+	grid.rawPSFs[patchIdx] = psf;
+
+	const QImage cellImage = afArrayToGrayscaleImage(psf);
+	const int destX = patchX * (grid.cellSize + grid.spacing);
+	const int destY = patchY * (grid.cellSize + grid.spacing);
+	const int copyWidth = qMin(cellImage.width(), grid.cellSize);
+	const int copyHeight = qMin(cellImage.height(), grid.cellSize);
+	for (int y = 0; y < copyHeight; ++y) {
+		std::memcpy(
+			grid.mosaicImage.scanLine(destY + y) + destX,
+			cellImage.constScanLine(y),
+			static_cast<size_t>(copyWidth));
+	}
+	return true;
 }
 
 QImage PSFGridGenerator::afArrayToGrayscaleImage(const af::array& arr)

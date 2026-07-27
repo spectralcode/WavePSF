@@ -8,8 +8,8 @@
 
 class QCheckBox;
 class QPushButton;
+class QProgressBar;
 class QSpinBox;
-class QLabel;
 class QSplitter;
 class QGraphicsView;
 class QGraphicsScene;
@@ -35,19 +35,29 @@ public slots:
 	void flipH();
 	void flipV();
 	void updateSinglePSF(af::array psf, int patchX, int patchY);
+	void invalidateGrid();
+	void generationStarted(int totalPatches);
+	void generationProgressUpdated(int completedPatches, int totalPatches);
+	void handleVisibilityChanged(bool visible);
 	void applyViewTransform(QTransform transform, QPointF center);
 	void setSyncActive(bool active);
 
 signals:
 	void generateRequested(int frame, int cropSize);
+	void cancelGenerationRequested();
+	void updatePatchRequested();
 	void patchClicked(int x, int y);
 
 private slots:
-	void onGenerateClicked();
+	void onUpdatePatchClicked();
+	void onUpdateFrameClicked();
 	void showContextMenu(const QPoint& pos);
 
 private:
 	void setupUI();
+	void finishGeneration();
+	void startPendingFrameUpdate();
+	void setStatus(const QString& text);
 	void updateHighlight();
 	QPair<int, int> cellAtScenePos(QPointF scenePos) const;
 	void saveMosaicAs(const QString& format);
@@ -59,10 +69,12 @@ private:
 	QSplitter* splitter;
 
 	// Controls
-	QPushButton* generateButton;
-	QCheckBox* liveUpdateCheckBox;
+	QPushButton* updatePatchButton;
+	QCheckBox* autoUpdatePatchCheckBox;
+	QPushButton* updateFrameButton;
+	QCheckBox* autoUpdateFrameCheckBox;
+	QProgressBar* progressBar;
 	QSpinBox* cropSizeSpinBox;
-	QLabel* infoLabel;
 
 	// Graphics view (zoom/pan)
 	QGraphicsView* graphicsView;
@@ -77,6 +89,12 @@ private:
 	int patchCols;
 	int patchRows;
 	bool syncActive;
+	bool generationInProgress;
+	bool discardPendingResult;
+	bool frameUpdatePending;
+	bool manualPatchUpdate;
+	bool gridOutdated;
+	bool resetGridOnNextPatchUpdate;
 	QTransform viewOrientation;
 	PSFGridResult lastResult;
 };

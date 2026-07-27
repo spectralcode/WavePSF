@@ -72,6 +72,18 @@ ApplicationController::ApplicationController(AFDeviceManager* afDeviceManager, Q
 				}
 			});
 
+	connect(this->psfGridGenerator, &PSFGridGenerator::started,
+			this, &ApplicationController::psfGridGenerationStarted);
+	connect(this->psfGridGenerator, &PSFGridGenerator::progressUpdated,
+			this, &ApplicationController::psfGridGenerationProgressUpdated);
+	connect(this->psfGridGenerator, &PSFGridGenerator::finished,
+			this, [this](const PSFGridResult& result) {
+				if (result.status == RunStatus::FAILED) {
+					this->reportError(QStringLiteral("PSF grid"), result.message);
+				}
+				emit this->psfGridGenerationFinished(result);
+			});
+
 	qRegisterMetaType<InterpolationResult>("InterpolationResult");
 }
 
@@ -137,7 +149,7 @@ void ApplicationController::setCurrentFrame(int frame)
 	this->suppressLiveDeconv = true;
 
 	this->imageSession->setCurrentFrame(frame);
-	this->coefficientWorkspace->loadForCurrentPatch();
+	this->loadCurrentPatchCoefficients();
 
 	this->suppressLiveDeconv = oldSuppress;
 
@@ -158,7 +170,7 @@ void ApplicationController::setCurrentPatch(int x, int y)
 		this->suppressLiveDeconv = true;
 
 		this->imageSession->setCurrentPatch(x, y);
-		this->coefficientWorkspace->loadForCurrentPatch();
+		this->loadCurrentPatchCoefficients();
 
 		this->suppressLiveDeconv = oldSuppress;
 
@@ -166,6 +178,25 @@ void ApplicationController::setCurrentPatch(int x, int y)
 			&& this->deconvolutionController != nullptr) {
 			this->deconvolutionController->requestCurrentDeconvolution();
 		}
+	}
+}
+
+void ApplicationController::loadCurrentPatchCoefficients()
+{
+	const bool canReusePSF =
+		this->psfModule->getGenerator()->supportsCoefficients()
+		&& !this->psfModule->getCurrentPSF().isempty();
+	const QVector<double> previousCoefficients =
+		canReusePSF
+			? this->psfModule->getAllCoefficients()
+			: QVector<double>();
+
+	this->coefficientWorkspace->loadForCurrentPatch();
+	if (canReusePSF
+		&& previousCoefficients == this->psfModule->getAllCoefficients()) {
+		emit this->psfUpdatedForPatch(
+			this->psfModule->getCurrentPSF(),
+			this->getCurrentPatchX(), this->getCurrentPatchY());
 	}
 }
 
@@ -866,6 +897,8 @@ void ApplicationController::setPSFSaveFolder(const QString& folder)
 void ApplicationController::setFilePSFSource(const QString& path)
 {
 	this->psfFileController->setFilePSFSource(path);
+	emit psfSettingsUpdated(this->psfModule->getPSFSettings());
+	this->psfModule->refreshPSF();
 }
 
 // --- PSF Grid ---
@@ -874,16 +907,68 @@ void ApplicationController::generatePSFGrid(int frame, int cropSize)
 {
 	if (!this->hasInputData() || this->psfModule == nullptr || this->coefficientWorkspace->table() == nullptr) {
 		LOG_WARNING() << "Cannot generate PSF grid: missing input data or parameters";
+		PSFGridResult result;
+		result.status = RunStatus::FAILED;
+		result.message = tr("Cannot generate a PSF grid without input data and parameters.");
+		emit this->psfGridGenerationFinished(result);
 		return;
 	}
 
 	this->coefficientWorkspace->store();
 
-	PSFGridResult result = this->psfGridGenerator->generate(
-		this->psfModule, this->coefficientWorkspace->table(),
-		frame, this->getPatchGridCols(), this->getPatchGridRows(),
-		cropSize);
-	emit psfGridGenerated(result);
+	PSFGridRequest request;
+	request.psfSettings = this->psfModule->getPSFSettings();
+	request.afBackend = this->afDeviceManager->getActiveBackendId();
+	request.afDeviceId = this->afDeviceManager->getActiveDeviceId();
+	request.frame = frame;
+	request.cols = this->getPatchGridCols();
+	request.rows = this->getPatchGridRows();
+	request.cropSize = cropSize;
+
+	WavefrontParameterTable* table = this->coefficientWorkspace->table();
+	const int coefficientFrame = request.psfSettings.is3D ? 0 : frame;
+	const bool useLoadedPSFs = request.psfSettings.isFileBased;
+	if (useLoadedPSFs) {
+		request.loadedPSFs.reserve(request.cols * request.rows);
+	} else {
+		request.coefficients.reserve(request.cols * request.rows);
+	}
+	for (int y = 0; y < request.rows; ++y) {
+		for (int x = 0; x < request.cols; ++x) {
+			const int patchIdx = table->patchIndex(x, y);
+			if (useLoadedPSFs) {
+				PSFRequest psfRequest;
+				psfRequest.gridSize = request.psfSettings.gridSize;
+				psfRequest.frame = frame;
+				psfRequest.patchIdx = patchIdx;
+				request.loadedPSFs.append(
+					this->psfModule->getGenerator()->generatePSF(psfRequest));
+			} else {
+				request.coefficients.append(
+					table->getCoefficients(coefficientFrame, patchIdx));
+			}
+		}
+	}
+
+	this->psfGridGenerator->generate(request);
+}
+
+void ApplicationController::cancelPSFGridGeneration()
+{
+	this->psfGridGenerator->cancel();
+}
+
+void ApplicationController::refreshPSFGridPatch()
+{
+	if (this->hasInputData() && this->psfModule != nullptr) {
+		const af::array psf = this->psfModule->getCurrentPSF();
+		if (!psf.isempty()) {
+			emit this->psfUpdatedForPatch(
+				psf, this->getCurrentPatchX(), this->getCurrentPatchY());
+		} else {
+			this->psfModule->refreshPSF();
+		}
+	}
 }
 
 // --- Interpolation ---

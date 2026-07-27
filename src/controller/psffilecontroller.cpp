@@ -41,7 +41,6 @@ void PSFFileController::setFilePSFSource(const QString& path)
 	FilePSFGenerator* fileGen = dynamic_cast<FilePSFGenerator*>(this->psfModule->getGenerator());
 	if (fileGen == nullptr) return;
 	fileGen->setSource(path);
-	this->psfModule->refreshPSF();
 	this->refreshFileInfo();
 }
 

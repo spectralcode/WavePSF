@@ -126,6 +126,8 @@ public slots:
 
 	// PSF grid
 	void generatePSFGrid(int frame, int cropSize);
+	void cancelPSFGridGeneration();
+	void refreshPSFGridPatch();
 
 	// Interpolation
 	void interpolateCoefficientsInX();
@@ -163,6 +165,7 @@ private:
 	void reportError(const QString& source, const QString& message);
 	OperationResult loadFileToSession(const QString& filePath, bool isGroundTruth);
 
+	void loadCurrentPatchCoefficients();
 	void syncNumZPlanesWithInput();
 
 	// Core components
@@ -241,7 +244,9 @@ signals:
 	void interpolationCompleted(InterpolationResult result);
 
 	// PSF grid
-	void psfGridGenerated(PSFGridResult result);
+	void psfGridGenerationStarted(int totalPatches);
+	void psfGridGenerationProgressUpdated(int completedPatches, int totalPatches);
+	void psfGridGenerationFinished(PSFGridResult result);
 
 	// File PSF metadata
 	void filePSFInfoUpdated(PSFFileInfo info);

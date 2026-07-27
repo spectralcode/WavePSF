@@ -3,10 +3,11 @@
 
 #include <cmath>
 #include <QVBoxLayout>
-#include <QHBoxLayout>
+#include <QGridLayout>
 #include <QSplitter>
 #include <QCheckBox>
 #include <QPushButton>
+#include <QProgressBar>
 #include <QSpinBox>
 #include <QLabel>
 #include <QGraphicsView>
@@ -24,10 +25,12 @@
 namespace {
 	const QString SETTINGS_GROUP    = QStringLiteral("psf_grid_widget");
 	const QString KEY_CROP_SIZE      = QStringLiteral("crop_size");
-	const QString KEY_LIVE_UPDATE    = QStringLiteral("live_update");
+	const QString KEY_AUTO_PATCH     = QStringLiteral("live_update");
+	const QString KEY_AUTO_FRAME     = QStringLiteral("auto_update_frame");
 	const QString KEY_SPLITTER_STATE = QStringLiteral("splitter_state");
 	const int     DEF_CROP_SIZE      = 32;
-	const bool    DEF_LIVE_UPDATE    = true;
+	const bool    DEF_AUTO_PATCH     = true;
+	const bool    DEF_AUTO_FRAME     = false;
 }
 
 PSFGridWidget::PSFGridWidget(QWidget* parent)
@@ -40,6 +43,12 @@ PSFGridWidget::PSFGridWidget(QWidget* parent)
 	, patchCols(1)
 	, patchRows(1)
 	, syncActive(false)
+	, generationInProgress(false)
+	, discardPendingResult(false)
+	, frameUpdatePending(false)
+	, manualPatchUpdate(false)
+	, gridOutdated(true)
+	, resetGridOnNextPatchUpdate(false)
 {
 	this->setupUI();
 }
@@ -53,7 +62,8 @@ QVariantMap PSFGridWidget::getSettings() const
 {
 	QVariantMap settings;
 	settings[KEY_CROP_SIZE] = this->cropSizeSpinBox->value();
-	settings[KEY_LIVE_UPDATE] = this->liveUpdateCheckBox->isChecked();
+	settings[KEY_AUTO_PATCH] = this->autoUpdatePatchCheckBox->isChecked();
+	settings[KEY_AUTO_FRAME] = this->autoUpdateFrameCheckBox->isChecked();
 	settings[KEY_SPLITTER_STATE] = this->splitter->saveState();
 	return settings;
 }
@@ -61,7 +71,10 @@ QVariantMap PSFGridWidget::getSettings() const
 void PSFGridWidget::setSettings(const QVariantMap& settings)
 {
 	this->cropSizeSpinBox->setValue(settings.value(KEY_CROP_SIZE, DEF_CROP_SIZE).toInt());
-	this->liveUpdateCheckBox->setChecked(settings.value(KEY_LIVE_UPDATE, DEF_LIVE_UPDATE).toBool());
+	this->autoUpdatePatchCheckBox->setChecked(
+		settings.value(KEY_AUTO_PATCH, DEF_AUTO_PATCH).toBool());
+	this->autoUpdateFrameCheckBox->setChecked(
+		settings.value(KEY_AUTO_FRAME, DEF_AUTO_FRAME).toBool());
 	if (settings.contains(KEY_SPLITTER_STATE)) {
 		this->splitter->restoreState(settings.value(KEY_SPLITTER_STATE).toByteArray());
 	}
@@ -87,32 +100,46 @@ void PSFGridWidget::setupUI()
 
 	// Controls (bottom)
 	QWidget* controlsWidget = new QWidget(this);
-	QHBoxLayout* controlsLayout = new QHBoxLayout(controlsWidget);
+	QGridLayout* controlsLayout = new QGridLayout(controlsWidget);
 	controlsLayout->setContentsMargins(4, 4, 4, 4);
+	controlsLayout->setHorizontalSpacing(6);
+	controlsLayout->setVerticalSpacing(2);
 
-	this->generateButton = new QPushButton(tr("Generate"), this);
-	controlsLayout->addWidget(this->generateButton);
+	this->updatePatchButton = new QPushButton(tr("Update patch"), this);
+	this->updatePatchButton->setSizePolicy(
+		QSizePolicy::Expanding, QSizePolicy::Fixed);
+	controlsLayout->addWidget(this->updatePatchButton, 0, 0);
 
-	this->liveUpdateCheckBox = new QCheckBox(tr("Auto-update"), this);
-	this->liveUpdateCheckBox->setChecked(DEF_LIVE_UPDATE);
-	this->liveUpdateCheckBox->setToolTip(tr("Automatically update the grid when coefficients change"));
-	controlsLayout->addWidget(this->liveUpdateCheckBox);
+	this->autoUpdatePatchCheckBox = new QCheckBox(tr("Auto update patch"), this);
+	this->autoUpdatePatchCheckBox->setChecked(DEF_AUTO_PATCH);
+	controlsLayout->addWidget(this->autoUpdatePatchCheckBox, 0, 1);
 
-	controlsLayout->addStretch();
-
-	controlsLayout->addWidget(new QLabel(tr("Crop:"), this));
+	controlsLayout->addWidget(new QLabel(tr("Crop:"), this), 0, 2);
 	this->cropSizeSpinBox = new QSpinBox(this);
 	this->cropSizeSpinBox->setRange(8, 1024);
 	this->cropSizeSpinBox->setValue(DEF_CROP_SIZE);
 	this->cropSizeSpinBox->setSuffix(tr(" px"));
-	controlsLayout->addWidget(this->cropSizeSpinBox);
+	controlsLayout->addWidget(this->cropSizeSpinBox, 0, 3);
 
-	controlsLayout->addStretch();
+	this->updateFrameButton = new QPushButton(tr("Update frame"), this);
+	this->updateFrameButton->setSizePolicy(
+		QSizePolicy::Expanding, QSizePolicy::Fixed);
+	controlsLayout->addWidget(this->updateFrameButton, 1, 0);
 
-	this->infoLabel = new QLabel(this);
-	controlsLayout->addWidget(this->infoLabel);
+	this->autoUpdateFrameCheckBox = new QCheckBox(tr("Auto update frame"), this);
+	this->autoUpdateFrameCheckBox->setChecked(DEF_AUTO_FRAME);
+	controlsLayout->addWidget(this->autoUpdateFrameCheckBox, 1, 1);
+
+	this->progressBar = new QProgressBar(this);
+	this->progressBar->setRange(0, 1);
+	this->progressBar->setValue(0);
+	this->progressBar->setFormat(QString());
+	this->progressBar->setAlignment(Qt::AlignCenter);
+	controlsLayout->addWidget(this->progressBar, 1, 2, 1, 2);
+	controlsLayout->setColumnStretch(3, 1);
 
 	this->splitter->addWidget(controlsWidget);
+	this->splitter->setCollapsible(1, false);
 
 	this->splitter->setStretchFactor(0, 3);
 	this->splitter->setStretchFactor(1, 0);
@@ -120,23 +147,78 @@ void PSFGridWidget::setupUI()
 	mainLayout->addWidget(this->splitter);
 
 	// Connections
-	connect(this->generateButton, &QPushButton::clicked,
-	        this, &PSFGridWidget::onGenerateClicked);
+	connect(this->updatePatchButton, &QPushButton::clicked,
+	        this, &PSFGridWidget::onUpdatePatchClicked);
+	connect(this->updateFrameButton, &QPushButton::clicked,
+	        this, &PSFGridWidget::onUpdateFrameClicked);
 	connect(this->graphicsView, &QWidget::customContextMenuRequested,
 	        this, &PSFGridWidget::showContextMenu);
-	connect(this->liveUpdateCheckBox, &QCheckBox::toggled,
-	        this->generateButton, &QPushButton::setDisabled);
-	this->generateButton->setDisabled(this->liveUpdateCheckBox->isChecked());
+	connect(this->cropSizeSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+	        this, &PSFGridWidget::invalidateGrid);
+	connect(this->autoUpdatePatchCheckBox, &QCheckBox::toggled,
+	        this, [this](bool checked) {
+		        if (checked) {
+			        this->handleVisibilityChanged(this->isVisible());
+		        }
+	        });
+	connect(this->autoUpdateFrameCheckBox, &QCheckBox::toggled,
+	        this, [this](bool checked) {
+		        if (checked && this->isVisible() && this->gridOutdated) {
+			        this->handleVisibilityChanged(true);
+		        }
+	        });
 }
 
-void PSFGridWidget::onGenerateClicked()
+void PSFGridWidget::onUpdatePatchClicked()
 {
+	this->manualPatchUpdate = true;
+	emit this->updatePatchRequested();
+	this->manualPatchUpdate = false;
+}
+
+void PSFGridWidget::onUpdateFrameClicked()
+{
+	if (this->generationInProgress) {
+		this->frameUpdatePending = false;
+		this->updateFrameButton->setEnabled(false);
+		this->setStatus(tr("Cancelling..."));
+		emit this->cancelGenerationRequested();
+		return;
+	}
+	this->frameUpdatePending = false;
 	emit generateRequested(this->currentFrame, this->cropSizeSpinBox->value());
 }
 
 void PSFGridWidget::displayPSFGrid(const PSFGridResult& result)
 {
+	this->finishGeneration();
+	const QString cancelledStatus = this->lastResult.mosaicImage.isNull()
+		? tr("Cancelled.")
+		: tr("Cancelled - previous grid retained");
+	if (this->discardPendingResult) {
+		this->discardPendingResult = false;
+		this->setStatus(this->gridOutdated
+			? tr("Out of date - Update frame")
+			: cancelledStatus);
+		this->startPendingFrameUpdate();
+		return;
+	}
+
+	if (result.status == RunStatus::CANCELLED) {
+		this->setStatus(cancelledStatus);
+		this->startPendingFrameUpdate();
+		return;
+	}
+	const bool failed = result.status == RunStatus::FAILED;
+	if (failed && result.mosaicImage.isNull()) {
+		this->setStatus(result.message);
+		this->startPendingFrameUpdate();
+		return;
+	}
+
 	this->lastResult = result;
+	this->gridOutdated = failed;
+	this->resetGridOnNextPatchUpdate = false;
 
 	// Clear existing items
 	this->graphicsScene->clear();
@@ -144,6 +226,8 @@ void PSFGridWidget::displayPSFGrid(const PSFGridResult& result)
 	this->highlightRect = nullptr;
 
 	if (result.mosaicImage.isNull()) {
+		this->setStatus(tr("No PSF grid available."));
+		this->startPendingFrameUpdate();
 		return;
 	}
 
@@ -161,8 +245,7 @@ void PSFGridWidget::displayPSFGrid(const PSFGridResult& result)
 
 	this->updateHighlight();
 
-	this->infoLabel->setText(QString("%1x%2 patches, %3 px crop")
-		.arg(result.cols).arg(result.rows).arg(result.cellSize));
+	this->setStatus(failed ? result.message : tr("Up to date"));
 
 	// Fit view to scene, preserving current orientation
 	this->graphicsView->resetTransform();
@@ -171,6 +254,7 @@ void PSFGridWidget::displayPSFGrid(const PSFGridResult& result)
 		this->graphicsView->setTransform(
 			this->graphicsView->transform() * this->viewOrientation);
 	}
+	this->startPendingFrameUpdate();
 }
 
 void PSFGridWidget::setCurrentPatch(int x, int y)
@@ -183,19 +267,120 @@ void PSFGridWidget::setCurrentPatch(int x, int y)
 void PSFGridWidget::setPatchGridDimensions(int cols, int rows, int borderExtension)
 {
 	Q_UNUSED(borderExtension);
+	if (this->patchCols == cols && this->patchRows == rows) {
+		return;
+	}
 	this->patchCols = cols;
 	this->patchRows = rows;
-	if (this->liveUpdateCheckBox->isChecked() && !this->lastResult.mosaicImage.isNull()) {
-		// Defer to next event loop iteration so parameter table is resized first
-		QTimer::singleShot(0, this, [this]() {
-			emit generateRequested(this->currentFrame, this->cropSizeSpinBox->value());
-		});
-	}
+	this->invalidateGrid();
 }
 
 void PSFGridWidget::setCurrentFrame(int frame)
 {
+	if (this->currentFrame == frame) {
+		return;
+	}
 	this->currentFrame = frame;
+	this->invalidateGrid();
+}
+
+void PSFGridWidget::invalidateGrid()
+{
+	this->gridOutdated = true;
+	this->resetGridOnNextPatchUpdate = true;
+	if (this->generationInProgress && !this->discardPendingResult) {
+		this->discardPendingResult = true;
+		this->updateFrameButton->setEnabled(false);
+		this->setStatus(tr("Stopping outdated generation..."));
+		emit this->cancelGenerationRequested();
+	}
+	if (!this->generationInProgress
+		&& !this->lastResult.mosaicImage.isNull()) {
+		this->setStatus(tr("Out of date - Update frame"));
+	}
+	if (this->autoUpdateFrameCheckBox->isChecked()) {
+		this->frameUpdatePending = true;
+		QTimer::singleShot(
+			0, this, &PSFGridWidget::startPendingFrameUpdate);
+	}
+}
+
+void PSFGridWidget::generationStarted(int totalPatches)
+{
+	this->generationInProgress = true;
+	this->discardPendingResult = false;
+	this->updatePatchButton->setEnabled(false);
+	this->updateFrameButton->setText(tr("Cancel"));
+	this->updateFrameButton->setEnabled(true);
+	this->cropSizeSpinBox->setEnabled(false);
+	this->progressBar->setRange(0, qMax(0, totalPatches));
+	this->progressBar->setValue(0);
+	this->progressBar->setFormat(tr("%v / %m patches"));
+	this->progressBar->setToolTip(tr("Generating PSF grid..."));
+}
+
+void PSFGridWidget::generationProgressUpdated(
+	int completedPatches, int totalPatches)
+{
+	if (!this->generationInProgress) {
+		return;
+	}
+	this->progressBar->setRange(0, qMax(0, totalPatches));
+	this->progressBar->setValue(qBound(
+		0, completedPatches, totalPatches));
+}
+
+void PSFGridWidget::handleVisibilityChanged(bool visible)
+{
+	if (!visible) {
+		this->frameUpdatePending = false;
+		if (this->generationInProgress) {
+			this->discardPendingResult = true;
+			emit this->cancelGenerationRequested();
+		}
+		return;
+	}
+
+	if (this->autoUpdateFrameCheckBox->isChecked()
+		&& this->gridOutdated) {
+		this->frameUpdatePending = true;
+		QTimer::singleShot(
+			0, this, &PSFGridWidget::startPendingFrameUpdate);
+	} else if (this->autoUpdatePatchCheckBox->isChecked()) {
+		emit this->updatePatchRequested();
+	}
+}
+
+void PSFGridWidget::finishGeneration()
+{
+	this->generationInProgress = false;
+	this->updatePatchButton->setEnabled(true);
+	this->updateFrameButton->setText(tr("Update frame"));
+	this->updateFrameButton->setEnabled(true);
+	this->cropSizeSpinBox->setEnabled(true);
+	this->progressBar->setRange(0, 1);
+	this->progressBar->setValue(0);
+}
+
+void PSFGridWidget::startPendingFrameUpdate()
+{
+	if (!this->frameUpdatePending || this->generationInProgress) {
+		return;
+	}
+	if (!this->isVisible()
+		|| !this->autoUpdateFrameCheckBox->isChecked()) {
+		this->frameUpdatePending = false;
+		return;
+	}
+	this->frameUpdatePending = false;
+	emit this->generateRequested(
+		this->currentFrame, this->cropSizeSpinBox->value());
+}
+
+void PSFGridWidget::setStatus(const QString& text)
+{
+	this->progressBar->setFormat(text);
+	this->progressBar->setToolTip(text);
 }
 
 void PSFGridWidget::rotate90()
@@ -263,75 +448,38 @@ void PSFGridWidget::setSyncActive(bool active)
 
 void PSFGridWidget::updateSinglePSF(af::array psf, int patchX, int patchY)
 {
-	if (!this->liveUpdateCheckBox->isChecked()) {
+	if (!this->autoUpdatePatchCheckBox->isChecked()
+		&& !this->manualPatchUpdate) {
 		return;
 	}
 	if (!this->isVisible()) {
 		return;
 	}
-	if (this->lastResult.mosaicImage.isNull() || this->mosaicItem == nullptr) {
-		// No mosaic yet — trigger full generation
-		emit generateRequested(this->currentFrame, this->cropSizeSpinBox->value());
+	const bool geometryChanged =
+		this->lastResult.cols != this->patchCols
+		|| this->lastResult.rows != this->patchRows
+		|| this->lastResult.cellSize != this->cropSizeSpinBox->value();
+	if (this->lastResult.mosaicImage.isNull()
+		|| this->mosaicItem == nullptr || geometryChanged
+		|| this->resetGridOnNextPatchUpdate) {
+		if (this->generationInProgress
+			|| this->patchCols <= 0 || this->patchRows <= 0) {
+			return;
+		}
+
+		PSFGridResult emptyGrid = PSFGridGenerator::createEmptyGrid(
+			this->patchCols, this->patchRows,
+			this->cropSizeSpinBox->value());
+		this->displayPSFGrid(emptyGrid);
+		this->gridOutdated = true;
+		this->setStatus(tr("Selected patch only"));
+	}
+
+	if (!PSFGridGenerator::updatePatch(
+		this->lastResult, psf, this->currentFrame,
+		patchX, patchY)) {
 		return;
 	}
-
-	// Bounds check
-	if (patchX < 0 || patchX >= this->lastResult.cols ||
-	    patchY < 0 || patchY >= this->lastResult.rows) {
-		return;
-	}
-
-	// Extract focal plane if PSF is 3D
-	if (psf.numdims() > 2 && psf.dims(2) > 1) {
-		int centerZ = static_cast<int>(psf.dims(2)) / 2;
-		psf = psf(af::span, af::span, centerZ);
-	}
-
-	int cellSize = this->lastResult.cellSize;
-
-	// Center-crop (same logic as PSFGridGenerator::generate)
-	int psfSize = static_cast<int>(psf.dims(0));
-	if (cellSize < psfSize) {
-		int offset = (psfSize - cellSize) / 2;
-		psf = psf(af::seq(offset, offset + cellSize - 1),
-		          af::seq(offset, offset + cellSize - 1));
-	}
-
-	// Transpose for correct display orientation
-	psf = af::transpose(psf);
-
-	// Store updated PSF
-	int patchIdx = patchY * this->lastResult.cols + patchX;
-	this->lastResult.rawPSFs[patchIdx] = psf;
-
-	// Convert to grayscale (same logic as PSFGridGenerator::afArrayToGrayscaleImage)
-	int h = static_cast<int>(psf.dims(0));
-	int w = static_cast<int>(psf.dims(1));
-	af::array floatArr = psf.as(af::dtype::f32);
-	float* hostData = floatArr.host<float>();
-
-	float peak = 0.0f;
-	for (int i = 0; i < w * h; i++) {
-		if (hostData[i] > peak) {
-			peak = hostData[i];
-		}
-	}
-	float scale = (peak > 0.0f) ? 255.0f / peak : 0.0f;
-
-	// Paint cell into mosaic
-	int stride = cellSize + this->lastResult.spacing;
-	int destX = patchX * stride;
-	int destY = patchY * stride;
-
-	for (int cy = 0; cy < h && (destY + cy) < this->lastResult.mosaicImage.height(); cy++) {
-		uchar* dstLine = this->lastResult.mosaicImage.scanLine(destY + cy);
-		for (int cx = 0; cx < w && (destX + cx) < this->lastResult.mosaicImage.width(); cx++) {
-			float val = hostData[cy + cx * h];
-			dstLine[destX + cx] = static_cast<uchar>(val * scale);
-		}
-	}
-
-	af::freeHost(hostData);
 
 	// Update display
 	this->mosaicItem->setPixmap(QPixmap::fromImage(this->lastResult.mosaicImage));
@@ -438,7 +586,8 @@ void PSFGridWidget::showContextMenu(const QPoint& pos)
 	menu.addSeparator();
 	QAction* resetViewAction = menu.addAction(tr("Reset View"));
 
-	bool hasMosaic = !this->lastResult.mosaicImage.isNull();
+	bool hasMosaic = !this->gridOutdated
+		&& !this->lastResult.mosaicImage.isNull();
 	saveTifAction->setEnabled(hasMosaic);
 	savePngAction->setEnabled(hasMosaic);
 
@@ -461,7 +610,7 @@ void PSFGridWidget::showContextMenu(const QPoint& pos)
 
 void PSFGridWidget::saveMosaicAs(const QString& format)
 {
-	if (this->lastResult.mosaicImage.isNull()) {
+	if (this->gridOutdated || this->lastResult.mosaicImage.isNull()) {
 		return;
 	}
 
